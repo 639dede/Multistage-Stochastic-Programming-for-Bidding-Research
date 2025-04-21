@@ -1,0 +1,134 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Authentication</TITLE>
+<META NAME="description" CONTENT="Authentication">
+<META NAME="keywords" CONTENT="remoteservices">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="remoteservices.css">
+
+<LINK REL="next" HREF="password_policy.html">
+<LINK REL="previous" HREF="user_roles.html">
+<LINK REL="next" HREF="password_policy.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="password_policy.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="security.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="user_roles.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="password_policy.html">Password Policy</A>
+<B> Up:</B> <A
+ HREF="security.html">Security</A>
+<B> Previous:</B> <A
+ HREF="user_roles.html">User Roles</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION00013200000000000000"></A>
+<A ID="sec:RemoteServicesAuthentication"></A>
+<BR>
+Authentication
+</H3>
+
+<P>
+The Cluster Manager authenticates all communication using one of two
+approaches: interactive login using a username and password, or an API key.
+
+<P>
+When a client provides a username and password, a JWT token is returned
+that is valid for a relatively short period of time (default is 8
+hours and can be changed in the Cluster Manager configuration). This
+is handy when using the Web User Interface or command-line tools
+such as <TT>gurobi_cl</TT> or <TT>grbcluster</TT>.
+
+<P>
+An API key is composed of an access ID and a secret key.  API keys are
+the recommended method for connecting to the Cluster Manager from an
+application.  When creating an API key, you can specify an optional
+application name and a description to help keep track of how the key
+is being used.  Once a key is created, you can download an associated
+client license file, which contains the API access ID, the secret key,
+and the Cluster Manager URL. This file can be used by client
+applications and command-line tools to connect to the Cluster
+Manager. The Cluster Manager keeps track of the timestamp and IP
+address of the last API key usage.  The owner of the API key or the
+system administrator can enable or disable an API key.  These features
+simplify the task of monitoring API keys, detecting unwanted usage,
+and safely rotating keys by disabling previous keys before permanently
+deleting them.
+
+<P>
+For each account, the system administrator can enable or disable
+interactive login or API key authentication.  This can be done at creation
+time, or it can be done later by editing the account properties. An
+account that only allows interactive login will not be allowed to create,
+use, or manage API keys. An account that only allows API key
+authentication (known as a <code>system account</code>)
+can only be used for programmatic access through the
+REST API.
+
+<P>
+The system administrator can disable and later reenable a user
+account. When an account has been disabled, interactive login and/or
+API key authentication will fail and access to the Cluster Manager
+will not be granted. Disabled accounts will appear with a grayed icon
+in the user account table.  The tooltip will indicate the reason.
+
+<P>
+To simplify installation, the Cluster Manager initially has three
+default users with predefined passwords:
+
+<UL>
+<LI>standard user: <TT>gurobi</TT> / <TT>pass</TT>
+</LI>
+<LI>administrator: <TT>admin</TT> / <TT>admin</TT>
+</LI>
+<LI>system administrator: <TT>sysadmin</TT> / <TT>cluster</TT>
+</LI>
+</UL>
+You should of course change the passwords or delete these accounts
+before actually using the cluster.
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="password_policy.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="security.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="user_roles.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="password_policy.html">Password Policy</A>
+<B> Up:</B> <A
+ HREF="security.html">Security</A>
+<B> Previous:</B> <A
+ HREF="user_roles.html">User Roles</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

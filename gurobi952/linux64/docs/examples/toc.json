@@ -1,0 +1,2035 @@
+[
+  {
+    "level": "section",
+    "href": "example_tour.html",
+    "lang": null,
+    "name": "Example tour",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "a_list_of_the_grb_examples.html",
+        "lang": null,
+        "name": "A list of the Gurobi examples",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "load_and_solve_a_model_fro.html",
+        "lang": null,
+        "name": "Load and solve a model from a file",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "build_a_model.html",
+        "lang": null,
+        "name": "Build a model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "additional_modeling_elemen.html",
+        "lang": null,
+        "name": "Additional modeling elements",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "modify_a_model.html",
+        "lang": null,
+        "name": "Modify a model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "change_parameters.html",
+        "lang": null,
+        "name": "Change parameters",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "diagnose_and_cope_with_inf.html",
+        "lang": null,
+        "name": "Diagnose and cope with infeasibility",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "mip_starts.html",
+        "lang": null,
+        "name": "MIP starts",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "model_data_separation_in_p.html",
+        "lang": null,
+        "name": "Model-data separation in Python",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cb_s.html",
+        "lang": null,
+        "name": "Callbacks",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "example_code.html",
+    "lang": null,
+    "name": "Example Source Code",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "c_examples.html",
+        "lang": "C",
+        "name": "C Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "batchmode_c_c.html",
+            "lang": "C",
+            "name": "batchmode_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "bilinear_c_c.html",
+            "lang": "C",
+            "name": "bilinear_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cb_c_c.html",
+            "lang": "C",
+            "name": "callback_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "dense_c_c.html",
+            "lang": "C",
+            "name": "dense_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_c_c.html",
+            "lang": "C",
+            "name": "diet_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_c_c.html",
+            "lang": "C",
+            "name": "facility_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_c_c.html",
+            "lang": "C",
+            "name": "feasopt_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_c_c.html",
+            "lang": "C",
+            "name": "fixanddive_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_c_c.html",
+            "lang": "C",
+            "name": "gc_pwl_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_func_c_c.html",
+            "lang": "C",
+            "name": "gc_pwl_func_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_c_c.html",
+            "lang": "C",
+            "name": "genconstr_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_c_c.html",
+            "lang": "C",
+            "name": "lp_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_c_c.html",
+            "lang": "C",
+            "name": "lpmethod_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_c_c.html",
+            "lang": "C",
+            "name": "lpmod_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_c_c.html",
+            "lang": "C",
+            "name": "mip1_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_c_c.html",
+            "lang": "C",
+            "name": "mip2_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_c_c.html",
+            "lang": "C",
+            "name": "multiobj_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiscenario_c_c.html",
+            "lang": "C",
+            "name": "multiscenario_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_c_c.html",
+            "lang": "C",
+            "name": "params_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_c_c.html",
+            "lang": "C",
+            "name": "piecewise_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_c_c.html",
+            "lang": "C",
+            "name": "poolsearch_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_c_c.html",
+            "lang": "C",
+            "name": "qcp_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_c_c.html",
+            "lang": "C",
+            "name": "qp_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_c_c.html",
+            "lang": "C",
+            "name": "sensitivity_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_c_c.html",
+            "lang": "C",
+            "name": "sos_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_c_c.html",
+            "lang": "C",
+            "name": "sudoku_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tsp_c_c.html",
+            "lang": "C",
+            "name": "tsp_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tune_c_c.html",
+            "lang": "C",
+            "name": "tune_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_c_c.html",
+            "lang": "C",
+            "name": "workforce1_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_c_c.html",
+            "lang": "C",
+            "name": "workforce2_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_c_c.html",
+            "lang": "C",
+            "name": "workforce3_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_c_c.html",
+            "lang": "C",
+            "name": "workforce4_c.c",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_c_c.html",
+            "lang": "C",
+            "name": "workforce5_c.c",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_examples.html",
+        "lang": "C++",
+        "name": "C++ Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "batchmode_cpp_cpp.html",
+            "lang": "C++",
+            "name": "batchmode_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "bilinear_cpp_cpp.html",
+            "lang": "C++",
+            "name": "bilinear_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cb_cpp_cpp.html",
+            "lang": "C++",
+            "name": "callback_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "dense_cpp_cpp.html",
+            "lang": "C++",
+            "name": "dense_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_cpp_cpp.html",
+            "lang": "C++",
+            "name": "diet_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_cpp_cpp.html",
+            "lang": "C++",
+            "name": "facility_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_cpp_cpp.html",
+            "lang": "C++",
+            "name": "feasopt_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_cpp_cpp.html",
+            "lang": "C++",
+            "name": "fixanddive_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_cpp_cpp.html",
+            "lang": "C++",
+            "name": "gc_pwl_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_func_cpp_cpp.html",
+            "lang": "C++",
+            "name": "gc_pwl_func_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_cpp_cpp.html",
+            "lang": "C++",
+            "name": "genconstr_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_cpp_cpp.html",
+            "lang": "C++",
+            "name": "lp_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_cpp_cpp.html",
+            "lang": "C++",
+            "name": "lpmethod_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_cpp_cpp.html",
+            "lang": "C++",
+            "name": "lpmod_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_cpp_cpp.html",
+            "lang": "C++",
+            "name": "mip1_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_cpp_cpp.html",
+            "lang": "C++",
+            "name": "mip2_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_cpp_cpp.html",
+            "lang": "C++",
+            "name": "multiobj_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiscenario_cpp_cpp.html",
+            "lang": "C++",
+            "name": "multiscenario_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_cpp_cpp.html",
+            "lang": "C++",
+            "name": "params_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_cpp_cpp.html",
+            "lang": "C++",
+            "name": "piecewise_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_cpp_cpp.html",
+            "lang": "C++",
+            "name": "poolsearch_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_cpp_cpp.html",
+            "lang": "C++",
+            "name": "sensitivity_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_cpp_cpp.html",
+            "lang": "C++",
+            "name": "qcp_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_cpp_cpp.html",
+            "lang": "C++",
+            "name": "qp_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_cpp_cpp.html",
+            "lang": "C++",
+            "name": "sos_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_cpp_cpp.html",
+            "lang": "C++",
+            "name": "sudoku_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tsp_cpp_cpp.html",
+            "lang": "C++",
+            "name": "tsp_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tune_cpp_cpp.html",
+            "lang": "C++",
+            "name": "tune_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_cpp_cpp.html",
+            "lang": "C++",
+            "name": "workforce1_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_cpp_cpp.html",
+            "lang": "C++",
+            "name": "workforce2_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_cpp_cpp.html",
+            "lang": "C++",
+            "name": "workforce3_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_cpp_cpp.html",
+            "lang": "C++",
+            "name": "workforce4_c++.cpp",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_cpp_cpp.html",
+            "lang": "C++",
+            "name": "workforce5_c++.cpp",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "java_examples.html",
+        "lang": "Java",
+        "name": "Java Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "batchmode_java.html",
+            "lang": "Java",
+            "name": "Batchmode.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "bilinear_java.html",
+            "lang": "Java",
+            "name": "Bilinear.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cb_java.html",
+            "lang": "Java",
+            "name": "Callback.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "dense_java.html",
+            "lang": "Java",
+            "name": "Dense.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_java.html",
+            "lang": "Java",
+            "name": "Diet.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_java.html",
+            "lang": "Java",
+            "name": "Facility.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_java.html",
+            "lang": "Java",
+            "name": "Feasopt.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_java.html",
+            "lang": "Java",
+            "name": "Fixanddive.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gcpwl_java.html",
+            "lang": "Java",
+            "name": "GCPWL.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gcpwlfunc_java.html",
+            "lang": "Java",
+            "name": "GCPWLFunc.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_java.html",
+            "lang": "Java",
+            "name": "Genconstr.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_java.html",
+            "lang": "Java",
+            "name": "Lp.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_java.html",
+            "lang": "Java",
+            "name": "Lpmethod.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_java.html",
+            "lang": "Java",
+            "name": "Lpmod.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_java.html",
+            "lang": "Java",
+            "name": "Mip1.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_java.html",
+            "lang": "Java",
+            "name": "Mip2.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_java.html",
+            "lang": "Java",
+            "name": "Multiobj.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiscenario_java.html",
+            "lang": "Java",
+            "name": "Multiscenario.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_java.html",
+            "lang": "Java",
+            "name": "Params.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_java.html",
+            "lang": "Java",
+            "name": "Piecewise.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_java.html",
+            "lang": "Java",
+            "name": "Poolsearch.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_java.html",
+            "lang": "Java",
+            "name": "Qcp.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_java.html",
+            "lang": "Java",
+            "name": "Qp.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_java.html",
+            "lang": "Java",
+            "name": "Sensitivity.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_java.html",
+            "lang": "Java",
+            "name": "Sos.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_java.html",
+            "lang": "Java",
+            "name": "Sudoku.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tsp_java.html",
+            "lang": "Java",
+            "name": "Tsp.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tune_java.html",
+            "lang": "Java",
+            "name": "Tune.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_java.html",
+            "lang": "Java",
+            "name": "Workforce1.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_java.html",
+            "lang": "Java",
+            "name": "Workforce2.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_java.html",
+            "lang": "Java",
+            "name": "Workforce3.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_java.html",
+            "lang": "Java",
+            "name": "Workforce4.java",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_java.html",
+            "lang": "Java",
+            "name": "Workforce5.java",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "cs_examples.html",
+        "lang": ".NET",
+        "name": "C# Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "batchmode_cs_cs.html",
+            "lang": ".NET",
+            "name": "batchmode_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "bilinear_cs_cs.html",
+            "lang": ".NET",
+            "name": "bilinear_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cb_cs_cs.html",
+            "lang": ".NET",
+            "name": "callback_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "dense_cs_cs.html",
+            "lang": ".NET",
+            "name": "dense_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_cs_cs.html",
+            "lang": ".NET",
+            "name": "diet_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_cs_cs.html",
+            "lang": ".NET",
+            "name": "facility_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_cs_cs.html",
+            "lang": ".NET",
+            "name": "feasopt_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_cs_cs.html",
+            "lang": ".NET",
+            "name": "fixanddive_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_cs_cs.html",
+            "lang": ".NET",
+            "name": "gc_pwl_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_func_cs_cs.html",
+            "lang": ".NET",
+            "name": "gc_pwl_func_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_cs_cs.html",
+            "lang": ".NET",
+            "name": "genconstr_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_cs_cs.html",
+            "lang": ".NET",
+            "name": "lp_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_cs_cs.html",
+            "lang": ".NET",
+            "name": "lpmethod_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_cs_cs.html",
+            "lang": ".NET",
+            "name": "lpmod_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_cs_cs.html",
+            "lang": ".NET",
+            "name": "mip1_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_cs_cs.html",
+            "lang": ".NET",
+            "name": "mip2_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_cs_cs.html",
+            "lang": ".NET",
+            "name": "multiobj_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiscenario_cs_cs.html",
+            "lang": ".NET",
+            "name": "multiscenario_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_cs_cs.html",
+            "lang": ".NET",
+            "name": "params_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_cs_cs.html",
+            "lang": ".NET",
+            "name": "piecewise_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_cs_cs.html",
+            "lang": ".NET",
+            "name": "poolsearch_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_cs_cs.html",
+            "lang": ".NET",
+            "name": "qcp_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_cs_cs.html",
+            "lang": ".NET",
+            "name": "qp_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_cs_cs.html",
+            "lang": ".NET",
+            "name": "sensitivity_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_cs_cs.html",
+            "lang": ".NET",
+            "name": "sos_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_cs_cs.html",
+            "lang": ".NET",
+            "name": "sudoku_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tsp_cs_cs.html",
+            "lang": ".NET",
+            "name": "tsp_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tune_cs_cs.html",
+            "lang": ".NET",
+            "name": "tune_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_cs_cs.html",
+            "lang": ".NET",
+            "name": "workforce1_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_cs_cs.html",
+            "lang": ".NET",
+            "name": "workforce2_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_cs_cs.html",
+            "lang": ".NET",
+            "name": "workforce3_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_cs_cs.html",
+            "lang": ".NET",
+            "name": "workforce4_cs.cs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_cs_cs.html",
+            "lang": ".NET",
+            "name": "workforce5_cs.cs",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "visual_basic_examples.html",
+        "lang": ".NET",
+        "name": "Visual Basic Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "batchmode_vb_vb.html",
+            "lang": ".NET",
+            "name": "batchmode_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "bilinear_vb_vb.html",
+            "lang": ".NET",
+            "name": "bilinear_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cb_vb_vb.html",
+            "lang": ".NET",
+            "name": "callback_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "dense_vb_vb.html",
+            "lang": ".NET",
+            "name": "dense_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_vb_vb.html",
+            "lang": ".NET",
+            "name": "diet_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_vb_vb.html",
+            "lang": ".NET",
+            "name": "facility_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_vb_vb.html",
+            "lang": ".NET",
+            "name": "feasopt_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_vb_vb.html",
+            "lang": ".NET",
+            "name": "fixanddive_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_vb_vb.html",
+            "lang": ".NET",
+            "name": "gc_pwl_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_func_vb_vb.html",
+            "lang": ".NET",
+            "name": "gc_pwl_func_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_vb_vb.html",
+            "lang": ".NET",
+            "name": "genconstr_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_vb_vb.html",
+            "lang": ".NET",
+            "name": "lp_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_vb_vb.html",
+            "lang": ".NET",
+            "name": "lpmethod_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_vb_vb.html",
+            "lang": ".NET",
+            "name": "lpmod_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_vb_vb.html",
+            "lang": ".NET",
+            "name": "mip1_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_vb_vb.html",
+            "lang": ".NET",
+            "name": "mip2_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_vb_vb.html",
+            "lang": ".NET",
+            "name": "multiobj_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiscenario_vb_vb.html",
+            "lang": ".NET",
+            "name": "multiscenario_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_vb_vb.html",
+            "lang": ".NET",
+            "name": "params_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_vb_vb.html",
+            "lang": ".NET",
+            "name": "piecewise_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_vb_vb.html",
+            "lang": ".NET",
+            "name": "poolsearch_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_vb_vb.html",
+            "lang": ".NET",
+            "name": "qcp_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_vb_vb.html",
+            "lang": ".NET",
+            "name": "qp_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_vb_vb.html",
+            "lang": ".NET",
+            "name": "sensitivity_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_vb_vb.html",
+            "lang": ".NET",
+            "name": "sos_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_vb_vb.html",
+            "lang": ".NET",
+            "name": "sudoku_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tsp_vb_vb.html",
+            "lang": ".NET",
+            "name": "tsp_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tune_vb_vb.html",
+            "lang": ".NET",
+            "name": "tune_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_vb_vb.html",
+            "lang": ".NET",
+            "name": "workforce1_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_vb_vb.html",
+            "lang": ".NET",
+            "name": "workforce2_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_vb_vb.html",
+            "lang": ".NET",
+            "name": "workforce3_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_vb_vb.html",
+            "lang": ".NET",
+            "name": "workforce4_vb.vb",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_vb_vb.html",
+            "lang": ".NET",
+            "name": "workforce5_vb.vb",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "python_examples.html",
+        "lang": "Python",
+        "name": "Python Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "batchmode_py.html",
+            "lang": "Python",
+            "name": "batchmode.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "bilinear_py.html",
+            "lang": "Python",
+            "name": "bilinear.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cb_py.html",
+            "lang": "Python",
+            "name": "callback.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "custom_py.html",
+            "lang": "Python",
+            "name": "custom.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "dense_py.html",
+            "lang": "Python",
+            "name": "dense.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_py.html",
+            "lang": "Python",
+            "name": "diet.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet2_py.html",
+            "lang": "Python",
+            "name": "diet2.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet3_py.html",
+            "lang": "Python",
+            "name": "diet3.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet4_py.html",
+            "lang": "Python",
+            "name": "diet4.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "dietmodel_py.html",
+            "lang": "Python",
+            "name": "dietmodel.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_py.html",
+            "lang": "Python",
+            "name": "facility.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_py.html",
+            "lang": "Python",
+            "name": "feasopt.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_py.html",
+            "lang": "Python",
+            "name": "fixanddive.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_py.html",
+            "lang": "Python",
+            "name": "gc_pwl.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_func_py.html",
+            "lang": "Python",
+            "name": "gc_pwl_func.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_py.html",
+            "lang": "Python",
+            "name": "genconstr.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_py.html",
+            "lang": "Python",
+            "name": "lp.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_py.html",
+            "lang": "Python",
+            "name": "lpmethod.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_py.html",
+            "lang": "Python",
+            "name": "lpmod.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "matrix1_py.html",
+            "lang": "Python",
+            "name": "matrix1.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "matrix2_py.html",
+            "lang": "Python",
+            "name": "matrix2.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_py.html",
+            "lang": "Python",
+            "name": "mip1.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_remote_py.html",
+            "lang": "Python",
+            "name": "mip1_remote.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_py.html",
+            "lang": "Python",
+            "name": "mip2.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_py.html",
+            "lang": "Python",
+            "name": "multiobj.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiscenario_py.html",
+            "lang": "Python",
+            "name": "multiscenario.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "netflow_py.html",
+            "lang": "Python",
+            "name": "netflow.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_py.html",
+            "lang": "Python",
+            "name": "params.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_py.html",
+            "lang": "Python",
+            "name": "piecewise.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_py.html",
+            "lang": "Python",
+            "name": "poolsearch.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "portfolio_py.html",
+            "lang": "Python",
+            "name": "portfolio.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_py.html",
+            "lang": "Python",
+            "name": "qcp.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_py.html",
+            "lang": "Python",
+            "name": "qp.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_py.html",
+            "lang": "Python",
+            "name": "sensitivity.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_py.html",
+            "lang": "Python",
+            "name": "sos.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_py.html",
+            "lang": "Python",
+            "name": "sudoku.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tsp_py.html",
+            "lang": "Python",
+            "name": "tsp.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "tune_py.html",
+            "lang": "Python",
+            "name": "tune.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce_batchmode_py.html",
+            "lang": "Python",
+            "name": "workforce_batchmode.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_py.html",
+            "lang": "Python",
+            "name": "workforce1.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_py.html",
+            "lang": "Python",
+            "name": "workforce2.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_py.html",
+            "lang": "Python",
+            "name": "workforce3.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_py.html",
+            "lang": "Python",
+            "name": "workforce4.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_py.html",
+            "lang": "Python",
+            "name": "workforce5.py",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_examples.html",
+        "lang": "MATLAB",
+        "name": "MATLAB Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "bilinear_m.html",
+            "lang": "MATLAB",
+            "name": "bilinear.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_m.html",
+            "lang": "MATLAB",
+            "name": "diet.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_m.html",
+            "lang": "MATLAB",
+            "name": "facility.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_m.html",
+            "lang": "MATLAB",
+            "name": "feasopt.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_m.html",
+            "lang": "MATLAB",
+            "name": "fixanddive.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_m.html",
+            "lang": "MATLAB",
+            "name": "gc_pwl.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_func_m.html",
+            "lang": "MATLAB",
+            "name": "gc_pwl_func.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_m.html",
+            "lang": "MATLAB",
+            "name": "genconstr.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "intlinprog_m.html",
+            "lang": "MATLAB",
+            "name": "intlinprog.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "linprog_m.html",
+            "lang": "MATLAB",
+            "name": "linprog.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_m.html",
+            "lang": "MATLAB",
+            "name": "lp.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp2_m.html",
+            "lang": "MATLAB",
+            "name": "lp2.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_m.html",
+            "lang": "MATLAB",
+            "name": "lpmethod.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_m.html",
+            "lang": "MATLAB",
+            "name": "lpmod.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip1_m.html",
+            "lang": "MATLAB",
+            "name": "mip1.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_m.html",
+            "lang": "MATLAB",
+            "name": "mip2.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_m.html",
+            "lang": "MATLAB",
+            "name": "multiobj.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "opttoolbox_lp_m.html",
+            "lang": "MATLAB",
+            "name": "opttoolbox_lp.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "opttoolbox_mip1_m.html",
+            "lang": "MATLAB",
+            "name": "opttoolbox_mip1.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_m.html",
+            "lang": "MATLAB",
+            "name": "params.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_m.html",
+            "lang": "MATLAB",
+            "name": "piecewise.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_m.html",
+            "lang": "MATLAB",
+            "name": "poolsearch.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_m.html",
+            "lang": "MATLAB",
+            "name": "qcp.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_m.html",
+            "lang": "MATLAB",
+            "name": "qp.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_m.html",
+            "lang": "MATLAB",
+            "name": "sensitivity.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_m.html",
+            "lang": "MATLAB",
+            "name": "sos.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_m.html",
+            "lang": "MATLAB",
+            "name": "sudoku.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_m.html",
+            "lang": "MATLAB",
+            "name": "workforce1.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_m.html",
+            "lang": "MATLAB",
+            "name": "workforce2.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_m.html",
+            "lang": "MATLAB",
+            "name": "workforce3.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_m.html",
+            "lang": "MATLAB",
+            "name": "workforce4.m",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_m.html",
+            "lang": "MATLAB",
+            "name": "workforce5.m",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "r_examples.html",
+        "lang": "R",
+        "name": "R Examples",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "bilinear_r.html",
+            "lang": "R",
+            "name": "bilinear.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "diet_r.html",
+            "lang": "R",
+            "name": "diet.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "facility_r.html",
+            "lang": "R",
+            "name": "facility.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "feasopt_r.html",
+            "lang": "R",
+            "name": "feasopt.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "fixanddive_r.html",
+            "lang": "R",
+            "name": "fixanddive.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_r.html",
+            "lang": "R",
+            "name": "gc_pwl.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "gc_pwl_func_r.html",
+            "lang": "R",
+            "name": "gc_pwl_func.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "genconstr_r.html",
+            "lang": "R",
+            "name": "genconstr.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp_r.html",
+            "lang": "R",
+            "name": "lp.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lp2_r.html",
+            "lang": "R",
+            "name": "lp2.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmethod_r.html",
+            "lang": "R",
+            "name": "lpmethod.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "lpmod_r.html",
+            "lang": "R",
+            "name": "lpmod.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip_r.html",
+            "lang": "R",
+            "name": "mip.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "mip2_r.html",
+            "lang": "R",
+            "name": "mip2.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "multiobj_r.html",
+            "lang": "R",
+            "name": "multiobj.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "params_r.html",
+            "lang": "R",
+            "name": "params.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "piecewise_r.html",
+            "lang": "R",
+            "name": "piecewise.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "poolsearch_r.html",
+            "lang": "R",
+            "name": "poolsearch.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qcp_r.html",
+            "lang": "R",
+            "name": "qcp.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "qp_r.html",
+            "lang": "R",
+            "name": "qp.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sensitivity_r.html",
+            "lang": "R",
+            "name": "sensitivity.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sos_r.html",
+            "lang": "R",
+            "name": "sos.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sudoku_r.html",
+            "lang": "R",
+            "name": "sudoku.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce1_r.html",
+            "lang": "R",
+            "name": "workforce1.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce2_r.html",
+            "lang": "R",
+            "name": "workforce2.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce3_r.html",
+            "lang": "R",
+            "name": "workforce3.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce4_r.html",
+            "lang": "R",
+            "name": "workforce4.R",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "workforce5_r.html",
+            "lang": "R",
+            "name": "workforce5.R",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+]

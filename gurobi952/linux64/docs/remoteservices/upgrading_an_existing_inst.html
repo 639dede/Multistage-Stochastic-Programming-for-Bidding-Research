@@ -1,0 +1,153 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Upgrading an Existing Installation</TITLE>
+<META NAME="description" CONTENT="Upgrading an Existing Installation">
+<META NAME="keywords" CONTENT="remoteservices">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="remoteservices.css">
+
+<LINK REL="previous" HREF="communication_options.html">
+<LINK REL="next" HREF="using_remote_services.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="using_remote_services.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="cluster_setup_and_administ.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="using_a_router_without_a_c.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="using_remote_services.html">Using Remote Services</A>
+<B> Up:</B> <A
+ HREF="cluster_setup_and_administ.html">Cluster Setup and Administration</A>
+<B> Previous:</B> <A
+ HREF="using_a_router_without_a_c.html">Using a Router without</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H2><A ID="SECTION00027000000000000000"></A>
+<A ID="sec:RSMUpgrade"></A>
+<BR>
+Upgrading an Existing Installation
+</H2>
+
+<P>
+If you wish to upgrade to a new Gurobi release, you can of course shut
+down the cluster, upgrade the Compute Server nodes and the Cluster
+Manager instances, and restart all of the components.  However, f you
+have set up a scalable architecture with a load balancer in front of
+the Cluster Manager instances, you can do a rolling upgrade to
+minimize the impact to the existing users. In this case, we recommend
+the following process:
+
+<P>
+
+<OL>
+<LI>First, upgrade the Cluster Manager. New Cluster Manager
+  instances can be added to the cluster and old ones can be
+  progressively terminated.
+</LI>
+<LI>Then, upgrade the Compute Server nodes, one at a time. To do so,
+  use the Cluster Manager to stop a node so that new jobs will not be
+  scheduled but existing jobs will continue until completion. Once the
+  node has fully stopped, upgrade the node and add it back to the
+  cluster.  This can be repeated for each node.
+</LI>
+</OL>
+
+<P>
+We also recommend to test this process in a QA environment to
+understand the different steps and how they apply to your specific
+environment.
+
+<P>
+In all cases, when installing the Cluster Manager on an existing
+deployment, the database schema may need to be upgraded. Please check
+the release notes to locate the schema for the version you are
+upgrading to.
+
+<P>
+For a minor upgrade, the database will be automatically migrated when
+starting the Cluster Manager.  During that process, new fields will be
+added and indexes will be dropped and recreated. No data will be
+deleted, and migration is a safe process. However, a backup of the
+data is still recommended before the upgrade is started.
+
+<P>
+For a major upgrade, please carefully follow the directions in the
+release notes. The upgrade will not be triggered automatically, and
+you will be advised to take a backup of your database first.
+
+<P>
+In all cases, you can display the schema information and trigger the upgrade manually
+with the <TT>grb_rsm database</TT> command. For example, if you were running
+version 9.1.2, and you are upgrading to 9.5.0, this command will display the following:
+
+<P>
+
+<TT>&gt; grb_rsm database 
+<BR>
+info  : Current schema version is 1.0.0
+<BR>
+info  : Latest schema version is 1.1.0
+<BR>
+info  : Please consider upgrading the database schema with 'grb_rsm database &mdash;upgrade' command
+<BR></TT>
+
+<P>
+If you want to proceed with the upgrade at this time, use the  <TT>&mdash;upgrade</TT> flag:
+
+<P>
+
+<TT>&gt; grb_rsm database &mdash;upgrade 
+<BR>
+info  : Starting database schema upgrade
+<BR>
+info  : Database schema, replacing 6 indexes
+<BR>
+info  : Database schema upgraded from version 1.0.0 to version 1.1.0
+<BR>
+info  : Database upgraded
+<BR></TT>
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="using_remote_services.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="cluster_setup_and_administ.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="using_a_router_without_a_c.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="using_remote_services.html">Using Remote Services</A>
+<B> Up:</B> <A
+ HREF="cluster_setup_and_administ.html">Cluster Setup and Administration</A>
+<B> Previous:</B> <A
+ HREF="using_a_router_without_a_c.html">Using a Router without</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

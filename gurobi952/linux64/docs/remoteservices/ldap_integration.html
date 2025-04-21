@@ -1,0 +1,103 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>LDAP Integration</TITLE>
+<META NAME="description" CONTENT="LDAP Integration">
+<META NAME="keywords" CONTENT="remoteservices">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="remoteservices.css">
+
+<LINK REL="next" HREF="encryption.html">
+<LINK REL="previous" HREF="password_policy.html">
+<LINK REL="next" HREF="encryption.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="encryption.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="security.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="password_policy.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="encryption.html">Encryption</A>
+<B> Up:</B> <A
+ HREF="security.html">Security</A>
+<B> Previous:</B> <A
+ HREF="password_policy.html">Password Policy</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION00013400000000000000"></A>
+<A ID="sec:LDAP"></A>
+<BR>
+LDAP Integration
+</H3>
+
+<P>
+The Cluster Manager can be integrated with an LDAP repository. This
+integration can be configured in the Cluster Manager settings
+section. The system administrator can specify connection parameters
+(including the use of LDAPS for encrypted communication), account
+filtering, and account mapping. Once activated, users will be given
+access based on the user accounts defined in the LDAP server.
+
+<P>
+Accounts with a system administrator role can log in using their local
+passwords, which enables them to administer the cluster even if there
+is a problem with the LDAP configuration. System administrators will
+need to log in using the special login page by following the "System
+Administrator Log in" link at the top of the main login page. System
+accounts (i.e., accounts with no interactive login) can always gain
+access using API keys only.
+
+<P>
+The Cluster Manager continually synchronizes user accounts with the
+LDAP server in the background.  If a given user account is no longer
+mapped to the LDAP filter in place, it will be disabled. In
+particular, if an account was created before the integration with the
+LDAP server and if it is not mapped to the defined LDAP filter in
+place, it will be disabled.  The same policy will apply during
+migration from local accounts to LDAP.  Two important exceptions are
+system administrator accounts and system accounts, which will not be
+disabled for this reason.
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="encryption.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="security.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="password_policy.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="encryption.html">Encryption</A>
+<B> Up:</B> <A
+ HREF="security.html">Security</A>
+<B> Previous:</B> <A
+ HREF="password_policy.html">Password Policy</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

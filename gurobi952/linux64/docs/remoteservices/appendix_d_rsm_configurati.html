@@ -1,0 +1,247 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Appendix D: grb_rsm - Configuration Properties</TITLE>
+<META NAME="description" CONTENT="Appendix D: grb_rsm - Configuration Properties">
+<META NAME="keywords" CONTENT="remoteservices">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="remoteservices.css">
+
+<LINK REL="next" HREF="appendix_e_cluster.html">
+<LINK REL="previous" HREF="appendix_c_rsm.html">
+<LINK REL="next" HREF="appendix_e_cluster.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="appendix_e_cluster.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="remoteservices.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="appendix_c_rsm.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="appendix_e_cluster.html">Appendix E: grbcluster</A>
+<B> Up:</B> <A
+ HREF="remoteservices.html">Gurobi Remote Services</A>
+<B> Previous:</B> <A
+ HREF="appendix_c_rsm.html">Appendix C: grb_rsm</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H1><A ID="SECTION00090000000000000000">
+Appendix D: grb_rsm - Configuration Properties</A>
+</H1>
+The following list of properties can also be displayed using the <code>grb_rsm properties</code> command.
+<DL>
+<DT><STRONG>AUTH_CACHE_AGE</STRONG></DT>
+<DD>Type int (default 30).
+    Maximum age of authentication information (seconds)  - DEPRECATED.
+    This property has been migrated to the Cluster Manager Settings stored into the Database.
+
+<P>
+</DD>
+<DT><STRONG>CLUSTER_TOKEN</STRONG></DT>
+<DD>Type string.
+    Unique cluster identifier.
+    The token is an encrypted key used to secure communication between
+    the manager and the cluster.
+    All nodes of a cluster and the manager must have the same token.
+    Use 'grb_rs token' command to generate a new token.
+
+<P>
+</DD>
+<DT><STRONG>CONSOLE_TS</STRONG></DT>
+<DD>Type bool, use <TT>&mdash;console-ts</TT> to override on the command line.
+    Add timestamps to console log messages.
+
+<P>
+</DD>
+<DT><STRONG>DB_URI</STRONG></DT>
+<DD>Type string (default mongodb://127.0.0.1:27017).
+    MongoDB connection string.
+
+<P>
+</DD>
+<DT><STRONG>HELMET</STRONG></DT>
+<DD>Type bool (default true).
+    Enable Helmet secure HTTP headers request protection.
+    If there is connectivity issue please disable Helmet request protection.
+
+<P>
+</DD>
+<DT><STRONG>HISTORY_MAX_AGE</STRONG></DT>
+<DD>Type int (default 7).
+    Limit the job history to a number of days - DEPRECATED.
+    This property has been migrated to the Cluster Manager Settings stored into the Database.
+
+<P>
+</DD>
+<DT><STRONG>HTTP_HEALTH_SERVER</STRONG></DT>
+<DD>Type bool.
+    Enable an additional HTTP server dedicated to processing health-check (/ping) requests.
+    When using TLS, it may be useful to keep a simple HTTP for health checks.
+
+<P>
+</DD>
+<DT><STRONG>HTTP_HEALTH_SERVER_PORT</STRONG></DT>
+<DD>Type int (default 9091).
+    Indicates the port for the additional HTTP health-check server.
+
+<P>
+</DD>
+<DT><STRONG>IDLE_CONN_TIMEOUT</STRONG></DT>
+<DD>Type int (default 130).
+    maximum amount of time an idle (keep-alive) connection will remain idle before closing itself. Zero means no limit.
+
+<P>
+</DD>
+<DT><STRONG>JWT_EXPIRATION</STRONG></DT>
+<DD>Type int (default 480).
+    Expiration of session tokens (in minutes) - DEPRECATED.
+    This property has been migrated to the Cluster Manager Settings stored into the Database.
+
+<P>
+</DD>
+<DT><STRONG>LOGFILE</STRONG></DT>
+<DD>Type string, use <TT>&mdash;logfile</TT> to override on the command line.
+    Enable logging to a rotating log file.
+
+<P>
+</DD>
+<DT><STRONG>LOGFILE_MAX_AGE</STRONG></DT>
+<DD>Type int (default 5), use <TT>&mdash;logfile-max-age</TT> to override on the command line.
+    Limit the rotating log file to a number of days.
+
+<P>
+</DD>
+<DT><STRONG>LOGFILE_MAX_SIZE</STRONG></DT>
+<DD>Type int (default 500), use <TT>&mdash;logfile-max-size</TT> to override on the command line.
+    Limit the size of each file to a size in MB.
+
+<P>
+</DD>
+<DT><STRONG>MAX_IDLE_CONNS</STRONG></DT>
+<DD>Type int (default 200).
+    Maximum number of connections in the idle connection pool.
+
+<P>
+</DD>
+<DT><STRONG>MAX_IDLE_CONNS_PER_HOST</STRONG></DT>
+<DD>Type int (default 32).
+    Maximum idle (keep-alive) connections to keep per-host.
+
+<P>
+</DD>
+<DT><STRONG>NO_CONSOLE</STRONG></DT>
+<DD>Type bool, use <TT>&mdash;no-console</TT> to override on the command line.
+    Disable the console log.
+
+<P>
+</DD>
+<DT><STRONG>OBJECT_NOT_CLOSED_MAX_AGE</STRONG></DT>
+<DD>Type int (default 1).
+    Limit the time an object must be closed before being deleted (hours)  - DEPRECATED.
+    This property has been migrated to the Cluster Manager Settings stored into the Database.
+
+<P>
+</DD>
+<DT><STRONG>PORT</STRONG></DT>
+<DD>Type int, use <TT>&mdash;port</TT> to override on the command line.
+    Port number for the REST API.
+
+<P>
+</DD>
+<DT><STRONG>SETTINGS_CACHE_AGE</STRONG></DT>
+<DD>Type int (default 5).
+    Maximum age of settings information (seconds).
+
+<P>
+</DD>
+<DT><STRONG>SYSLOG</STRONG></DT>
+<DD>Type bool, use <TT>&mdash;syslog</TT> to override on the command line.
+    Log to syslog or Windows event log.
+
+<P>
+</DD>
+<DT><STRONG>TLS</STRONG></DT>
+<DD>Type bool, use <TT>&mdash;tls</TT> to override on the command line.
+    Enable TLS encryption protocol.
+
+<P>
+</DD>
+<DT><STRONG>TLS_CERT</STRONG></DT>
+<DD>Type string, use <TT>&mdash;tlscert</TT> to override on the command line.
+    Path to TLS certificate file.
+    If not specified, a self-signed certificate will be generated.
+
+<P>
+</DD>
+<DT><STRONG>TLS_CIPHERS</STRONG></DT>
+<DD>Type string, use <TT>&mdash;tls-ciphers</TT> to override on the command line.
+    A comma-separated list of supported cipher policies or suites used for TLS secure communication.
+    Use grb_rsm ciphers to list the supported policies and ciphers for this release.
+    If not specified, the Default Policy of secure cipher suites is used.
+
+<P>
+</DD>
+<DT><STRONG>TLS_INSECURE</STRONG></DT>
+<DD>Type bool, use <TT>&mdash;tls-insecure</TT> to override on the command line.
+    Enable TLS encryption protocol but skip certificate verification.
+    This mode can be used with self-signed certificate so that data is encrypted.
+
+<P>
+</DD>
+<DT><STRONG>TLS_KEY</STRONG></DT>
+<DD>Type string, use <TT>&mdash;tlskey</TT> to override on the command line.
+    Path to TLS key file.
+    If not specified, a key will be generated to self-sign a certificate.
+
+<P>
+</DD>
+<DT><STRONG>VERBOSE</STRONG></DT>
+<DD>Type bool, use <TT>&mdash;verbose</TT> to override on the command line.
+    Enable verbose logging.
+
+<P>
+</DD>
+</DL>
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="appendix_e_cluster.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="remoteservices.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="appendix_c_rsm.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="appendix_e_cluster.html">Appendix E: grbcluster</A>
+<B> Up:</B> <A
+ HREF="remoteservices.html">Gurobi Remote Services</A>
+<B> Previous:</B> <A
+ HREF="appendix_c_rsm.html">Appendix C: grb_rsm</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

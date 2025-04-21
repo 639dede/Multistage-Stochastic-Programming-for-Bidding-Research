@@ -1,0 +1,103 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>TuneTargetTime</TITLE>
+<META NAME="description" CONTENT="TuneTargetTime">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="tunetimelimit.html">
+<LINK REL="previous" HREF="tunetargetmipgap.html">
+<LINK REL="next" HREF="tunetimelimit.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="tunetimelimit.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="parameter_descriptions.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="tunetargetmipgap.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="tunetimelimit.html">TuneTimeLimit</A>
+<B> Up:</B> <A
+ HREF="parameter_descriptions.html">Parameter Descriptions</A>
+<B> Previous:</B> <A
+ HREF="tunetargetmipgap.html">TuneTargetMIPGap</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION00019216600000000000000"></A>
+<A ID="parameter:TuneTargetTime"></A>
+<BR>
+TuneTargetTime
+</H3>
+A target runtime in seconds to be reached
+
+<TABLE class="PAD " style="">
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TH CLASS="LEFT"><SPAN  CLASS="textbf">Type:</SPAN></TH>
+<TD CLASS="LEFT">double</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Default value:</SPAN></TD>
+<TD CLASS="LEFT">0.005</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Minimum value:</SPAN></TD>
+<TD CLASS="LEFT">0</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Maximum value:</SPAN></TD>
+<TD CLASS="LEFT">Infinity</TD>
+</TR>
+</TABLE>
+
+<P>
+A target runtime in seconds to be reached. As soon as the tuner has
+found parameter settings that allow Gurobi to solve the model(s)
+within the target runtime, it stops trying to improve parameter
+settings further. Instead, the tuner switches into the cleanup phase
+(see
+<A HREF="tunecleanup.html#parameter:TuneCleanup">TuneCleanup</A> parameter).
+
+<P>
+For examples of how to query or modify parameter values from
+our different APIs, refer to our
+<A HREF="parameter_examples.html#sec:ParameterExamples">Parameter Examples</A>.
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="tunetimelimit.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="parameter_descriptions.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="tunetargetmipgap.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="tunetimelimit.html">TuneTimeLimit</A>
+<B> Up:</B> <A
+ HREF="parameter_descriptions.html">Parameter Descriptions</A>
+<B> Previous:</B> <A
+ HREF="tunetargetmipgap.html">TuneTargetMIPGap</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

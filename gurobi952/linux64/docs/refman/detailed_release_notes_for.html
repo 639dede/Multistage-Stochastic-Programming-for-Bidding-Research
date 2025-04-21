@@ -1,0 +1,695 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Detailed Release Notes for Gurobi 9.5.2</TITLE>
+<META NAME="description" CONTENT="Detailed Release Notes for Gurobi 9.5.2">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="c_api_overview.html">
+<LINK REL="previous" HREF="refman.html">
+<LINK REL="next" HREF="c_api_overview.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="c_api_overview.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="refman.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="refman.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="c_api_overview.html">C API Overview</A>
+<B> Up:</B> <A
+ HREF="refman.html">Gurobi Optimizer Reference Manual</A>
+<B> Previous:</B> <A
+ HREF="refman.html">Gurobi Optimizer Reference Manual</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H1><A ID="SECTION00010000000000000000"></A>
+<A ID="sec:DetailedReleaseNotes"></A>
+<BR>
+Detailed Release Notes for Gurobi 9.5.2
+</H1>
+
+<P>
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Supported Platforms</SPAN></SPAN></SPAN></SPAN>
+
+<P>
+
+<P>
+<BR>
+<DIV class="CENTER">
+<TABLE class="PAD  BORDER" style="">
+<TR><TH CLASS="LEFT"><SPAN  CLASS="textbf">Platform (port)</SPAN></TH>
+<TH CLASS="LEFT"><SPAN  CLASS="textbf">Operating System</SPAN></TH>
+<TH CLASS="LEFT"><SPAN  CLASS="textbf">Compiler</SPAN></TH>
+<TH CLASS="LEFT"><SPAN  CLASS="textbf">Notes</SPAN></TH>
+</TR>
+<TR><TD CLASS="LEFT">Windows 64-bit (win64)</TD>
+<TD CLASS="LEFT">Windows 10, 11, Windows Server 2012 R2, 2016, 2019, 2022</TD>
+<TD CLASS="LEFT">Visual Studio 2017</TD>
+<TD CLASS="LEFT"><SPAN CLASS="FOOTNOTESIZE">Use <SPAN  CLASS="texttt">gurobi_c++md2017.lib</SPAN> (e.g.) for C++</SPAN></TD>
+</TR>
+<TR><TD CLASS="LEFT">&nbsp;</TD>
+<TD CLASS="LEFT">Windows 10, 11, Windows Server 2012 R2, 2016, 2019, 2022</TD>
+<TD CLASS="LEFT">Visual Studio 2019</TD>
+<TD CLASS="LEFT"><SPAN CLASS="FOOTNOTESIZE">Use <SPAN  CLASS="texttt">gurobi_c++md2019.lib</SPAN> (e.g.) for C++</SPAN></TD>
+</TR>
+<TR><TD CLASS="LEFT">Linux x86-64 64-bit (linux64)</TD>
+<TD CLASS="LEFT">Red Hat Enterprise Linux 7 (and corresponding CentOS distribution), 8</TD>
+<TD CLASS="LEFT">GCC <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.25ex; vertical-align: -0.43ex; " SRC="img3.svg"
+ ALT="$\ge$"></SPAN> 4.8</TD>
+<TD CLASS="LEFT"><SPAN CLASS="FOOTNOTESIZE">Use <SPAN  CLASS="texttt">libgurobi_g++5.2.a</SPAN> for newer C++ compilers</SPAN></TD>
+</TR>
+<TR><TD CLASS="LEFT">&nbsp;</TD>
+<TD CLASS="LEFT">SUSE Enterprise Linux 12, 15</TD>
+<TD CLASS="LEFT">&nbsp;</TD>
+<TD CLASS="LEFT">&nbsp;</TD>
+</TR>
+<TR><TD CLASS="LEFT">&nbsp;</TD>
+<TD CLASS="LEFT">Ubuntu 18.04, 20.04</TD>
+<TD CLASS="LEFT">&nbsp;</TD>
+<TD CLASS="LEFT">&nbsp;</TD>
+</TR>
+<TR><TD CLASS="LEFT">&nbsp;</TD>
+<TD CLASS="LEFT">Amazon Linux 2</TD>
+<TD CLASS="LEFT">&nbsp;</TD>
+<TD CLASS="LEFT">&nbsp;</TD>
+</TR>
+<TR><TD CLASS="LEFT">macOS 64-bit universal2 (macos_universal2)</TD>
+<TD CLASS="LEFT">macOS 10.15 (Catalina), 11 (Big Sur), 12 (Monterey)</TD>
+<TD CLASS="LEFT">Xcode 12/13</TD>
+<TD CLASS="LEFT"><P></TD>
+</TR>
+<TR><TD CLASS="LEFT">AIX 64-bit (power64)</TD>
+<TD CLASS="LEFT">AIX 7.1, 7.2, 7.3</TD>
+<TD CLASS="LEFT">XL C/C++ 9</TD>
+<TD CLASS="LEFT"><SPAN CLASS="FOOTNOTESIZE">Due to limited Python support on AIX, this port does not include the Interactive Shell or the Python libraries.</SPAN></TD>
+</TR>
+</TABLE>
+</DIV>
+<BR>
+Note that the previous mac64 port has been replaced by the new
+macos_universal2 port, which supports both Intel (x64_86) and Apple
+(arm64) processors.
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Additional Supported Platform Information</SPAN></SPAN></SPAN></SPAN>
+
+<P>
+Gurobi&nbsp;9.5.2 supports the following language/platform versions:
+
+<P>
+<DIV class="CENTER">
+<TABLE class="PAD  BORDER" style="">
+<TR><TH CLASS="LEFT"><SPAN  CLASS="textbf">Language</SPAN></TH>
+<TH CLASS="LEFT"><SPAN  CLASS="textbf">Version</SPAN></TH>
+</TR>
+<TR><TD CLASS="LEFT">Python</TD>
+<TD CLASS="LEFT">2.7, 3.7, 3.8, 3.9, 3.10</TD>
+</TR>
+<TR><TD CLASS="LEFT">MATLAB</TD>
+<TD CLASS="LEFT">R2019a-R2022a</TD>
+</TR>
+<TR><TD CLASS="LEFT">R</TD>
+<TD CLASS="LEFT">4.2</TD>
+</TR>
+<TR><TD CLASS="LEFT">JDK</TD>
+<TD CLASS="LEFT">8, 11, 17</TD>
+</TR>
+<TR><TD CLASS="LEFT">.NET</TD>
+<TD CLASS="LEFT">Core 3.1, 6.0</TD>
+</TR>
+</TABLE>
+</DIV>
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Deprecation Notes</SPAN></SPAN></SPAN></SPAN>
+<A ID="v95:subsection:deprecations"></A>
+<P>
+<SPAN  CLASS="textbf">End of support for Python 2.7 in next release</SPAN>
+
+<P>
+The release that follows Gurobi&nbsp;9.5 (major or minor)
+will drop support for Python&nbsp;2.7.
+We recommend that you move to a supported Python&nbsp;3
+version now.
+
+<P>
+<SPAN  CLASS="textbf">Legacy methods for creating Compute Server and Instant Cloud environments</SPAN>
+
+<P>
+The following legacy methods for creating Compute Server and Instant Cloud environments
+are deprecated in Gurobi&nbsp;9.5 and will be removed in the next major or minor release:
+
+<UL>
+<LI>C: <SPAN  CLASS="texttt">GRBloadclientenv</SPAN>, <SPAN  CLASS="texttt">GRBloadcloudenv</SPAN>
+</LI>
+<LI>C++:
+<PRE>
+     GRBEnv(const std::string&amp; logfilename, const std::string&amp; computeserver,
+            const std::string&amp; router, const std::string&amp; password,
+            const std::string&amp; group, int CStlsInsecure, int priority,
+            double timeout)
+
+     GRBEnv(const std::string&amp; logfilename, const std::string&amp; accessID,
+            const std::string&amp; secretKey, const std::string&amp; pool,
+            int priority)
+</PRE>
+</LI>
+<LI>Java:
+<PRE>
+     GRBEnv(String logFileName, String computeServer, String router,
+            String password, String group, int CStlsInsecure, int priority,
+            double timeout)
+     GRBEnv(String logfilename, String accessID, String secretKey, String pool,
+            int priority)
+</PRE>
+</LI>
+<LI>.NET:
+<PRE>
+     GRBEnv(string logfilename, string computeserver, string router,
+            string password, string group, int CStlsInsecure, int priority,
+            double timeout)
+     GRBEnv(string logfilename, string accessID, string secretKey, string pool,
+            int priority)
+</PRE>
+</LI>
+<LI>gurobipy: <SPAN  CLASS="texttt">Env.ClientEnv</SPAN>, <SPAN  CLASS="texttt">Env.CloudEnv</SPAN>,
+</LI>
+<LI>Matlab and R: The <SPAN  CLASS="texttt">env</SPAN> parameter to the Gurobi functions. See
+<A HREF="#v95:subsection:MATLABR">Matlab and R changes</A> below for conversion details.
+</LI>
+</UL>
+
+<P>
+To programmatically create Compute Server and Instant Cloud environments
+you should use the
+<A HREF="configuration_parameters.html#subsection:ConfigurationParameters">configuration parameters</A>
+introduced in Gurobi&nbsp;8.0.
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">New features affecting all APIs</SPAN></SPAN></SPAN></SPAN>
+
+<P>
+<SPAN  CLASS="textbf">New parameters</SPAN>
+The following parameters are new in Gurobi&nbsp;9.5:
+
+<UL>
+<LI><A HREF="presos1encoding.html#parameter:PreSOS1Encoding">PreSOS1Encoding</A> and
+<A HREF="presos2encoding.html#parameter:PreSOS2Encoding">PreSOS2Encoding</A> to choose a
+reformulation for SOS1 and SOS2 constraints.
+
+<P>
+</LI>
+<LI><A HREF="nlpheur.html#parameter:NLPHeur">NLPHeur</A> to control the use of the new
+non-linear barrier solver for quickly finding feasible solutions to non-convex
+quadratic models.
+
+<P>
+</LI>
+<LI><A HREF="worklimit.html#parameter:WorkLimit">WorkLimit</A> to terminate an optimization when the
+specified work limit has been exceeded.
+
+<P>
+</LI>
+<LI><A HREF="memlimit.html#parameter:MemLimit">MemLimit</A> to terminate an optimization when the
+the memory used by the optimization exceeds the specified value.
+
+<P>
+</LI>
+<LI><A HREF="liftprojectcuts.html#parameter:LiftProjectCuts">LiftProjectCuts</A> to control a new type of cut in this release.
+
+<P>
+</LI>
+<LI><A HREF="lpwarmstart.html#parameter:LPWarmStart">LPWarmStart</A> to control how
+the Simplex algorithms warm-start from a previous solution.  In particular,
+new options to warm-start are introduced, including the option to start
+from a basis while maintaining presolve.
+</LI>
+</UL>
+
+<P>
+<SPAN  CLASS="textbf">New attributes</SPAN>
+The following attributes are new in Gurobi&nbsp;9.5:
+
+<P>
+
+<UL>
+<LI>The <A HREF="concurrentwinmethod.html#attr:ConcurrentWinMethod">ConcurrentWinMethod</A>
+attribute indicates the winning method after solving an LP with
+the concurrent optimizer.
+
+<P>
+</LI>
+<LI>The <A HREF="work.html#attr:Work">Work</A> attribute captures the amount
+of work performed in an Optimize call in a deterministic fashion.
+
+<P>
+</LI>
+<LI>The <A HREF="iislbforce.html#attr:IISLBForce">IISLBForce</A>,
+<A HREF="iisubforce.html#attr:IISUBForce">IISUBForce</A>,
+<A HREF="iisconstrforce.html#attr:IISConstrForce">IISConstrForce</A>,
+<A HREF="iissosforce.html#attr:IISSOSForce">IISSOSForce</A>,
+<A HREF="iisqconstrforce.html#attr:IISQConstrForce">IISQConstrForce</A>, and
+<A HREF="iisgenconstrforce.html#attr:IISGenConstrForce">IISGenConstrForce</A> attributes
+control how the Irreducible Infeasible Subsystem (IIS) algorithm handles
+each type of constraint.  With these attributes you can force specific
+constraints or bounds
+to be part of the IIS, even if the resulting subsystem is not minimal.
+Similarly, you can exclude constraints or bounds from the IIS.
+
+<P>
+</LI>
+<LI>The <A HREF="maxvio.html#attr:MaxVio">MaxVio</A>
+attribute provides the maximum (unscaled) constraint violation for the computed solution.
+
+<P>
+</LI>
+<LI>The <A HREF="poolignore.html#attr:PoolIgnore">PoolIgnore</A>
+attribute is used to choose variables that should be ignored when checking whether two
+solutions differ in the solution pool.
+
+<P>
+</LI>
+</UL>
+
+<P>
+<SPAN  CLASS="textbf">New callback functionality</SPAN>
+The following features have been added to the callback framework in Gurobi&nbsp;9.5:
+
+<UL>
+<LI>The <code>CB_WORK</code> callback value allows you to monitor the <A HREF="work.html#attr:Work">Work</A>
+metric from within a callback (see the <A HREF="cb_codes.html#sec:CallbackCodes">Callback Codes</A>
+section for more information).
+
+<P>
+</LI>
+<LI>Callbacks can now be used to programmatically track the progress of the IIS algorithm.
+See the <A HREF="cb_codes.html#sec:CallbackCodes">Callback Codes</A> section for the description of the
+new <code>where</code> value <code>IIS</code> and the new <code>what</code> values <code>IIS_CONSTRMIN</code>,
+<code>IIS_CONSTRMAX</code>, <code>IIS_CONSTRGUESS</code>, <code>IIS_BOUNDMIN</code>, <code>IIS_BOUNDMAX</code>
+and <code>IIS_BOUNDGUESS</code>.
+
+<P>
+</LI>
+<LI>Callbacks can now be used for exiting the NoRel Heuristic: The
+new Proceed method (e.g., <A HREF="py_model_cbproceed.html#pythonmethod:Model.cbProceed">Model.cbProceed</A> in
+Python) allows you to transition from the NoRel heuristic to the standard MIP search.
+
+<P>
+</LI>
+<LI>Lazy Constraints in the NoRel Heuristic: Lazy constraints are now supported in the NoRel
+heuristic. You will receive solution callbacks and be given the opportunity to cut off those
+solutions with lazy constraints.
+</LI>
+</UL>
+
+<P>
+<SPAN  CLASS="textbf">New file formats</SPAN>
+
+<P>
+We added two new file formats for writing the explicit dual of a
+linear program:
+
+<UL>
+<LI><SPAN  CLASS="texttt">.dlp</SPAN>: used for writing the dual formulation of an LP in
+  <SPAN  CLASS="texttt">LP</SPAN> file format, and
+</LI>
+<LI><SPAN  CLASS="texttt">.dua</SPAN>: used for writing the dual formulation of an LP in
+  <SPAN  CLASS="texttt">MPS</SPAN> file format.
+</LI>
+</UL>
+
+<P>
+<SPAN  CLASS="textbf">Norm General Constraint</SPAN>
+
+<P>
+Our existing general constraint feature allows you to add common higher-level
+constraints using a convenient shorthand. This release includes a new vector norm
+constraint, which allows you to set one decision variable in your optimization model
+equal to the norm of a list of decision variables. A number of norms are supported: the
+0-norm, 1-norm, 2-norm, and the infinity-norm. See the
+<A HREF="constraints.html#subsubsection:GeneralConstraints">general constraint section</A> for more information.
+
+<P>
+<SPAN  CLASS="textbf">Tuning Tool</SPAN>
+
+<P>
+We added a number of additional controls to our tuning tool, including control over
+termination (using parameters <A HREF="tunetargetmipgap.html#parameter:TuneTargetMIPGap">TuneTargetMIPGap</A> and
+<A HREF="tunetargettime.html#parameter:TuneTargetTime">TuneTargetTime</A>), and control over how runtimes from
+multiple trials are aggregated (using parameter <A HREF="tunemetric.html#parameter:TuneMetric">TuneMetric</A>).
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Behavior changes affecting all APIs</SPAN></SPAN></SPAN></SPAN>
+
+<P>
+<SPAN  CLASS="textbf">Formatting changes to the solution JSON format</SPAN>
+
+<P>
+In past releases, literals corresponding to floating-point and integer
+attributes were formatted as strings (i.e., enclosed in quotes).
+Starting with this release, all number literals are formatted as numbers, in
+accordance with the JSON specification.
+For example, the <SPAN  CLASS="texttt">SolutionInfo</SPAN> section of a JSON solution file now
+appears as:
+<PRE>
+{
+   "SolutionInfo" : {
+      "BarIterCount" : 6,
+      "BoundVio" : 0,
+      "ConstrVio" : 0,
+      "IterCount" : 5,
+      "ObjVal" : -4.6475314285714285e+02,
+      "Runtime" : 2.8498172760009766e-03,
+      "Status" : 2,
+   }
+}
+</PRE>
+
+<P>
+<SPAN  CLASS="textbf">Using the JSON solution file without setting tags</SPAN>
+
+<P>
+We changed a default behavior of the JSON solution file.
+Before this release, if none of the variables had been tagged through the
+<A HREF="vtag.html#attr:VTag">VTag</A> attribute, no variable solution
+information would be included in the file.
+Starting with this release, if no <A HREF="vtag.html#attr:VTag">VTag</A>
+attributes have been set, the JSON solution data will contain
+names and solution values for all variables with non-zero
+solution values.
+
+<P>
+<SPAN  CLASS="textbf">Parameter changes</SPAN>
+
+<P>
+The units for the
+<A HREF="nodefilestart.html#parameter:NodefileStart">NodefileStart</A> parameter have
+been changed from GiB (<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.35ex; vertical-align: -0.12ex; " SRC="img4.svg"
+ ALT="$1024^3$"></SPAN> bytes) to GB (<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.35ex; vertical-align: -0.12ex; " SRC="img5.svg"
+ ALT="$1000^3$"></SPAN> bytes).
+
+<P>
+The <A HREF="startnodelimit.html#parameter:StartNodeLimit">StartNodeLimit</A> parameter
+now behaves in a slightly different way.
+If you solve a model, modify it, and then solve the modified
+model, Gurobi uses the incumbent solution of the first solve as a MIP
+start for the second.
+This is usually done by fixing the integer variables to their
+respective values and then solving an LP to find values for the
+continuous variables.
+With Gurobi&nbsp;9.5, in default settings of the
+<A HREF="startnodelimit.html#parameter:StartNodeLimit">StartNodeLimit</A> parameter, if
+the model has just a few integer variables and many continuous
+variables, the continuous variables are fixed as well and the solution
+is just checked for feasibility.
+This change was made to avoid a potentially very expensive LP solve on the original
+model.
+To recover the old behavior, you can set the
+<A HREF="startnodelimit.html#parameter:StartNodeLimit">StartNodeLimit</A> parameter to a
+non-default value.
+
+<P>
+<SPAN  CLASS="textbf">Attribute changes</SPAN>
+
+<P>
+The <A HREF="fingerprint.html#attr:Fingerprint">Fingerprint</A> attribute will
+(likely) take a different value than it did in older versions,
+but now it is platform independent.
+Thus, for example,
+<A HREF="fingerprint.html#attr:Fingerprint">Fingerprint</A> will now be
+identical on Windows and Linux for the same model.
+
+<P>
+<SPAN  CLASS="textbf">API method changes</SPAN>
+
+<P>
+The <SPAN  CLASS="texttt">setSolution</SPAN> and <SPAN  CLASS="texttt">useSolution</SPAN> methods
+
+<UL>
+<LI>C: <A HREF="c_cbsolution.html#routine:GRBcbsolution">GRBcbsolution</A>,
+</LI>
+<LI>C++: <A HREF="cpp_cb_setsolution.html#cppmethod:GRBCallback::setSolution">setSolution</A> and
+    <A HREF="cpp_cb_usesolution.html#cppmethod:GRBCallback::useSolution">useSolution</A>,
+</LI>
+<LI>Java: <A HREF="java_cb_setsolution.html#javamethod:GRBCallback.setSolution">setSolution</A> and
+    <A HREF="java_cb_usesolution.html#javamethod:GRBCallback.useSolution">useSolution</A>,
+</LI>
+<LI>.NET: <A HREF="cs_cb_setsolution.html#dotnetmethod:GRBCallback.SetSolution">SetSolution</A> and
+    <A HREF="cs_cb_usesolution.html#dotnetmethod:GRBCallback.UseSolution">UseSolution</A>,
+</LI>
+<LI>gurobipy: <A HREF="py_model_cbsetsolution.html#pythonmethod:Model.cbSetSolution">cbSetSolution</A> and
+    <A HREF="py_model_cbusesolution.html#pythonmethod:Model.cbUseSolution">cbUseSolution</A>
+</LI>
+</UL>
+can now also be called from the callback when the <SPAN  CLASS="texttt">where</SPAN> flag
+has values <SPAN  CLASS="texttt">MIP</SPAN> or <SPAN  CLASS="texttt">MIPSOL</SPAN>.
+This allows you, for example, to directly pass a new solution to
+Gurobi from within a <SPAN  CLASS="texttt">MIPSOL</SPAN> callback.
+In previous versions, you had to temporarily store the modified
+solution in your own data structures and then pass it to Gurobi only
+during the next <SPAN  CLASS="texttt">MIPNODE</SPAN> callback.
+
+<P>
+<SPAN  CLASS="textbf">Changes in the log</SPAN>
+
+<P>
+Gurobi now displays all parameter changes in the log (when
+logging is enabled).
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Changes in gurobipy</SPAN></SPAN></SPAN></SPAN>
+
+<P>
+<SPAN  CLASS="textbf">Specifying dependencies when installing from PyPI.org</SPAN>
+
+<P>
+Since version&nbsp;9.1
+<A ID="tex2html5"
+  HREF="https://pypi.org/project/gurobipy/">gurobipy</A>
+can be installed through
+<A ID="tex2html6"
+  HREF="https://pypi.org/project/pip/">pip</A>
+from
+<A ID="tex2html7"
+  HREF="https://pypi.org/">PyPI.org</A>.
+While the core funcionality of gurobipy does not have any dependencies
+on other Python packages, the matrix-friendly API (the classes
+<A HREF="py_mvar.html#pythonclass:MVar">MVar</A>, <A HREF="py_mconstr.html#pythonclass:MConstr">MConstr</A>,
+<A HREF="py_mlex.html#pythonclass:MLinExpr">MLinExpr</A>, ...) relies on
+<A ID="tex2html8"
+  HREF="https://numpy.org/">NumPy</A>
+and
+<A ID="tex2html9"
+  HREF="https://www.scipy.org/">SciPy</A>.
+This "optional dependency" is now reflected in the <SPAN  CLASS="texttt">setup.py</SPAN>
+configuration.  Specifying
+<SPAN  CLASS="texttt">pip install gurobipy[matrixapi]</SPAN> indicates that you
+intend to use the matrix API and that
+NumPy and SciPy should be installed as well.
+Similarly, you can add <SPAN  CLASS="texttt">gurobipy[matrixapi]</SPAN> to a
+<SPAN  CLASS="texttt">requirements.txt</SPAN> file in order to guarantee that these
+dependencies are installed even if they are not explicitly mentioned.
+
+<P>
+<SPAN  CLASS="textbf">Type hints for gurobipy</SPAN>
+
+<P>
+Type hints are now available for most of the gurobipy classes and functions.
+They are not part of the gurobipy extension itself, but are distributed
+as a separate extension available on
+<A ID="tex2html10"
+  HREF="https://pypi.org/project/gurobipy-stubs">PyPI.org</A>.  Use
+the command <SPAN  CLASS="texttt">pip install gurobipy-stubs</SPAN> in order to install them alongside
+of the gurobipy extension.
+
+<P>
+<SPAN  CLASS="textbf">Indexing of <SPAN  CLASS="texttt">MVar</SPAN> and <SPAN  CLASS="texttt">MConstr</SPAN> objects</SPAN>
+<A ID="v95:subsection:Mvar"></A>
+<P>
+The indexing behaviour of the
+<A HREF="py_mvar.html#pythonclass:MVar">MVar</A> and <A HREF="py_mconstr.html#pythonclass:MConstr">MConstr</A> classes
+has changed.
+Selecting a single element from such objects now returns the corresponding
+<SPAN  CLASS="textit">scalar</SPAN> Object of type <SPAN  CLASS="texttt">Var</SPAN> or <SPAN  CLASS="texttt">Constr</SPAN>.
+In version&nbsp;9.1, such indexing would return an <SPAN  CLASS="texttt">MVar</SPAN> or
+<SPAN  CLASS="texttt">MConstr</SPAN> object of shape <SPAN  CLASS="texttt">(1,)</SPAN>.
+With this change these two ndarray-like classes behave more like
+NumPy ndarrays.
+
+<P>
+Example:
+<PRE>
+import gurobipy as gp
+m = gp.Model()
+x = m.addMVar(3)  # An MVar object of shape (3,)
+mc = m.addConstr(x &gt;= 1)  # An MConstr object of shape (3,)
+print(x[1])  # NEW: This is a Var object
+print(mc[1]) # NEW: This is a Constr object
+</PRE>
+
+<P>
+You can use slicing if you want the old behavior:
+<PRE>
+print(x[1:2]) # Not changed, still an MVar of shape (1,)
+print(mc[1:2]) # Not changed, still an MConstr of shape (1,)
+</PRE>
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Changes in the Matlab and R APIs</SPAN></SPAN></SPAN></SPAN>
+<A ID="v95:subsection:MATLABR"></A>
+<P>
+The <SPAN  CLASS="texttt">env</SPAN> argument to Matlab and R API functions has been deprecated.
+This argument was previously used
+to provide the data required to connect to a Compute Server or
+to Gurobi Instant Cloud. This information should now be passed through
+parameters in the <SPAN  CLASS="texttt">params</SPAN> struct.
+
+<P>
+For example, the new signature of the "gurobi" function is
+<SPAN  CLASS="texttt">gurobi(model, params)</SPAN>. To update an program that
+uses the <SPAN  CLASS="texttt">env</SPAN>
+argument, just set the appropriate parameters in <SPAN  CLASS="texttt">params</SPAN>
+to match the fields you previously used in <SPAN  CLASS="texttt">env</SPAN>.
+The following table shows the correspondence between
+the field names of the deprecated <SPAN  CLASS="texttt">env</SPAN> argument
+and <A HREF="parameters.html#sec:Parameters">Gurobi parameters</A>:
+
+<P>
+<TABLE class="PAD  BORDER" style="">
+<TR><TH CLASS="LEFT"><SPAN  CLASS="textbf">env</SPAN></TH>
+<TH CLASS="LEFT"><SPAN  CLASS="textbf">params</SPAN></TH>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">router</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="csrouter.html#parameter:CSRouter">CSRouter</A></TD>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">password</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="serverpassword.html#parameter:ServerPassword">ServerPassword</A></TD>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">group</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="csgroup.html#parameter:CSGroup">CSGroup</A></TD>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">priority</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="cspriority.html#parameter:CSPriority">CSPriority</A></TD>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">timeout</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="csqueuetimeout.html#parameter:CSQueueTimeout">CSQueueTimeout</A></TD>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">accessid</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="cloudaccessid.html#parameter:CloudAccessID">CloudAccessID</A></TD>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">secretkey</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="cloudsecretkey.html#parameter:CloudSecretKey">CloudSecretKey</A></TD>
+</TR>
+<TR><TD CLASS="LEFT"><SPAN  CLASS="texttt">pool</SPAN></TD>
+<TD CLASS="LEFT"><A HREF="cloudpool.html#parameter:CloudPool">CloudPool</A></TD>
+</TR>
+</TABLE>
+
+<P>
+A client code to solve a model on a Compute Server with MATLAB
+should now read:
+<PRE>
+m.A = sparse(0,0);  % Just a minimal model struct for demonstration
+params.Method = 2;  % Use barrier method (for demonstration)
+params.ComputeServer = 'myserver.mycompany.com';  % Set server name
+params.ServerPassword = 'pass';  % Set password
+gurobi(m, params);  % Solve model on server with barrier
+</PRE>
+
+<P>
+Similarly, for R the client code to solve a model on a Compute Server should read:
+<PRE>
+m &lt;- list(A = matrix(0))  # Just a minimal model struct for demonstration
+params &lt;- list()
+params$Method &lt;- 2  # Use barrier method (for demonstration)
+params$ComputeServer &lt;- "myserver.mycompany.com";  # Set server name
+params$ServerPassword &lt;- "pass";  # Set password
+gurobi(m, params);  # Solve model on server with barrier
+</PRE>
+
+<P>
+In summary, here are the new signatures for all Matlab and R API functions:
+<PRE>
+gurobi(model, params)
+gurobi_feasrelax(model, relaxobjtype, minrelax, penalties, params)
+gurobi_iis(model, params)
+gurobi_read(model, filename, params)
+gurobi_relax(model, params)
+gurobi_write(model, filename, params)
+</PRE>
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Changes in the Java API</SPAN></SPAN></SPAN></SPAN>
+
+<P>
+Gurobi&nbsp;9.5 adds two new methods to the Java API:
+
+<UL>
+<LI><A HREF="java_env_setlogcb_.html#javamethod:GRBEnv.setLogCallback"><SPAN  CLASS="texttt">public void GRBEnv.setLogCallback(java.util.function.Consumer&lt;String&gt; logCallback)</SPAN></A>, and
+</LI>
+<LI><A HREF="java_model_setlogcb_.html#javamethod:GRBModel.setLogCallback"><SPAN  CLASS="texttt">public void GRBModel.setLogCallback(java.util.function.Consumer&lt;String&gt; logCallback)</SPAN></A>.
+</LI>
+</UL>
+These can be used to pipe all log output through a user callback
+function.
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf"><SPAN CLASS="XXLARGE"><SPAN  CLASS="textbf">Compute Server, Cluster Manager, and Instant Cloud</SPAN></SPAN></SPAN></SPAN>
+
+<P>
+Detailed release notes for Compute Server, Cluster Manager, and
+Instant Cloud can be found
+<A ID="tex2html11"
+  HREF="https://www.gurobi.com/release-notes/server/v9.5/">here</A>
+<P>
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="c_api_overview.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="refman.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="refman.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="c_api_overview.html">C API Overview</A>
+<B> Up:</B> <A
+ HREF="refman.html">Gurobi Optimizer Reference Manual</A>
+<B> Previous:</B> <A
+ HREF="refman.html">Gurobi Optimizer Reference Manual</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

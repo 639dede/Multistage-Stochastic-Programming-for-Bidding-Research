@@ -1,0 +1,763 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Constants</TITLE>
+<META NAME="description" CONTENT="Constants">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="cs_charattr.html">
+<LINK REL="previous" HREF="cs_.html">
+<LINK REL="next" HREF="cs_charattr.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="cs_charattr.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="cs_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="cs_.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="cs_charattr.html">GRB.CharAttr</A>
+<B> Up:</B> <A
+ HREF="cs_.html">GRB</A>
+<B> Previous:</B> <A
+ HREF="cs_.html">GRB</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION000917100000000000000"></A>
+<A ID="dotnetconstants"></A>
+<BR>
+Constants
+</H3>
+
+<P>
+The following list contains the set of constants needed by the Gurobi
+.NET interface.  You would refer to them using a <code>GRB.</code> prefix
+(e.g., <code>GRB.Status.OPTIMAL</code>).
+
+<P>
+
+<SCRIPT SRC="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js"></SCRIPT>
+<BR>
+<PRE CLASS="prettyprint">  // Model status codes (after call to optimize())
+
+  /// &lt;summary&gt;
+  /// Optimization status codes
+  /// &lt;/summary&gt;
+  public class Status
+  {
+    /// &lt;summary&gt;
+    /// Model is loaded, but no solution information is available.
+    /// &lt;/summary&gt;
+    public const int LOADED = 1;
+
+    /// &lt;summary&gt;
+    /// Model was solved to optimality (subject to tolerances) and an optimal
+    /// solution is available.
+    /// &lt;/summary&gt;
+    public const int OPTIMAL = 2;
+
+    /// &lt;summary&gt;
+    /// Model was proven to be infeasible.
+    /// &lt;/summary&gt;
+    public const int INFEASIBLE = 3;
+
+    /// &lt;summary&gt;
+    /// Model was proven to be either infeasible or unbounded.
+    /// &lt;/summary&gt;
+    public const int INF_OR_UNBD = 4;
+
+    /// &lt;summary&gt;
+    /// Model was proven to be unbounded.
+    /// &lt;/summary&gt;
+    public const int UNBOUNDED = 5;
+
+    /// &lt;summary&gt;
+    /// Optimal objective was proven to be worse than the value specified
+    /// in the Cutoff parameter.
+    /// &lt;/summary&gt;
+    public const int CUTOFF = 6;
+
+    /// &lt;summary&gt;
+    /// Optimization terminated because the total number of simplex
+    /// iterations performed exceeded the limit specified in the IterationLimit
+    /// parameter.
+    /// &lt;/summary&gt;
+    public const int ITERATION_LIMIT = 7;
+
+    /// &lt;summary&gt;
+    /// Optimization terminated because the total number of branch-and-cut
+    /// nodes explored exceeded the limit specified in the NodeLimit
+    /// parameter.
+    /// &lt;/summary&gt;
+    public const int NODE_LIMIT = 8;
+
+    /// &lt;summary&gt;
+    /// Optimization terminated because the total elapsed time
+    /// exceeded the limit specified in the TimeLimit parameter.
+    /// &lt;/summary&gt;
+    public const int TIME_LIMIT = 9;
+
+    /// &lt;summary&gt;
+    /// Optimization terminated because the number of solutions found
+    /// reached the value specified in the SolutionLimit parameter.
+    /// &lt;/summary&gt;
+    public const int SOLUTION_LIMIT = 10;
+
+    /// &lt;summary&gt;
+    /// Optimization was terminated by the user.
+    /// &lt;/summary&gt;
+    public const int INTERRUPTED = 11;
+
+    /// &lt;summary&gt;
+    /// Optimization was terminated due to unrecoverable numerical
+    /// difficulties.
+    /// &lt;/summary&gt;
+    public const int NUMERIC = 12;
+
+    /// &lt;summary&gt;
+    /// Optimization terminated with a sub-optimal solution.
+    /// &lt;/summary&gt;
+    public const int SUBOPTIMAL = 13;
+
+    /// &lt;summary&gt;
+    /// Optimization is still in progress.
+    /// &lt;/summary&gt;
+    public const int INPROGRESS = 14;
+
+    /// &lt;summary&gt;
+    /// User specified objective limit (a bound on either the best objective
+    /// or the best bound), and that limit has been reached.
+    /// &lt;/summary&gt;
+    public const int USER_OBJ_LIMIT = 15;
+
+    /// &lt;summary&gt;
+    /// Optimization terminated because the total elapsed work
+    /// exceeded the limit specified in the WorkLimit parameter.
+    /// &lt;/summary&gt;
+    public const int WORK_LIMIT = 16;
+  }
+
+  /// &lt;summary&gt;
+  /// Batch status codes
+  /// &lt;/summary&gt;
+  public class BatchStatus
+  {
+
+    /// &lt;summary&gt;
+    /// Batch object was created, but is not ready to be scheduled.
+    /// See the Batch Optimization section of the manual for more details.
+    /// &lt;/summary&gt;
+    public const int CREATED   = 1;
+
+    /// &lt;summary&gt;
+    /// The Batch object has been completely specified, and now is waiting
+    /// for a job to finish processing the request.
+    /// See the Batch Optimization section of the manual for more details.
+    /// &lt;/summary&gt;
+    public const int SUBMITTED = 2;
+
+    /// &lt;summary&gt;
+    /// Batch processing was aborted by the user.
+    /// See the Batch Optimization section of the manual for more details.
+    /// &lt;/summary&gt;
+    public const int ABORTED   = 3;
+
+    /// &lt;summary&gt;
+    /// Batch processing failed.
+    /// See the Batch Optimization section of the manual for more details.
+    /// &lt;/summary&gt;
+    public const int FAILED    = 4;
+
+    /// &lt;summary&gt;
+    /// A Batch Job successfully processed the Batch request.
+    /// See the Batch Optimization section of the manual for more details.
+    /// &lt;/summary&gt;
+    public const int COMPLETED = 5;
+  }
+
+  // Version numbers
+
+  /// &lt;summary&gt;
+  /// Major number
+  /// &lt;/summary&gt;
+  public const int VERSION_MAJOR     = 9;
+
+  /// &lt;summary&gt;
+  /// Minor number
+  /// &lt;/summary&gt;
+  public const int VERSION_MINOR     = 5;
+
+  /// &lt;summary&gt;
+  /// Technical number
+  /// &lt;/summary&gt;
+  public const int VERSION_TECHNICAL = 2;
+
+  // Basis status info
+
+  /// &lt;summary&gt;
+  /// Variable is basic.
+  /// &lt;/summary&gt;
+  public const int BASIC           = 0;
+
+  /// &lt;summary&gt;
+  /// Variable is non-basic at lower bound.
+  /// &lt;/summary&gt;
+  public const int NONBASIC_LOWER  = -1;
+
+  /// &lt;summary&gt;
+  /// Variable is non-basic at upper bound.
+  /// &lt;/summary&gt;
+  public const int NONBASIC_UPPER  = -2;
+
+  /// &lt;summary&gt;
+  /// Variable is superbasic.
+  /// &lt;/summary&gt;
+  public const int SUPERBASIC      = -3;
+
+  // Constraint senses
+
+  /// &lt;summary&gt;
+  /// Less or equal constraint sense.
+  /// &lt;/summary&gt;
+  public const char LESS_EQUAL    = '&lt;';
+  /// &lt;summary&gt;
+  /// Greater or equal constraint sense.
+  /// &lt;/summary&gt;
+  public const char GREATER_EQUAL = '&gt;';
+  /// &lt;summary&gt;
+  /// Equal constraint sense.
+  /// &lt;/summary&gt;
+  public const char EQUAL         = '=';
+
+  // Variable types
+
+  /// &lt;summary&gt;
+  /// Continuous variable.
+  /// &lt;/summary&gt;
+  public const char CONTINUOUS   = 'C';
+  /// &lt;summary&gt;
+  /// Binary variable.
+  /// &lt;/summary&gt;
+  public const char BINARY       = 'B';
+  /// &lt;summary&gt;
+  /// Integer variable.
+  /// &lt;/summary&gt;
+  public const char INTEGER      = 'I';
+  /// &lt;summary&gt;
+  /// Semi-continuous variable.
+  /// &lt;/summary&gt;
+  public const char SEMICONT     = 'S';
+  /// &lt;summary&gt;
+  /// Semi-integer variable.
+  /// &lt;/summary&gt;
+  public const char SEMIINT      = 'N';
+
+  // Objective sense
+
+  /// &lt;summary&gt;
+  /// Minimization objective.
+  /// &lt;/summary&gt;
+  public const int MINIMIZE = 1;
+  /// &lt;summary&gt;
+  /// Maximization objective.
+  /// &lt;/summary&gt;
+  public const int MAXIMIZE = -1;
+
+  // SOS types
+
+  /// &lt;summary&gt;
+  /// SOS of type 1.
+  /// &lt;/summary&gt;
+  public const int SOS_TYPE1      = 1;
+  /// &lt;summary&gt;
+  /// SOS of type 2.
+  /// &lt;/summary&gt;
+  public const int SOS_TYPE2      = 2;
+
+  // General constraint types
+
+  /// &lt;summary&gt;
+  /// General constraint maximum.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_MAX       = 0;
+  /// &lt;summary&gt;
+  /// General constraint minimum.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_MIN       = 1;
+  /// &lt;summary&gt;
+  /// General constraint absolute value.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_ABS       = 2;
+  /// &lt;summary&gt;
+  /// General constraint logical AND.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_AND       = 3;
+  /// &lt;summary&gt;
+  /// General constraint logical OR.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_OR        = 4;
+  /// &lt;summary&gt;
+  /// General constraint norm.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_NORM      = 5;
+  /// &lt;summary&gt;
+  /// General constraint indicator.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_INDICATOR = 6;
+  /// &lt;summary&gt;
+  /// General constraint piecewise-linear.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_PWL       = 7;
+  /// &lt;summary&gt;
+  /// General constraint polynomial function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_POLY      = 8;
+  /// &lt;summary&gt;
+  /// General constraint natural exponential function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_EXP       = 9;
+  /// &lt;summary&gt;
+  /// General constraint exponential function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_EXPA      = 10;
+  /// &lt;summary&gt;
+  /// General constraint natural logarithmic function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_LOG       = 11;
+  /// &lt;summary&gt;
+  /// General constraint logarithmic function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_LOGA      = 12;
+  /// &lt;summary&gt;
+  /// General constraint power function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_POW       = 13;
+  /// &lt;summary&gt;
+  /// General constraint sine function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_SIN       = 14;
+  /// &lt;summary&gt;
+  /// General constraint cosine function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_COS       = 15;
+  /// &lt;summary&gt;
+  /// General constraint tangent function.
+  /// &lt;/summary&gt;
+  public const int GENCONSTR_TAN       = 16;
+
+  // Numeric constants
+
+  /// &lt;summary&gt;
+  /// Infinity value.
+  /// &lt;/summary&gt;
+  public const double INFINITY    = 1e100;
+  /// &lt;summary&gt;
+  /// Undefined value.
+  /// &lt;/summary&gt;
+  public const double UNDEFINED   = 1e101;
+  /// &lt;summary&gt;
+  /// Maximum integer value.
+  /// &lt;/summary&gt;
+  public const int    MAXINT      = 2000000000;
+
+  // Other constants
+
+  /// &lt;summary&gt;
+  /// Default compute server port.
+  /// &lt;/summary&gt;
+  public const int DEFAULT_CS_PORT  = 61000;
+
+  // Limits
+
+  /// &lt;summary&gt;
+  /// Maximum string length.
+  /// &lt;/summary&gt;
+  public const int MAX_STRLEN     = 512;
+  /// &lt;summary&gt;
+  /// Maximum name length.
+  /// &lt;/summary&gt;
+  public const int MAX_NAMELEN    = 255;
+  /// &lt;summary&gt;
+  /// Maximum tag length.
+  /// &lt;/summary&gt;
+  public const int MAX_TAGLEN     = 10240;
+  /// &lt;summary&gt;
+  /// Maximum concurrent threads.
+  /// &lt;/summary&gt;
+  public const int MAX_CONCURRENT = 64;
+
+  // Callback constants
+
+  /// &lt;summary&gt;
+  /// Gurobi callback codes.
+  /// &lt;/summary&gt;
+  public class Callback
+  {
+    /// &lt;summary&gt;
+    /// Periodic polling callback.
+    /// &lt;/summary&gt;
+    public const int POLLING       =     0;
+
+    /// &lt;summary&gt;
+    /// Currently performing presolve.
+    /// &lt;/summary&gt;
+    public const int PRESOLVE      =     1;
+
+    /// &lt;summary&gt;
+    /// Currently in simplex.
+    /// &lt;/summary&gt;
+    public const int SIMPLEX       =     2;
+
+    /// &lt;summary&gt;
+    /// Currently in MIP.
+    /// &lt;/summary&gt;
+    public const int MIP           =     3;
+
+    /// &lt;summary&gt;
+    /// Found a new MIP incumbent.
+    /// &lt;/summary&gt;
+    public const int MIPSOL        =     4;
+
+    /// &lt;summary&gt;
+    /// Currently exploring a MIP node.
+    /// &lt;/summary&gt;
+    public const int MIPNODE       =     5;
+
+    /// &lt;summary&gt;
+    /// Currently in barrier.
+    /// &lt;/summary&gt;
+    public const int BARRIER       =     7;
+
+    /// &lt;summary&gt;
+    /// Printing a log message.
+    /// &lt;/summary&gt;
+    public const int MESSAGE       =     6;
+
+    /// &lt;summary&gt;
+    /// Currently in multi-objective optimization.
+    /// &lt;/summary&gt;
+    public const int MULTIOBJ      =     8;
+
+    /// &lt;summary&gt;
+    /// Currently computing an IIS.
+    /// &lt;/summary&gt;
+    public const int IIS           =     9;
+
+    /// &lt;summary&gt;
+    /// Returns the number of columns removed by presolve to this point.
+    /// &lt;/summary&gt;
+    public const int PRE_COLDEL      = 1000;
+    /// &lt;summary&gt;
+    /// Returns the number of rows removed by presolve to this point.
+    /// &lt;/summary&gt;
+    public const int PRE_ROWDEL      = 1001;
+    /// &lt;summary&gt;
+    /// Returns the number of constraint senses changed by presolve to this
+    /// point.
+    /// &lt;/summary&gt;
+    public const int PRE_SENCHG      = 1002;
+    /// &lt;summary&gt;
+    /// Returns the number of bounds changed by presolve to this point.
+    /// &lt;/summary&gt;
+    public const int PRE_BNDCHG      = 1003;
+    /// &lt;summary&gt;
+    /// Returns the number of coefficients changed by presolve to this point.
+    /// &lt;/summary&gt;
+    public const int PRE_COECHG      = 1004;
+    /// &lt;summary&gt;
+    /// Returns the current simplex iteration count.
+    /// &lt;/summary&gt;
+    public const int SPX_ITRCNT      = 2000;
+    /// &lt;summary&gt;
+    /// Returns the current simplex objective value.
+    /// &lt;/summary&gt;
+    public const int SPX_OBJVAL      = 2001;
+    /// &lt;summary&gt;
+    /// Returns the current simplex primal infeasibility.
+    /// &lt;/summary&gt;
+    public const int SPX_PRIMINF     = 2002;
+    /// &lt;summary&gt;
+    /// Returns the current simplex dual infeasibility.
+    /// &lt;/summary&gt;
+    public const int SPX_DUALINF     = 2003;
+    /// &lt;summary&gt;
+    /// Returns 1 if the model has been perturbed.
+    /// &lt;/summary&gt;
+    public const int SPX_ISPERT      = 2004;
+    /// &lt;summary&gt;
+    /// Returns the current best objective value.
+    /// &lt;/summary&gt;
+    public const int MIP_OBJBST      = 3000;
+    /// &lt;summary&gt;
+    /// Returns the current best objective bound.
+    /// &lt;/summary&gt;
+    public const int MIP_OBJBND      = 3001;
+    /// &lt;summary&gt;
+    /// Returns the current explored node count.
+    /// &lt;/summary&gt;
+    public const int MIP_NODCNT      = 3002;
+    /// &lt;summary&gt;
+    /// Returns the current solution count.
+    /// &lt;/summary&gt;
+    public const int MIP_SOLCNT      = 3003;
+    /// &lt;summary&gt;
+    /// Returns the current cutting plane count.
+    /// &lt;/summary&gt;
+    public const int MIP_CUTCNT      = 3004;
+    /// &lt;summary&gt;
+    /// Returns the current unexplored node count.
+    /// &lt;/summary&gt;
+    public const int MIP_NODLFT      = 3005;
+    /// &lt;summary&gt;
+    /// Returns the current simplex iteration count.
+    /// &lt;/summary&gt;
+    public const int MIP_ITRCNT      = 3006;
+    /// &lt;summary&gt;
+    /// For a multi-scenario model, returns the number of scenarios that are still open.
+    /// &lt;/summary&gt;
+    public const int MIP_OPENSCENARIOS = 3007;
+    /// &lt;summary&gt;
+    /// Returns the current phase of the MIP algorithm.
+    /// &lt;/summary&gt;
+    public const int MIP_PHASE         = 3008;
+
+    /// &lt;summary&gt;
+    /// Returns the new solution.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_SOL      = 4001;
+    /// &lt;summary&gt;
+    /// Returns the objective value for the new solution.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_OBJ      = 4002;
+    /// &lt;summary&gt;
+    /// Returns the current best objective value.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_OBJBST   = 4003;
+    /// &lt;summary&gt;
+    /// Returns the current best objective bound.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_OBJBND   = 4004;
+    /// &lt;summary&gt;
+    /// Returns the current explored node count.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_NODCNT   = 4005;
+    /// &lt;summary&gt;
+    /// Returns the current solution count.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_SOLCNT   = 4006;
+    /// &lt;summary&gt;
+    /// For a multi-scenario model, returns the number of scenarios that are still open.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_OPENSCENARIOS = 4007;
+    /// &lt;summary&gt;
+    /// Returns the current phase of the MIP algorithm.
+    /// &lt;/summary&gt;
+    public const int MIPSOL_PHASE   = 4008;
+
+    /// &lt;summary&gt;
+    /// Returns the status of the current node relaxation.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_STATUS  = 5001;
+    /// &lt;summary&gt;
+    /// Returns the current node relaxation solution or ray.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_REL     = 5002;
+    /// &lt;summary&gt;
+    /// Returns the current best objective value.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_OBJBST  = 5003;
+    /// &lt;summary&gt;
+    /// Returns the current best objective bound.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_OBJBND  = 5004;
+    /// &lt;summary&gt;
+    /// Returns the current explored node count.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_NODCNT  = 5005;
+    /// &lt;summary&gt;
+    /// Returns the current solution count.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_SOLCNT  = 5006;
+    /// &lt;summary&gt;
+    /// Returns the branching variable for the current node.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_BRVAR  = 5007;
+    /// &lt;summary&gt;
+    /// For a multi-scenario model, returns the number of scenarios that are still open.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_OPENSCENARIOS = 5008;
+    /// &lt;summary&gt;
+    /// Returns the current phase of the MIP algorithm.
+    /// &lt;/summary&gt;
+    public const int MIPNODE_PHASE  = 5009;
+
+    /// &lt;summary&gt;
+    /// Returns the current barrier iteration count.
+    /// &lt;/summary&gt;
+    public const int BARRIER_ITRCNT  = 7001;
+    /// &lt;summary&gt;
+    /// Returns the current barrier primal objective value.
+    /// &lt;/summary&gt;
+    public const int BARRIER_PRIMOBJ = 7002;
+    /// &lt;summary&gt;
+    /// Returns the current barrier dual objective value.
+    /// &lt;/summary&gt;
+    public const int BARRIER_DUALOBJ = 7003;
+    /// &lt;summary&gt;
+    /// Returns the current barrier primal infeasibility.
+    /// &lt;/summary&gt;
+    public const int BARRIER_PRIMINF = 7004;
+    /// &lt;summary&gt;
+    /// Returns the current barrier dual infeasibility.
+    /// &lt;/summary&gt;
+    public const int BARRIER_DUALINF = 7005;
+    /// &lt;summary&gt;
+    /// Returns the current barrier complementarity violation.
+    /// &lt;/summary&gt;
+    public const int BARRIER_COMPL   = 7006;
+    /// &lt;summary&gt;
+    /// Returns the message that is being printed.
+    /// &lt;/summary&gt;
+    public const int MSG_STRING      = 6001;
+    /// &lt;summary&gt;
+    /// Returns the elapsed solver runtime (in seconds).
+    /// &lt;/summary&gt;
+    public const int RUNTIME         = 6002;
+    /// &lt;summary&gt;
+    /// Returns the elapsed solver work (in work units).
+    /// &lt;/summary&gt;
+    public const int WORK            = 6003;
+    /// &lt;summary&gt;
+    /// Returns the number of objectives that have already been optimized.
+    /// &lt;/summary&gt;
+    public const int MULTIOBJ_OBJCNT = 8001;
+    /// &lt;summary&gt;
+    /// Returns the current solution count.
+    /// &lt;/summary&gt;
+    public const int MULTIOBJ_SOLCNT = 8002;
+    /// &lt;summary&gt;
+    /// Returns the new solution.
+    /// &lt;/summary&gt;
+    public const int MULTIOBJ_SOL    = 8003;
+    /// &lt;summary&gt;
+    /// Returns the minimum number of constraints in the IIS.
+    /// &lt;/summary&gt;
+    public const int IIS_CONSTRMIN   = 9001;
+    /// &lt;summary&gt;
+    /// Returns the maximum number of constraints in the IIS.
+    /// &lt;/summary&gt;
+    public const int IIS_CONSTRMAX   = 9002;
+    /// &lt;summary&gt;
+    /// Returns the estimated number of constraints in the IIS.
+    /// &lt;/summary&gt;
+    public const int IIS_CONSTRGUESS = 9003;
+    /// &lt;summary&gt;
+    /// Returns the minimum number of bounds in the IIS.
+    /// &lt;/summary&gt;
+    public const int IIS_BOUNDMIN    = 9004;
+    /// &lt;summary&gt;
+    /// Returns the maximum number of bounds in the IIS.
+    /// &lt;/summary&gt;
+    public const int IIS_BOUNDMAX    = 9005;
+    /// &lt;summary&gt;
+    /// Returns the estimated number of bounds in the IIS.
+    /// &lt;/summary&gt;
+    public const int IIS_BOUNDGUESS  = 9006;
+  }
+
+  // Errors
+
+  /// &lt;summary&gt;
+  /// Gurobi error codes.
+  /// &lt;/summary&gt;
+  public class Error
+  {
+    /// &lt;summary&gt;
+    /// Available memory was exhausted.
+    /// &lt;/summary&gt;
+    public const int OUT_OF_MEMORY            = 10001;
+
+    /// &lt;summary&gt;
+    /// NULL input value provided for a required argument.
+    /// &lt;/summary&gt;
+    public const int NULL_ARGUMENT            = 10002;
+
+    /// &lt;summary&gt;
+    /// Invalid input value.
+    /// &lt;/summary&gt;
+    public const int INVALID_ARGUMENT         = 10003;
+
+    /// &lt;summary&gt;
+    /// Tried to query or set an unknown attribute.
+    /// &lt;/summary&gt;
+    public const int UNKNOWN_ATTRIBUTE        = 10004;
+
+    /// &lt;summary&gt;
+    /// Tried to query or set an attribute that could not be accessed.
+    /// &lt;/summary&gt;
+    public const int DATA_NOT_AVAILABLE       = 10005;
+
+    /// &lt;summary&gt;
+    /// Index for attribute query was out of range.
+    /// &lt;/summary&gt;
+    public const int INDEX_OUT_OF_RANGE       = 10006;
+
+    /// &lt;summary&gt;
+    /// Tried to query or set an unknown parameter.
+    /// &lt;/summary&gt;
+    public const int UNKNOWN_PARAMETER        = 10007;
+
+    /// &lt;summary&gt;
+    /// Tried to set a parameter to a value that is outside its valid range.
+    /// &lt;/summary&gt;
+    public const int VALUE_OUT_OF_RANGE       = 10008;
+
+    /// &lt;summary&gt;
+    /// Failed to obtain a Gurobi license.
+</PRE>
+
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="cs_charattr.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="cs_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="cs_.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="cs_charattr.html">GRB.CharAttr</A>
+<B> Up:</B> <A
+ HREF="cs_.html">GRB</A>
+<B> Previous:</B> <A
+ HREF="cs_.html">GRB</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

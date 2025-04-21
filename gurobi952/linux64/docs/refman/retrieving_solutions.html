@@ -1,0 +1,122 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Retrieving Solutions</TITLE>
+<META NAME="description" CONTENT="Retrieving Solutions">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="examples.html">
+<LINK REL="previous" HREF="finding_multiple_solutions.html">
+<LINK REL="next" HREF="examples.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="examples.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="solution_pool.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="finding_multiple_solutions.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="examples.html">Examples</A>
+<B> Up:</B> <A
+ HREF="solution_pool.html">Solution Pool</A>
+<B> Previous:</B> <A
+ HREF="finding_multiple_solutions.html">Finding Multiple Solutions</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H2><A ID="SECTION000272000000000000000">
+Retrieving Solutions</A>
+</H2>
+
+<P>
+After optimization has completed, you can retrieve solutions from the
+solution pool using a few parameters and attributes.  The
+<A HREF="solcount.html#attr:SolCount">SolCount</A> attribute indicates how many
+solutions were retained by the MIP solver.  The best solution can
+always be obtained through the <A HREF="x.html#attr:X">X</A> attribute.
+Sub-optimal solutions can be obtained by first setting the
+<A HREF="solutionnumber.html#parameter:SolutionNumber">SolutionNumber</A> parameter and
+then querying the <A HREF="xn.html#attr:Xn">Xn</A> attribute to obtain the
+solution or the <A HREF="poolobjval.html#attr:PoolObjVal">PoolObjVal</A> attribute
+to obtain the objective value for the corresponding solution.
+
+<P>
+For example, to retrieve the worst solution kept by the MIP solver,
+you'd first query <code>SolCount</code> to determine how many solutions are
+available, then set the <code>SolutionNumber</code> parameter to
+<code>SolCount-1</code>, then query the <code>Xn</code> attribute.
+
+<P>
+The <A HREF="poolobjbound.html#attr:PoolObjBound">PoolObjBound</A> attribute gives a
+bound on the objective value of undiscovered solutions (i.e., of 
+solutions that aren't already in the solution pool).  Further tree
+exploration won't find solutions having a better objective value 
+than <code>PoolObjBound</code>.  
+
+<P>
+The difference between this attribute and
+<A HREF="objbound.html#attr:ObjBound">ObjBound</A> is that the latter gives a
+bound on the objective for any solution, while 
+<code>PoolObjBound</code> only refers to undiscovered 
+solutions (which are not in the solution pool). <code>ObjBound</code> 
+is always at least as tight as <code>PoolObjBound</code>, 
+and is often strictly looser than <code>PoolObjBound</code>.
+If <code>PoolSearchMode=0</code> or <code>PoolSearchMode=1</code>, then 
+<code>PoolObjBound</code> and 
+<code>ObjBound</code> will always take the same value.
+
+<P>
+If the solver terminated early (e.g. due to reaching the time limit),
+you can still use the attribute <code>PoolObjBound</code>
+to get a count of how many of the <SPAN CLASS="MATH"><IMG
+ STYLE="height: 1.46ex; vertical-align: -0.12ex; " SRC="img27.svg"
+ ALT="$n$"></SPAN> best solutions you found: any
+solutions having objective values that are at least as good as
+<code>PoolObjBound</code> are among the <SPAN CLASS="MATH"><IMG
+ STYLE="height: 1.46ex; vertical-align: -0.12ex; " SRC="img27.svg"
+ ALT="$n$"></SPAN> best. This is illustrated 
+in the examples on the next section.
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="examples.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="solution_pool.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="finding_multiple_solutions.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="examples.html">Examples</A>
+<B> Up:</B> <A
+ HREF="solution_pool.html">Solution Pool</A>
+<B> Previous:</B> <A
+ HREF="finding_multiple_solutions.html">Finding Multiple Solutions</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

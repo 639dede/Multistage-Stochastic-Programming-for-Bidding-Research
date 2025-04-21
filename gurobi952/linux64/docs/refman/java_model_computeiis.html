@@ -1,0 +1,176 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>GRBModel.computeIIS()</TITLE>
+<META NAME="description" CONTENT="GRBModel.computeIIS()">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="java_model_discardconcurre.html">
+<LINK REL="previous" HREF="java_model_chgcoeffs.html">
+<LINK REL="next" HREF="java_model_discardconcurre.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="java_model_discardconcurre.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="java_model.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="java_model_chgcoeffs.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="java_model_discardconcurre.html">GRBModel.discardConcurrentEnvs()</A>
+<B> Up:</B> <A
+ HREF="java_model.html">GRBModel</A>
+<B> Previous:</B> <A
+ HREF="java_model_chgcoeffs.html">GRBModel.chgCoeffs()</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION000721300000000000000"></A>
+<A ID="javamethod:GRBModel.computeIIS"></A>
+<BR>
+GRBModel.computeIIS()
+</H3>
+
+<P>
+Compute an Irreducible Inconsistent Subsystem (IIS).
+An IIS is a subset of the constraints and variable bounds with the following properties:
+
+<UL>
+<LI>It is still infeasible, and
+</LI>
+<LI>If a single constraint or bound is removed, the subsystem becomes feasible.
+</LI>
+</UL>
+Note that an infeasible model may have multiple IISs. The one returned
+by Gurobi is not necessarily the smallest one; there may exist others
+with fewer constraints or bounds.
+
+<P>
+IIS results are returned in a number of attributes:
+<A HREF="iisconstr.html#attr:IISConstr">IISConstr</A>,
+<A HREF="iislb.html#attr:IISLB">IISLB</A>,
+<A HREF="iislb.html#attr:IISLB">IISUB</A>,
+<A HREF="iissos.html#attr:IISSOS">IISSOS</A>,
+<A HREF="iisqconstr.html#attr:IISQConstr">IISQConstr</A>, and
+<A HREF="iisgenconstr.html#attr:IISGenConstr">IISGenConstr</A>.
+Each indicates whether the corresponding model element is a member
+of the computed IIS.
+
+<P>
+The <A HREF="iis_logging.html#sec:IISLogging">IIS log</A> provides information about
+the progress of the algorithm, including a guess at the eventual IIS
+size.
+
+<P>
+If an IIS computation is interrupted before completion, Gurobi will
+return the smallest infeasible subsystem found to that point.
+
+<P>
+The
+<A HREF="iisconstrforce.html#attr:IISConstrForce">IISConstrForce</A>,
+<A HREF="iislbforce.html#attr:IISLBForce">IISLBForce</A>,
+<A HREF="iisubforce.html#attr:IISUBForce">IISUBForce</A>,
+<A HREF="iissosforce.html#attr:IISSOSForce">IISSOSForce</A>,
+<A HREF="iisqconstrforce.html#attr:IISQConstrForce">IISQConstrForce</A>, and
+<A HREF="iisgenconstrforce.html#attr:IISGenConstrForce">IISGenConstrForce</A>
+attributes allow you mark model elements to either include or exclude
+from the computed IIS.  Setting the attribute to 1 forces the
+corresponding element into the IIS, setting it to 0 forces it out of
+the IIS, and setting it to -1 allows the algorithm to decide.
+
+<P>
+To give an example of when these attributes might be useful, consider
+the case where an initial model is known to be feasible, but it
+becomes infeasible after adding constraints or tightening bounds.  If
+you are only interested in knowing which of the changes caused the
+infeasibility, you can force the unmodified bounds and constraints
+into the IIS.  That allows the IIS algorithm to focus exclusively on
+the new constraints, which will often be substantially faster.
+
+<P>
+Note that setting any of the <code>Force</code> attributes to 0 may make the
+resulting subsystem feasible, which would then make it impossible to
+construct an IIS.  Trying anyway will result in a
+<code>GRB_ERROR_IIS_NOT_INFEASIBLE</code> error.  Similarly, setting this
+attribute to 1 may result in an IIS that is not irreducible.  More
+precisely, the system would only be irreducible with respect to the
+model elements that have force values of -1 or 0.
+
+<P>
+This method populates the
+<A HREF="iisconstr.html#attr:IISConstr">IISConstr</A>,
+<A HREF="iisqconstr.html#attr:IISQConstr">IISQConstr</A>, and
+<A HREF="iisgenconstr.html#attr:IISGenConstr">IISGenConstr</A>
+constraint attributes,
+the
+<A HREF="iissos.html#attr:IISSOS">IISSOS</A>,
+SOS attribute, and the
+<A HREF="iislb.html#attr:IISLB">IISLB</A> and
+<A HREF="iislb.html#attr:IISLB">IISUB</A>
+variable attributes.
+You can
+also obtain information about the results of the IIS computation by
+writing a <code>.ilp</code> format file (see
+<A HREF="java_model_write.html#javamethod:GRBModel.write">GRBModel.write</A>).  This file
+contains only the IIS from the original model.
+
+<P>
+Use the <A HREF="iismethod.html#parameter:IISMethod">IISMethod</A> parameter to
+adjust the behavior of the IIS algorithm.
+
+<P>
+Note that this method can be used to compute IISs for both continuous
+and MIP models.
+
+<P>
+
+<TABLE class="PAD " style="">
+<TR><TD CLASS="LEFT">void</TD>
+<TD CLASS="LEFT"><SPAN CLASS="LARGE"><FONT COLOR="#801a1a"> <SPAN  CLASS="textbf">computeIIS</SPAN></FONT></SPAN> ( )</TD>
+</TR>
+</TABLE>
+
+<P>
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="java_model_discardconcurre.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="java_model.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="java_model_chgcoeffs.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="java_model_discardconcurre.html">GRBModel.discardConcurrentEnvs()</A>
+<B> Up:</B> <A
+ HREF="java_model.html">GRBModel</A>
+<B> Previous:</B> <A
+ HREF="java_model_chgcoeffs.html">GRBModel.chgCoeffs()</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

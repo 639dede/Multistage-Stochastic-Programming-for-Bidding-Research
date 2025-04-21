@@ -1,0 +1,117 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>IISUBForce</TITLE>
+<META NAME="description" CONTENT="IISUBForce">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="poolignore.html">
+<LINK REL="previous" HREF="iisub.html">
+<LINK REL="next" HREF="poolignore.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="poolignore.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="variable_attributes.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="iisub.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="poolignore.html">PoolIgnore</A>
+<B> Up:</B> <A
+ HREF="variable_attributes.html">Variable Attributes</A>
+<B> Previous:</B> <A
+ HREF="iisub.html">IISUB</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION0001822100000000000000"></A>
+<A ID="attr:IISUBForce"></A>
+<BR>
+IISUBForce
+</H3>
+<TABLE class="PAD " style="">
+<TR><TH CLASS="LEFT"><SPAN  CLASS="textbf">Type:</SPAN></TH>
+<TD CLASS="LEFT">int</TD>
+</TR>
+<TR><TH CLASS="LEFT"><SPAN  CLASS="textbf">Modifiable:</SPAN></TH>
+<TD CLASS="LEFT">Yes</TD>
+</TR>
+</TABLE>
+
+<P>
+When computing an Irreducible Inconsistent Subsytem (IIS) for an
+infeasible model, indicates whether the variable upper bound should be
+included or excluded from the IIS.
+
+<P>
+The default value of -1 lets the IIS algorithm decide.
+
+<P>
+If the attribute is set to 0, the bound is not eligible for inclusion
+in the IIS.
+
+<P>
+If the attribute is set to 1, the bound is included in the IIS and the
+IIS algorithm never considers the possibility of removing it.
+
+<P>
+Note that setting this attribute to 0 may make the resulting
+  subsystem feasible (or consistent), which would then make it
+  impossible to construct an IIS.  Trying anyway will
+  result in a <SPAN  CLASS="texttt">GRB_ERROR_IIS_NOT_INFEASIBLE</SPAN> error.
+  Similarly, setting this attribute to 1 may result in an IIS that is
+  not irreducible.  More precisely, the system would only be
+  irreducible with respect to the model elements that have force
+  values of -1 or 0.
+
+<P>
+See the <A HREF="py_model_computeiis.html#pythonmethod:Model.computeIIS">Model.computeIIS</A>&nbsp;documentation for more details.
+
+<P>
+
+<P>
+For examples of how to query or modify attributes, refer to
+our <A HREF="attribute_examples.html#sec:AttributeExamples">Attribute Examples</A>.
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="poolignore.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="variable_attributes.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="iisub.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="poolignore.html">PoolIgnore</A>
+<B> Up:</B> <A
+ HREF="variable_attributes.html">Variable Attributes</A>
+<B> Previous:</B> <A
+ HREF="iisub.html">IISUB</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

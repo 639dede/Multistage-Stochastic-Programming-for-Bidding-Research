@@ -1,0 +1,223 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Constants</TITLE>
+<META NAME="description" CONTENT="Constants">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="py_attr.html">
+<LINK REL="previous" HREF="py_.html">
+<LINK REL="next" HREF="py_attr.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="py_attr.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="py_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="py_.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="py_attr.html">GRB.Attr</A>
+<B> Up:</B> <A
+ HREF="py_.html">GRB</A>
+<B> Previous:</B> <A
+ HREF="py_.html">GRB</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION0001121100000000000000"></A>
+<A ID="pythonconstants"></A>
+<BR>
+Constants
+</H3>
+
+<P>
+The following list contains a set of constants that are used by the
+Gurobi Python interface.  You would refer to them using a <code>GRB.</code>
+prefix (e.g., <code>GRB.OPTIMAL</code>).
+
+<P>
+
+<SCRIPT SRC="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js"></SCRIPT>
+<BR>
+<PRE CLASS="prettyprint"># Status codes
+
+  LOADED          = 1
+  OPTIMAL         = 2
+  INFEASIBLE      = 3
+  INF_OR_UNBD     = 4
+  UNBOUNDED       = 5
+  CUTOFF          = 6
+  ITERATION_LIMIT = 7
+  NODE_LIMIT      = 8
+  TIME_LIMIT      = 9
+  SOLUTION_LIMIT  = 10
+  INTERRUPTED     = 11
+  NUMERIC         = 12
+  SUBOPTIMAL      = 13
+  INPROGRESS      = 14
+  USER_OBJ_LIMIT  = 15
+  WORK_LIMIT      = 16
+
+# Batch status codes
+
+  BATCH_CREATED   = 1
+  BATCH_SUBMITTED = 2
+  BATCH_ABORTED   = 3
+  BATCH_FAILED    = 4
+  BATCH_COMPLETED = 5
+
+# Version number
+
+  VERSION_MAJOR     = 9
+  VERSION_MINOR     = 5
+  VERSION_TECHNICAL = 2
+
+# Basis status
+
+  BASIC          = 0
+  NONBASIC_LOWER = -1
+  NONBASIC_UPPER = -2
+  SUPERBASIC     = -3
+
+# Constraint senses
+
+  LESS_EQUAL    = '&lt;'
+  GREATER_EQUAL = '&gt;'
+  EQUAL         = '='
+
+# Variable types
+
+  CONTINUOUS = 'C'
+  BINARY     = 'B'
+  INTEGER    = 'I'
+  SEMICONT   = 'S'
+  SEMIINT    = 'N'
+
+# Objective sense
+
+  MINIMIZE = 1
+  MAXIMIZE = -1
+
+# SOS types
+
+  SOS_TYPE1 = 1
+  SOS_TYPE2 = 2
+
+# General constraint types
+
+  GENCONSTR_MAX       = 0
+  GENCONSTR_MIN       = 1
+  GENCONSTR_ABS       = 2
+  GENCONSTR_AND       = 3
+  GENCONSTR_OR        = 4
+  GENCONSTR_NORM      = 5
+  GENCONSTR_INDICATOR = 6
+  GENCONSTR_PWL       = 7
+  GENCONSTR_POLY      = 8
+  GENCONSTR_EXP       = 9
+  GENCONSTR_EXPA      = 10
+  GENCONSTR_LOG       = 11
+  GENCONSTR_LOGA      = 12
+  GENCONSTR_POW       = 13
+  GENCONSTR_SIN       = 14
+  GENCONSTR_COS       = 15
+  GENCONSTR_TAN       = 16
+
+# Numeric constants
+
+  INFINITY  = 1e100
+  UNDEFINED = 1e101
+  MAXINT    = 2000000000
+
+# Limits
+
+  MAX_NAMELEN    = 255
+  MAX_STRLEN     = 512
+  MAX_TAGLEN     = 10240
+  MAX_CONCURRENT = 64
+
+# Other constants
+
+  DEFAULT_CS_PORT = 61000
+
+# Errors
+
+  ERROR_OUT_OF_MEMORY            = 10001
+  ERROR_NULL_ARGUMENT            = 10002
+  ERROR_INVALID_ARGUMENT         = 10003
+  ERROR_UNKNOWN_ATTRIBUTE        = 10004
+  ERROR_DATA_NOT_AVAILABLE       = 10005
+  ERROR_INDEX_OUT_OF_RANGE       = 10006
+  ERROR_UNKNOWN_PARAMETER        = 10007
+  ERROR_VALUE_OUT_OF_RANGE       = 10008
+  ERROR_NO_LICENSE               = 10009
+  ERROR_SIZE_LIMIT_EXCEEDED      = 10010
+  ERROR_CALLBACK                 = 10011
+  ERROR_FILE_READ                = 10012
+  ERROR_FILE_WRITE               = 10013
+  ERROR_NUMERIC                  = 10014
+  ERROR_IIS_NOT_INFEASIBLE       = 10015
+  ERROR_NOT_FOR_MIP              = 10016
+  ERROR_OPTIMIZATION_IN_PROGRESS = 10017
+  ERROR_DUPLICATES               = 10018
+  ERROR_NODEFILE                 = 10019
+  ERROR_Q_NOT_PSD                = 10020
+  ERROR_QCP_EQUALITY_CONSTRAINT  = 10021
+  ERROR_NETWORK                  = 10022
+  ERROR_JOB_REJECTED             = 10023
+  ERROR_NOT_SUPPORTED            = 10024
+  ERROR_EXCEED_2B_NONZEROS       = 10025
+  ERROR_INVALID_PIECEWISE_OBJ    = 10026
+  ERROR_UPDATEMODE_CHANGE        = 10027
+  ERROR_CLOUD                    = 10028
+  ERROR_MODEL_MODIFICATION       = 10029
+  ERROR_CSWORKER                 = 10030
+  ERROR_TUNE_MODEL_TYPES         = 10031
+  ERROR_SECURITY                 = 10032
+  ERROR_NOT_IN_MODEL             = 20001
+</PRE>
+
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="py_attr.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="py_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="py_.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="py_attr.html">GRB.Attr</A>
+<B> Up:</B> <A
+ HREF="py_.html">GRB</A>
+<B> Previous:</B> <A
+ HREF="py_.html">GRB</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

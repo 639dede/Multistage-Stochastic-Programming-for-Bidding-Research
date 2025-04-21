@@ -1,0 +1,121 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Model.getGenConstrNorm()</TITLE>
+<META NAME="description" CONTENT="Model.getGenConstrNorm()">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="py_model_ggc_indicator.html">
+<LINK REL="previous" HREF="py_model_ggc_or.html">
+<LINK REL="next" HREF="py_model_ggc_indicator.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="py_model_ggc_indicator.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="py_model.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="py_model_ggc_or.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="py_model_ggc_indicator.html">Model.getGenConstrIndicator()</A>
+<B> Up:</B> <A
+ HREF="py_model.html">Model</A>
+<B> Previous:</B> <A
+ HREF="py_model_ggc_or.html">Model.getGenConstrOr()</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION0001126100000000000000"></A>
+<A ID="pythonmethod:Model.getGenConstrNorm"></A>
+<BR>
+Model.getGenConstrNorm()
+</H3>
+<SPAN CLASS="LARGE">
+<FONT COLOR="#801a1a"> <SPAN  CLASS="textbf">getGenConstrNorm</SPAN></FONT></SPAN> ( genconstr )
+
+<P>
+Retrieve the data associated with a general constraint of type NORM.
+Calling this method for a general constraint of a different type
+leads to an exception.
+You can query the <A HREF="genconstrtype.html#attr:GenConstrType">GenConstrType</A>
+attribute to determine the type of the general constraint.
+
+<P>
+See also <A HREF="py_model_agc_norm.html#pythonmethod:Model.addGenConstrNorm">addGenConstrNorm</A>
+for a description of the semantics of this general constraint type.
+
+<P>
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf">Arguments:</SPAN></SPAN>
+
+<P>
+ <SPAN  CLASS="textbf">genconstr</SPAN>: The general constraint object of interest.
+
+<P>
+
+<SPAN CLASS="LARGE"><SPAN  CLASS="textbf">Return value:</SPAN></SPAN>
+
+<P>
+A tuple (resvar, vars, which) that contains the data
+  associated with the general constraint:
+
+<P>
+ <SPAN  CLASS="textbf">resvar (Var)</SPAN>: Resultant variable of NORM constraint.
+
+<P>
+ <SPAN  CLASS="textbf">vars (list of Var)</SPAN>: Operand variables of NORM constraint.
+
+<P>
+ <SPAN  CLASS="textbf">which (float)</SPAN>: Which norm (possible values are 0, 1, 2, or GRB.INFINITY).
+
+<P>
+<SPAN CLASS="LARGE"><B>Example usage:</B></SPAN><PRE>
+  # x5 = norm2(x1, x3, x4)
+  normconstr = model.addGenConstrNorm(x5, [x1, x3, x4], 2.0, "normconstr")
+  model.update()
+  (resvar, vars, which) = model.getGenConstrNorm(normconstr)
+</PRE>
+
+<P>
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="py_model_ggc_indicator.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="py_model.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="py_model_ggc_or.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="py_model_ggc_indicator.html">Model.getGenConstrIndicator()</A>
+<B> Up:</B> <A
+ HREF="py_model.html">Model</A>
+<B> Previous:</B> <A
+ HREF="py_model_ggc_or.html">Model.getGenConstrOr()</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

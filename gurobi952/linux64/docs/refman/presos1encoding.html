@@ -1,0 +1,137 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>PreSOS1Encoding</TITLE>
+<META NAME="description" CONTENT="PreSOS1Encoding">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="presos2bigm.html">
+<LINK REL="previous" HREF="presos1bigm.html">
+<LINK REL="next" HREF="presos2bigm.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="presos2bigm.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="parameter_descriptions.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="presos1bigm.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="presos2bigm.html">PreSOS2BigM</A>
+<B> Up:</B> <A
+ HREF="parameter_descriptions.html">Parameter Descriptions</A>
+<B> Previous:</B> <A
+ HREF="presos1bigm.html">PreSOS1BigM</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION00019212200000000000000"></A>
+<A ID="parameter:PreSOS1Encoding"></A>
+<BR>
+PreSOS1Encoding
+</H3>
+Encoding used for SOS1 reformulation
+
+<TABLE class="PAD " style="">
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TH CLASS="LEFT"><SPAN  CLASS="textbf">Type:</SPAN></TH>
+<TD CLASS="LEFT">int</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Default value:</SPAN></TD>
+<TD CLASS="LEFT">-1</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Minimum value:</SPAN></TD>
+<TD CLASS="LEFT">-1</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Maximum value:</SPAN></TD>
+<TD CLASS="LEFT">3</TD>
+</TR>
+</TABLE>
+
+<P>
+Controls the automatic reformulation of SOS1 constraints.  Such
+constraints can be handled directly by the MIP branch-and-cut
+algorithm, but they are often handled more efficiently by
+reformulating them using binary or integer variables.  There are
+several diffent ways to perform this reformulation; they differ in
+their size and strength.  Smaller reformulations add fewer variables
+and constraints to the model.  Stronger reformulations reduce the
+number of branch-and-cut nodes required to solve the resulting model.
+
+<P>
+Options 0 and 1 of this parameter encode an SOS1 constraint using a
+formulation whose size is linear in the number of SOS members. Option
+0 uses a so-called multiple choice model.  It usually produces an LP
+relaxation that is easier to solve. Option 1 uses an incremental
+model. It often gives a stronger representation, reducing the amount
+of branching required to solve harder problems.
+
+<P>
+Options 2 and 3 of this parameter encode the SOS1 using a formulation of
+logarithmic size. They both only apply when all the variables in the SOS1 are
+non-negative. Option 3 additionally requires that the sum of the variables
+in the SOS1 is equal to 1. Logarithmic formulations are often advantageous
+when the SOS1 constraint has a large number of members.
+Option 2 focuses on a formulation whose LP relaxation is easier to solve,
+while option 3 has better branching behaviour.
+
+<P>
+The default value of -1 chooses a reformulation for each SOS1
+constraint automatically.
+
+<P>
+Note that the reformulation of SOS1 constraints is also influenced by
+the <A HREF="presos1bigm.html#parameter:PreSOS1BigM">PreSOS1BigM</A> parameter.  To
+shut off the reformulation entirely you should set that parameter to
+0.
+
+<P>
+For examples of how to query or modify parameter values from
+our different APIs, refer to our
+<A HREF="parameter_examples.html#sec:ParameterExamples">Parameter Examples</A>.
+<P>
+Please refer to
+<A HREF="constraints.html#subsubsection:SOSConstraints">this section</A>
+for more information on SOS constraints.
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="presos2bigm.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="parameter_descriptions.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="presos1bigm.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="presos2bigm.html">PreSOS2BigM</A>
+<B> Up:</B> <A
+ HREF="parameter_descriptions.html">Parameter Descriptions</A>
+<B> Previous:</B> <A
+ HREF="presos1bigm.html">PreSOS1BigM</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

@@ -1,0 +1,164 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Variable Attributes</TITLE>
+<META NAME="description" CONTENT="Variable Attributes">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="linear_constraint_attribut.html">
+<LINK REL="previous" HREF="model_attributes.html">
+<LINK REL="next" HREF="lb.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="lb.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="attributes.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="server.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="lb.html">LB</A>
+<B> Up:</B> <A
+ HREF="attributes.html">Attributes</A>
+<B> Previous:</B> <A
+ HREF="server.html">Server</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H2><A ID="SECTION000182000000000000000">
+Variable Attributes</A>
+</H2>
+
+<P>
+These are variable attributes, meaning that they are associated with
+specific variables in the model.  You should use one of the various
+<code>get</code> routines to retrieve the value of an attribute.  These are
+described at the beginning of
+<A HREF="attributes.html#sec:Attributes">this section</A>.
+For the object-oriented interfaces, variable attributes are retrieved
+by invoking the <code>get</code> method on a variable object.  For
+attributes that can be modified directly by the user, you can use one
+of the various <code>set</code> methods.
+
+<P>
+Attempting to query an attribute that is not available will produce an
+error.  In C, the attribute query routine will return a
+<code>GRB_ERROR_DATA_NOT_AVAILABLE</code> error code.  The object-oriented
+interfaces will throw an exception.
+
+<P>
+Additional variable attributes can be found in the
+<A HREF="multi_objective_attributes.html#sec:MultiobjectiveAttributes">Multi-objective Attributes</A>
+and
+<A HREF="multi_scenario_attributes.html#sec:MultiScenarioAttributes">Multi-Scenario Attributes</A>
+sections.
+
+<P>
+<BR><HR>
+<!--Table of Child-Links-->
+<A ID="CHILD_LINKS"><STRONG>Subsections</STRONG></A>
+
+<UL CLASS="ChildLinks">
+<LI><A ID="tex2html4093"
+  HREF="lb.html">LB</A>
+<LI><A ID="tex2html4094"
+  HREF="ub.html">UB</A>
+<LI><A ID="tex2html4095"
+  HREF="obj.html">Obj</A>
+<LI><A ID="tex2html4096"
+  HREF="varname.html">VarName</A>
+<LI><A ID="tex2html4097"
+  HREF="vtag.html">VTag</A>
+<LI><A ID="tex2html4098"
+  HREF="vtype.html">VType</A>
+<LI><A ID="tex2html4099"
+  HREF="x.html">X</A>
+<LI><A ID="tex2html4100"
+  HREF="xn.html">Xn</A>
+<LI><A ID="tex2html4101"
+  HREF="rc.html">RC</A>
+<LI><A ID="tex2html4102"
+  HREF="barx.html">BarX</A>
+<LI><A ID="tex2html4103"
+  HREF="start.html">Start</A>
+<LI><A ID="tex2html4104"
+  HREF="varhintval.html">VarHintVal</A>
+<LI><A ID="tex2html4105"
+  HREF="varhintpri.html">VarHintPri</A>
+<LI><A ID="tex2html4106"
+  HREF="branchpriority.html">BranchPriority</A>
+<LI><A ID="tex2html4107"
+  HREF="partition.html">Partition</A>
+<LI><A ID="tex2html4108"
+  HREF="vbasis.html">VBasis</A>
+<LI><A ID="tex2html4109"
+  HREF="pstart.html">PStart</A>
+<LI><A ID="tex2html4110"
+  HREF="iislb.html">IISLB</A>
+<LI><A ID="tex2html4111"
+  HREF="iislbforce.html">IISLBForce</A>
+<LI><A ID="tex2html4112"
+  HREF="iisub.html">IISUB</A>
+<LI><A ID="tex2html4113"
+  HREF="iisubforce.html">IISUBForce</A>
+<LI><A ID="tex2html4114"
+  HREF="poolignore.html">PoolIgnore</A>
+<LI><A ID="tex2html4115"
+  HREF="pwlobjcvx.html">PWLObjCvx</A>
+<LI><A ID="tex2html4116"
+  HREF="saobjlow.html">SAObjLow</A>
+<LI><A ID="tex2html4117"
+  HREF="saobjup.html">SAObjUp</A>
+<LI><A ID="tex2html4118"
+  HREF="salblow.html">SALBLow</A>
+<LI><A ID="tex2html4119"
+  HREF="salbup.html">SALBUp</A>
+<LI><A ID="tex2html4120"
+  HREF="saublow.html">SAUBLow</A>
+<LI><A ID="tex2html4121"
+  HREF="saubup.html">SAUBUp</A>
+<LI><A ID="tex2html4122"
+  HREF="unbdray.html">UnbdRay</A>
+</UL>
+<!--End of Table of Child-Links-->
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="lb.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="attributes.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="server.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="lb.html">LB</A>
+<B> Up:</B> <A
+ HREF="attributes.html">Attributes</A>
+<B> Previous:</B> <A
+ HREF="server.html">Server</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

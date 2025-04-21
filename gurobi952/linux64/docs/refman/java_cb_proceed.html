@@ -1,0 +1,96 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>GRBCallback.proceed()</TITLE>
+<META NAME="description" CONTENT="GRBCallback.proceed()">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="java_cb_setsolution.html">
+<LINK REL="previous" HREF="java_cb_getstringinfo.html">
+<LINK REL="next" HREF="java_cb_setsolution.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="java_cb_setsolution.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="java_cb_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="java_cb_getstringinfo.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="java_cb_setsolution.html">GRBCallback.setSolution()</A>
+<B> Up:</B> <A
+ HREF="java_cb_.html">GRBCallback</A>
+<B> Previous:</B> <A
+ HREF="java_cb_getstringinfo.html">GRBCallback.getStringInfo()</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION0007121000000000000000"></A>
+<A ID="javamethod:GRBCallback.proceed"></A>
+<BR>
+GRBCallback.proceed()
+</H3>
+
+<P>
+Generate a request to proceed to the next phase of the computation.
+Note that the request is only accepted in a few phases of the
+algorithm, and it won't be acted upon immediately.
+
+<P>
+In the current Gurobi version, this callback allows you to proceed
+from the NoRel heuristic to the standard MIP search.  You can determine
+the current algorithm phase using <code>MIP_PHASE</code>,
+<code>MIPNODE_PHASE</code>, or <code>MIPSOL_PHASE</code> queries from a callback.
+
+<P>
+
+<TABLE class="PAD " style="">
+<TR><TD CLASS="LEFT">void</TD>
+<TD CLASS="LEFT"><SPAN CLASS="LARGE"><FONT COLOR="#801a1a"> <SPAN  CLASS="textbf">proceed</SPAN></FONT></SPAN> ( )</TD>
+</TR>
+</TABLE>
+
+<P>
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="java_cb_setsolution.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="java_cb_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="java_cb_getstringinfo.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="java_cb_setsolution.html">GRBCallback.setSolution()</A>
+<B> Up:</B> <A
+ HREF="java_cb_.html">GRBCallback</A>
+<B> Previous:</B> <A
+ HREF="java_cb_getstringinfo.html">GRBCallback.getStringInfo()</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

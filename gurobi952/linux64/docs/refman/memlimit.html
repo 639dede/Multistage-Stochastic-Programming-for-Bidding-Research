@@ -1,0 +1,111 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>MemLimit</TITLE>
+<META NAME="description" CONTENT="MemLimit">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="next" HREF="method.html">
+<LINK REL="previous" HREF="markowitztol.html">
+<LINK REL="next" HREF="method.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="method.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="parameter_descriptions.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="markowitztol.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="method.html">Method</A>
+<B> Up:</B> <A
+ HREF="parameter_descriptions.html">Parameter Descriptions</A>
+<B> Previous:</B> <A
+ HREF="markowitztol.html">MarkowitzTol</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION0001928000000000000000"></A>
+<A ID="parameter:MemLimit"></A>
+<BR>
+MemLimit
+</H3>
+Memory limit
+
+<TABLE class="PAD " style="">
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TH CLASS="LEFT"><SPAN  CLASS="textbf">Type:</SPAN></TH>
+<TD CLASS="LEFT">double</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Default value:</SPAN></TD>
+<TD CLASS="LEFT">Infinity</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Minimum value:</SPAN></TD>
+<TD CLASS="LEFT">0</TD>
+</TR>
+<TR><TD ALIGN="LEFT">&nbsp;</TD><TD CLASS="LEFT"><SPAN  CLASS="textbf">Maximum value:</SPAN></TD>
+<TD CLASS="LEFT">Infinity</TD>
+</TR>
+</TABLE>
+
+<P>
+Limits the total amount of memory (in GB, i.e., <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.35ex; vertical-align: -0.12ex; " SRC="img265.svg"
+ ALT="$10^9$"></SPAN> bytes) available to Gurobi.  If
+more is needed, Gurobi will fail with an
+<code>OUT_OF_MEMORY</code> error (see the <A HREF="error_codes.html#sec:ErrorCodes">Error Code</A>
+section for further details).
+
+<P>
+This parameter must be set when the Gurobi environment is first
+created.  You will need to create an
+<A HREF="environments.html#sec:Environment">empty environment</A>,
+set the parameter, and then start the environment.
+
+<P>
+
+<P>
+For examples of how to query or modify parameter values from
+our different APIs, refer to our
+<A HREF="parameter_examples.html#sec:ParameterExamples">Parameter Examples</A>.
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="method.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="parameter_descriptions.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="markowitztol.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="method.html">Method</A>
+<B> Up:</B> <A
+ HREF="parameter_descriptions.html">Parameter Descriptions</A>
+<B> Previous:</B> <A
+ HREF="markowitztol.html">MarkowitzTol</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

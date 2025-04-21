@@ -1,0 +1,750 @@
+[
+  {
+    "level": "section",
+    "href": "overview.html",
+    "lang": null,
+    "name": "Overview",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "client_server_optimization.html",
+        "lang": null,
+        "name": "Client-Server Optimization",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "client_api.html",
+            "lang": null,
+            "name": "Client API",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "queuing_and_load_balancing.html",
+            "lang": null,
+            "name": "Queuing and Load Balancing",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cluster_manager.html",
+            "lang": null,
+            "name": "Cluster Manager",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "interactive_and_non_intera.html",
+            "lang": null,
+            "name": "Interactive and Non-Interactive Optimization",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "distributed_algorithms.html",
+            "lang": null,
+            "name": "Distributed Algorithms",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "architecture.html",
+        "lang": null,
+        "name": "Architecture",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "architecture_topologies.html",
+            "lang": null,
+            "name": "Architecture Topologies",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "security.html",
+        "lang": null,
+        "name": "Security",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "user_roles.html",
+            "lang": null,
+            "name": "User Roles",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "authentication.html",
+            "lang": null,
+            "name": "Authentication",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "password_policy.html",
+            "lang": null,
+            "name": "Password Policy",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "ldap_integration.html",
+            "lang": null,
+            "name": "LDAP Integration",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "encryption.html",
+            "lang": null,
+            "name": "Encryption",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "security_in_a_self_managed.html",
+            "lang": null,
+            "name": "Security in a Self-Managed Cluster",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "simple_example.html",
+        "lang": null,
+        "name": "Simple Example",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "log_in_to_the_cluster.html",
+            "lang": null,
+            "name": "Log In to the Cluster",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sub_an_interactive_job.html",
+            "lang": null,
+            "name": "Submitting an Interactive Job",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sub_a_non_interactive_job.html",
+            "lang": null,
+            "name": "Submitting a Non-Interactive Job",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "cluster_setup_and_administ.html",
+    "lang": null,
+    "name": "Cluster Setup and Administration",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "quick_cluster_manager_inst.html",
+        "lang": null,
+        "name": "Quick Cluster Manager Installation",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "ins_the_remote_services_pa.html",
+        "lang": null,
+        "name": "Installing the Remote Services Package",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "linux_installation.html",
+            "lang": null,
+            "name": "Linux Installation",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "macos_installation.html",
+            "lang": null,
+            "name": "macOS Installation",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "windows_installation.html",
+            "lang": null,
+            "name": "Windows Installation",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "ins_a_cluster_manager.html",
+        "lang": null,
+        "name": "Installing a Cluster Manager",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "ins_the_database.html",
+            "lang": null,
+            "name": "Installing the Database",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cluster_manager_server__rs.html",
+            "lang": null,
+            "name": "Cluster Manager Server (grb_rsm)",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "configuring_the_cluster_ma.html",
+            "lang": null,
+            "name": "Configuring the Cluster Manager",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sta_the_cluster_manager_as.html",
+            "lang": null,
+            "name": "Starting the Cluster Manager as a Process",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sta_the_cluster_manager_as2.html",
+            "lang": null,
+            "name": "Starting the Cluster Manager as a Service",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "verification.html",
+            "lang": null,
+            "name": "Verification",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "ins_a_cluster_node.html",
+        "lang": null,
+        "name": "Installing a Cluster Node",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "licensing.html",
+            "lang": null,
+            "name": "Licensing",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "remote_services_agent__rs.html",
+            "lang": null,
+            "name": "Remote Services Agent (grb_rs)",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "configuring_a_cluster_node.html",
+            "lang": null,
+            "name": "Configuring a Cluster Node",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sta_a_cluster_node_as_a_pr.html",
+            "lang": null,
+            "name": "Starting a Cluster Node as a Process",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sta_a_cluster_node_as_a_se.html",
+            "lang": null,
+            "name": "Starting a Cluster Node as a Service",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "verification2.html",
+            "lang": null,
+            "name": "Verification",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "forming_a_cluster.html",
+        "lang": null,
+        "name": "Forming a Cluster",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "connecting_nodes.html",
+            "lang": null,
+            "name": "Connecting Nodes",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "compute_servers_and_distri.html",
+            "lang": null,
+            "name": "Compute Servers and Distributed Workers",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "grouping.html",
+            "lang": null,
+            "name": "Grouping",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "processing_state_and_scali.html",
+            "lang": null,
+            "name": "Processing State and Scaling",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "communication_options.html",
+        "lang": null,
+        "name": "Communication Options",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "enabling_https.html",
+            "lang": null,
+            "name": "Enabling HTTPS",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "using_https_with_self_sign.html",
+            "lang": null,
+            "name": "Using HTTPS with Self-Signed Certificates",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "firewalls.html",
+            "lang": null,
+            "name": "Firewalls",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "using_a_router_without_a_c.html",
+            "lang": "C",
+            "name": "Using a Router without a Cluster Manager",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "upgrading_an_existing_inst.html",
+        "lang": null,
+        "name": "Upgrading an Existing Installation",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "using_remote_services.html",
+    "lang": null,
+    "name": "Using Remote Services",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "client_configuration.html",
+        "lang": null,
+        "name": "Client Configuration",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "client_license_file.html",
+            "lang": null,
+            "name": "Client License File",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "generating_a_client_licens.html",
+            "lang": null,
+            "name": "Generating a Client License with grbcluster",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "queueing_load_balancing_an.html",
+            "lang": null,
+            "name": "Queueing, Load Balancing, and Job Priorities",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "job_commands.html",
+        "lang": null,
+        "name": "Job Commands",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "sub_interactive_jobs.html",
+            "lang": null,
+            "name": "Submitting Interactive Jobs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "listing_jobs.html",
+            "lang": null,
+            "name": "Listing Jobs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "accessing_job_logs.html",
+            "lang": null,
+            "name": "Accessing Job Logs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "accessing_job_parameters.html",
+            "lang": null,
+            "name": "Accessing Job Parameters",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "aborting_jobs.html",
+            "lang": null,
+            "name": "Aborting Jobs",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "accessing_the_job_history.html",
+            "lang": null,
+            "name": "Accessing the Job History",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "batch_commands.html",
+        "lang": null,
+        "name": "Batch Commands",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "creating_batches.html",
+            "lang": null,
+            "name": "Creating Batches",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "listing_batches.html",
+            "lang": null,
+            "name": "Listing Batches",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "aborting_batches.html",
+            "lang": null,
+            "name": "Aborting Batches",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "retrying_batches.html",
+            "lang": null,
+            "name": "Retrying Batches",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "discarding_batches.html",
+            "lang": null,
+            "name": "Discarding Batches",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "repository_commands.html",
+        "lang": null,
+        "name": "Repository Commands",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "uploading_a_file_to_the_re.html",
+            "lang": null,
+            "name": "Uploading a File to the Repository",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "using_a_file_from_the_repo.html",
+            "lang": null,
+            "name": "Using a File from the Repository",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "deleting_a_file_from_the_r.html",
+            "lang": "R",
+            "name": "Deleting a File from the Repository",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "node_commands.html",
+        "lang": null,
+        "name": "Node Commands",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "listing_cluster_nodes.html",
+            "lang": null,
+            "name": "Listing Cluster Nodes",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "troubleshooting_connectivi.html",
+            "lang": null,
+            "name": "Troubleshooting Connectivity Issues",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "listing_cluster_licenses.html",
+            "lang": null,
+            "name": "Listing Cluster Licenses",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "changing_the_job_limit.html",
+            "lang": null,
+            "name": "Changing the Job Limit",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "distributed_algorithms2.html",
+        "lang": null,
+        "name": "Distributed Algorithms",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "distributed_workers_and_th.html",
+            "lang": null,
+            "name": "Distributed Workers and the Distributed Manager",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "configuration.html",
+            "lang": null,
+            "name": "Configuration",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "running_a_distributed_algo.html",
+            "lang": null,
+            "name": "Running a Distributed Algorithm as an Interactive Job",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sub_a_distributed_algorith.html",
+            "lang": null,
+            "name": "Submitting a Distributed Algorithm as a Batch",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "using_a_separate_distribut.html",
+            "lang": null,
+            "name": "Using a Separate Distributed Manager",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "programming_with_remote_se.html",
+    "lang": null,
+    "name": "Programming with Remote Services",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "using_an_api_to_create_a_c.html",
+        "lang": "C",
+        "name": "Using an API to Create a Compute Server Job",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "using_an_api_to_create_a_b.html",
+        "lang": null,
+        "name": "Using an API to Create a Batch",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "performance_considerations.html",
+        "lang": null,
+        "name": "Performance Considerations on a Wide-Area Network (WAN)",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cb_s.html",
+        "lang": null,
+        "name": "Callbacks",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "developing_for_compute_ser.html",
+        "lang": null,
+        "name": "Developing for Compute Server",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "distributed_algorithm_cons.html",
+        "lang": null,
+        "name": "Distributed Algorithm Considerations",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cluster_rest_api.html",
+        "lang": null,
+        "name": "Cluster REST API",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "using_remote_services_with.html",
+    "lang": null,
+    "name": "Using Remote Services with Gurobi Instant Cloud",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "client_setup.html",
+        "lang": null,
+        "name": "Client Setup",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "client_commands.html",
+        "lang": null,
+        "name": "Client Commands",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "region_router.html",
+        "lang": null,
+        "name": "Region Router",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "appendix_a_rs.html",
+    "lang": null,
+    "name": "Appendix A: grb_rs",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "appendix_b_rs_configuratio.html",
+    "lang": null,
+    "name": "Appendix B: grb_rs - Configuration Properties",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "appendix_c_rsm.html",
+    "lang": null,
+    "name": "Appendix C: grb_rsm",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "appendix_d_rsm_configurati.html",
+    "lang": null,
+    "name": "Appendix D: grb_rsm - Configuration Properties",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "appendix_e_cluster.html",
+    "lang": null,
+    "name": "Appendix E: grbcluster",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "appendix_f_grb_cl.html",
+    "lang": null,
+    "name": "Appendix F: gurobi_cl",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "appendix_g_acknowledgement.html",
+    "lang": null,
+    "name": "Appendix G: Acknowledgement of 3rd Party Icons",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "appendix_h_open_component_.html",
+    "lang": null,
+    "name": "Appendix H: Open Source Component Licenses",
+    "children": []
+  }
+]

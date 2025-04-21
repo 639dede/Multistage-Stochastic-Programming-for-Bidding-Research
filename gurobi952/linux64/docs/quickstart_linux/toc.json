@@ -1,0 +1,1100 @@
+[
+  {
+    "level": "section",
+    "href": "obtaining_a_grb_license.html",
+    "lang": null,
+    "name": "Obtaining a Gurobi License",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "creating_a_new_academic_li.html",
+        "lang": null,
+        "name": "Creating a new academic license",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "software_installation_guid.html",
+    "lang": null,
+    "name": "Software Installation Guide",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "selinux.html",
+        "lang": null,
+        "name": "SELinux",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "retrieving_and_setting_up_.html",
+    "lang": null,
+    "name": "Retrieving and Setting Up a Gurobi License",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "retrieving_a_free_academic.html",
+        "lang": null,
+        "name": "Retrieving a Free Academic license",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "academic_validation.html",
+            "lang": null,
+            "name": "Academic validation",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "retrieving_a_named_user_or.html",
+        "lang": null,
+        "name": "Retrieving a Named-User or Single-Machine or Single-Use license",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "retrieving_a_web_license_s.html",
+        "lang": null,
+        "name": "Retrieving a Web License Service (WLS) client license",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "setting_up_and_using_a_flo.html",
+        "lang": null,
+        "name": "Setting up and using a Floating license",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "retrieving_a_floating_lice.html",
+            "lang": null,
+            "name": "Retrieving a Floating license",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "sta_a_token_server.html",
+            "lang": null,
+            "name": "Starting a token server",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "upgrading_a_token_server.html",
+            "lang": null,
+            "name": "Upgrading a token server",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "creating_a_token_server_cl.html",
+            "lang": null,
+            "name": "Creating a token server client license",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "setting_up_and_using_a_com.html",
+        "lang": null,
+        "name": "Setting up and using a Compute Server license",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "retrieving_a_compute_serve.html",
+            "lang": null,
+            "name": "Retrieving a Compute Server license",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "creating_a_compute_server_.html",
+            "lang": null,
+            "name": "Creating a Compute Server client license",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "sta_grb_remote_services.html",
+        "lang": null,
+        "name": "Starting Gurobi Remote Services",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "using_an_instant_cloud_lic.html",
+        "lang": null,
+        "name": "Using an Instant Cloud license",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "testing_your_license.html",
+        "lang": null,
+        "name": "Testing your license",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "setting_environment_variab.html",
+        "lang": null,
+        "name": "Setting environment variables",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "solving_a_simple_model_the.html",
+    "lang": null,
+    "name": "Solving a Simple Model - The Gurobi Command Line",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "the_problem_statement_prod.html",
+        "lang": null,
+        "name": "The problem statement - producing coins",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "the_optimization_model.html",
+        "lang": null,
+        "name": "The optimization model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "the_model_file.html",
+        "lang": null,
+        "name": "The model file",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "solving_the_model_using_th.html",
+        "lang": null,
+        "name": "Solving the model using the Gurobi command-line interface",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "interactive_shell.html",
+    "lang": null,
+    "name": "Interactive Shell",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "reading_and_optimizing_a_m.html",
+        "lang": "MATLAB",
+        "name": "Reading and optimizing a model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "inspecting_the_solution.html",
+        "lang": null,
+        "name": "Inspecting the solution",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "simple_model_modification.html",
+        "lang": null,
+        "name": "Simple model modification",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "simple_experimentation_wit.html",
+        "lang": null,
+        "name": "Simple experimentation with a more difficult model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "changing_parameters.html",
+        "lang": null,
+        "name": "Changing parameters",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "parameter_tuning_tool.html",
+        "lang": null,
+        "name": "Parameter tuning tool",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "using_a_grb_env_file.html",
+        "lang": null,
+        "name": "Using a gurobi.env file",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "working_with_multiple_mode.html",
+        "lang": null,
+        "name": "Working with multiple models",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "help.html",
+        "lang": null,
+        "name": "Help",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "interface_customization.html",
+        "lang": null,
+        "name": "Interface customization",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "customization_through_cb_s.html",
+        "lang": null,
+        "name": "Customization through callbacks",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "attributes.html",
+    "lang": null,
+    "name": "Attributes",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "c_interface.html",
+    "lang": "C",
+    "name": "C Interface",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "c_example_mip1_c_c.html",
+        "lang": "C",
+        "name": "Example mip1_c.c",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_example_details.html",
+        "lang": "C",
+        "name": "Example details",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_creating_the_environment.html",
+        "lang": "C",
+        "name": "Creating the environment",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_creating_the_model.html",
+        "lang": "C",
+        "name": "Creating the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_adding_variables_to_the_.html",
+        "lang": "C",
+        "name": "Adding variables to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_changing_the_objective_s.html",
+        "lang": "C",
+        "name": "Changing the objective sense",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_adding_constraints_to_th.html",
+        "lang": "C",
+        "name": "Adding constraints to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_optimizing_the_model.html",
+        "lang": "C",
+        "name": "Optimizing the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_error_reporting.html",
+        "lang": "C",
+        "name": "Error reporting",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "c_building_and_running_the.html",
+        "lang": "C",
+        "name": "Building and running the example",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "cpp_interface.html",
+    "lang": "C++",
+    "name": "C++ Interface",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "cpp_example_mip1_cpp_cpp.html",
+        "lang": "C++",
+        "name": "Example mip1_c++.cpp",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_example_details.html",
+        "lang": "C++",
+        "name": "Example details",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_creating_the_environme.html",
+        "lang": "C++",
+        "name": "Creating the environment",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_creating_the_model.html",
+        "lang": "C++",
+        "name": "Creating the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_adding_variables_to_th.html",
+        "lang": "C++",
+        "name": "Adding variables to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_setting_the_objective.html",
+        "lang": "C++",
+        "name": "Setting the objective",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_adding_constraints_to_.html",
+        "lang": "C++",
+        "name": "Adding constraints to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_optimizing_the_model.html",
+        "lang": "C++",
+        "name": "Optimizing the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_reporting_results_attr.html",
+        "lang": "C++",
+        "name": "Reporting results - attributes",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_error_handling.html",
+        "lang": "C++",
+        "name": "Error handling",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cpp_building_and_running_t.html",
+        "lang": "C++",
+        "name": "Building and running the example",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "java_interface.html",
+    "lang": "Java",
+    "name": "Java Interface",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "java_example_mip1_java.html",
+        "lang": "Java",
+        "name": "Example Mip1.java",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_example_details.html",
+        "lang": "Java",
+        "name": "Example details",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_creating_the_environm.html",
+        "lang": "Java",
+        "name": "Creating the environment",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_creating_the_model.html",
+        "lang": "Java",
+        "name": "Creating the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_adding_variables_to_t.html",
+        "lang": "Java",
+        "name": "Adding variables to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_setting_the_objective.html",
+        "lang": "Java",
+        "name": "Setting the objective",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_adding_constraints_to.html",
+        "lang": "Java",
+        "name": "Adding constraints to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_optimizing_the_model.html",
+        "lang": "Java",
+        "name": "Optimizing the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_reporting_results_att.html",
+        "lang": "Java",
+        "name": "Reporting results - attributes",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_cleaning_up.html",
+        "lang": "Java",
+        "name": "Cleaning up",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_error_handling.html",
+        "lang": "Java",
+        "name": "Error handling",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "java_building_and_running_.html",
+        "lang": "Java",
+        "name": "Building and running the example",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "cs_net_interface_cs.html",
+    "lang": ".NET",
+    "name": ".NET Interface (C#)",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "cs_example_mip1_cs_cs.html",
+        "lang": ".NET",
+        "name": "Example mip1_cs.cs",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_example_details.html",
+        "lang": ".NET",
+        "name": "Example details",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_creating_the_environmen.html",
+        "lang": ".NET",
+        "name": "Creating the environment",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_creating_the_model.html",
+        "lang": ".NET",
+        "name": "Creating the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_adding_variables_to_the.html",
+        "lang": ".NET",
+        "name": "Adding variables to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_setting_the_objective.html",
+        "lang": ".NET",
+        "name": "Setting the objective",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_adding_constraints_to_t.html",
+        "lang": ".NET",
+        "name": "Adding constraints to the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_optimizing_the_model.html",
+        "lang": ".NET",
+        "name": "Optimizing the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_reporting_results_attri.html",
+        "lang": ".NET",
+        "name": "Reporting results - attributes",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_cleaning_up.html",
+        "lang": ".NET",
+        "name": "Cleaning up",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_error_handling.html",
+        "lang": ".NET",
+        "name": "Error handling",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_building_and_running_th.html",
+        "lang": ".NET",
+        "name": "Building and running the example",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "cs_python.html",
+    "lang": ".NET",
+    "name": "Python",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "cs_python_installation_opt.html",
+        "lang": ".NET",
+        "name": "Python Installation Options",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "cs_using_pip_to_install_gr.html",
+            "lang": ".NET",
+            "name": "Using pip to install gurobipy",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_manual_installation.html",
+            "lang": ".NET",
+            "name": "Manual installation",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_anaconda_and_grb_conda_.html",
+            "lang": ".NET",
+            "name": "Anaconda and Gurobi conda package",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "cs_python_tools.html",
+        "lang": ".NET",
+        "name": "Python Tools",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "cs_jupyter_notebook.html",
+            "lang": ".NET",
+            "name": "Jupyter Notebook",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_the_spyder_ide.html",
+            "lang": ".NET",
+            "name": "The Spyder IDE",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "cs_grbpy_the_gurobi_python.html",
+        "lang": ".NET",
+        "name": "gurobipy, the Gurobi Python Interface",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "cs_simple_python_example.html",
+        "lang": ".NET",
+        "name": "Simple Python Example",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "cs_example_mip1_py.html",
+            "lang": ".NET",
+            "name": "Example mip1.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_example_details2.html",
+            "lang": ".NET",
+            "name": "Example details",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_creating_the_model2.html",
+            "lang": ".NET",
+            "name": "Creating the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_adding_variables_to_the2.html",
+            "lang": ".NET",
+            "name": "Adding variables to the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_setting_the_objective2.html",
+            "lang": ".NET",
+            "name": "Setting the objective",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_adding_constraints_to_t2.html",
+            "lang": ".NET",
+            "name": "Adding constraints to the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_optimizing_the_model2.html",
+            "lang": ".NET",
+            "name": "Optimizing the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_reporting_results_attri2.html",
+            "lang": ".NET",
+            "name": "Reporting results - attributes",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_cleaning_up2.html",
+            "lang": ".NET",
+            "name": "Cleaning up",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_error_handling2.html",
+            "lang": ".NET",
+            "name": "Error handling",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_running_the_example.html",
+            "lang": ".NET",
+            "name": "Running the example",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "cs_python_matrix_example.html",
+        "lang": ".NET",
+        "name": "Python Matrix Example",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "cs_example_matrix1_py.html",
+            "lang": ".NET",
+            "name": "Example matrix1.py",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_example_details3.html",
+            "lang": ".NET",
+            "name": "Example details",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_creating_the_model3.html",
+            "lang": ".NET",
+            "name": "Creating the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_adding_variables_to_the3.html",
+            "lang": ".NET",
+            "name": "Adding variables to the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_setting_the_objective3.html",
+            "lang": ".NET",
+            "name": "Setting the objective",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_adding_constraints_to_t3.html",
+            "lang": ".NET",
+            "name": "Adding constraints to the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_optimizing_the_model3.html",
+            "lang": ".NET",
+            "name": "Optimizing the model",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_reporting_results_attri3.html",
+            "lang": ".NET",
+            "name": "Reporting results - attributes",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_error_handling3.html",
+            "lang": ".NET",
+            "name": "Error handling",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_running_the_example2.html",
+            "lang": ".NET",
+            "name": "Running the example",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "cs_python_dictionary_examp.html",
+        "lang": ".NET",
+        "name": "Python Dictionary Example",
+        "children": [
+          {
+            "level": "subsubsection",
+            "href": "cs_motivation.html",
+            "lang": ".NET",
+            "name": "Motivation",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_lists_and_tuples.html",
+            "lang": ".NET",
+            "name": "Lists and Tuples",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_dictionaries.html",
+            "lang": ".NET",
+            "name": "Dictionaries",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_list_comprehension_and_.html",
+            "lang": ".NET",
+            "name": "List comprehension and generator expressions",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_the_tuplelist_class.html",
+            "lang": ".NET",
+            "name": "The tuplelist class",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_the_tupledict_class.html",
+            "lang": ".NET",
+            "name": "The tupledict class",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_netflow_py_example.html",
+            "lang": ".NET",
+            "name": "netflow.py example",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_netflow_py_example_deta.html",
+            "lang": ".NET",
+            "name": "netflow.py example details",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_building_a_multi_dimens.html",
+            "lang": ".NET",
+            "name": "Building a multi-dimensional array of variables",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_arc_capacity_constraint.html",
+            "lang": ".NET",
+            "name": "Arc capacity constraints",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_flow_conservation_const.html",
+            "lang": ".NET",
+            "name": "Flow conservation constraints",
+            "children": []
+          },
+          {
+            "level": "subsubsection",
+            "href": "cs_results.html",
+            "lang": ".NET",
+            "name": "Results",
+            "children": []
+          }
+        ]
+      },
+      {
+        "level": "subsection",
+        "href": "cs_running_the_examples.html",
+        "lang": ".NET",
+        "name": "Running the examples",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "matlab_interface.html",
+    "lang": "MATLAB",
+    "name": "MATLAB Interface",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "matlab_setting_up_grb_for_.html",
+        "lang": "MATLAB",
+        "name": "Setting up Gurobi for MATLAB",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_example.html",
+        "lang": "MATLAB",
+        "name": "Example",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_example_details.html",
+        "lang": "MATLAB",
+        "name": "Example details",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_building_the_model.html",
+        "lang": "MATLAB",
+        "name": "Building the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_modifying_grb_param.html",
+        "lang": "MATLAB",
+        "name": "Modifying Gurobi parameters",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_solving_the_model.html",
+        "lang": "MATLAB",
+        "name": "Solving the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_printing_the_soluti.html",
+        "lang": "MATLAB",
+        "name": "Printing the solution",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "matlab_running_the_example.html",
+        "lang": "MATLAB",
+        "name": "Running the example",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "r_interface.html",
+    "lang": "R",
+    "name": "R Interface",
+    "children": [
+      {
+        "level": "subsection",
+        "href": "r_ins_the_r_package.html",
+        "lang": "R",
+        "name": "Installing the R Package",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "r_example.html",
+        "lang": "R",
+        "name": "Example",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "r_example_details.html",
+        "lang": "R",
+        "name": "Example details",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "r_building_the_model.html",
+        "lang": "R",
+        "name": "Building the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "r_modifying_grb_parameters.html",
+        "lang": "R",
+        "name": "Modifying Gurobi parameters",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "r_solving_the_model.html",
+        "lang": "R",
+        "name": "Solving the model",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "r_printing_the_solution.html",
+        "lang": "R",
+        "name": "Printing the solution",
+        "children": []
+      },
+      {
+        "level": "subsection",
+        "href": "r_running_the_example.html",
+        "lang": "R",
+        "name": "Running the example",
+        "children": []
+      }
+    ]
+  },
+  {
+    "level": "section",
+    "href": "recommended_reading.html",
+    "lang": null,
+    "name": "Recommended Reading",
+    "children": []
+  },
+  {
+    "level": "section",
+    "href": "file_overview.html",
+    "lang": null,
+    "name": "File Overview",
+    "children": []
+  }
+]

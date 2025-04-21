@@ -1,0 +1,222 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>FarkasDual</TITLE>
+<META NAME="description" CONTENT="FarkasDual">
+<META NAME="keywords" CONTENT="refman">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="refman.css">
+
+<LINK REL="previous" HREF="sarhsup.html">
+<LINK REL="next" HREF="sos_attributes.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="sos_attributes.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="linear_constraint_attribut.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="sarhsup.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="sos_attributes.html">SOS Attributes</A>
+<B> Up:</B> <A
+ HREF="linear_constraint_attribut.html">Linear Constraint Attributes</A>
+<B> Previous:</B> <A
+ HREF="sarhsup.html">SARHSUp</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H3><A ID="SECTION0001831400000000000000"></A>
+<A ID="attr:FarkasDual"></A>
+<BR>
+FarkasDual
+</H3>
+<TABLE class="PAD " style="">
+<TR><TH CLASS="LEFT"><SPAN  CLASS="textbf">Type:</SPAN></TH>
+<TD CLASS="LEFT">double</TD>
+</TR>
+<TR><TH CLASS="LEFT"><SPAN  CLASS="textbf">Modifiable:</SPAN></TH>
+<TD CLASS="LEFT">No</TD>
+</TR>
+</TABLE>
+
+<P>
+Together, attributes <A HREF="#attr:FarkasDual">FarkasDual</A> and
+<A HREF="farkasproof.html#attr:FarkasProof">FarkasProof</A> provide a certificate of
+infeasibility for the given infeasible problem.
+Specifically, <A HREF="#attr:FarkasDual">FarkasDual</A> can
+be used to form the following inequality from the original
+constraints that is infeasible within the bounds of the variables:
+
+<P>
+<DIV class="CENTER">
+<!-- MATH
+ $\lambda^tAx \leq \lambda^tb.$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.62ex; vertical-align: -0.43ex; " SRC="img222.svg"
+ ALT="$\lambda^tAx \leq \lambda^tb.$"></SPAN>
+</DIV>
+
+<P>
+This Farkas constraint is valid, because <!-- MATH
+ $\lambda_i \geq 0$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.42ex; vertical-align: -0.46ex; " SRC="img223.svg"
+ ALT="$\lambda_i \geq 0$"></SPAN> if the
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 1.99ex; vertical-align: -0.12ex; " SRC="img66.svg"
+ ALT="$i$"></SPAN>-th constraint has a <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.25ex; vertical-align: -0.43ex; " SRC="img100.svg"
+ ALT="$\leq$"></SPAN> sense and <!-- MATH
+ $\lambda_i \leq 0$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.42ex; vertical-align: -0.46ex; " SRC="img224.svg"
+ ALT="$\lambda_i \leq 0$"></SPAN> if the
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 1.99ex; vertical-align: -0.12ex; " SRC="img66.svg"
+ ALT="$i$"></SPAN>-th constraint has a <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.25ex; vertical-align: -0.43ex; " SRC="img44.svg"
+ ALT="$\geq$"></SPAN> sense.
+
+<P>
+Let
+
+<P>
+<DIV class="CENTER">
+<!-- MATH
+ $\bar{a} := \lambda^tA$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.30ex; vertical-align: -0.12ex; " SRC="img225.svg"
+ ALT="$\bar{a} := \lambda^tA$"></SPAN>
+</DIV>
+
+<P>
+be the coefficients of this inequality and
+
+<P>
+<DIV class="CENTER">
+<!-- MATH
+ $\bar{b} := \lambda^tb$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.39ex; vertical-align: -0.12ex; " SRC="img226.svg"
+ ALT="$\bar{b} := \lambda^tb$"></SPAN>
+</DIV>
+
+<P>
+be its right hand side. With <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.71ex; vertical-align: -0.78ex; " SRC="img227.svg"
+ ALT="$L_j$"></SPAN> and <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.71ex; vertical-align: -0.78ex; " SRC="img228.svg"
+ ALT="$U_j$"></SPAN> being the lower and upper
+bounds of the variables <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.12ex; vertical-align: -0.78ex; " SRC="img28.svg"
+ ALT="$x_j$"></SPAN> we have <!-- MATH
+ $\bar{a}_j \geq 0$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.62ex; vertical-align: -0.78ex; " SRC="img229.svg"
+ ALT="$\bar{a}_j \geq 0$"></SPAN> if
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.71ex; vertical-align: -0.78ex; " SRC="img230.svg"
+ ALT="$U_j = \infty$"></SPAN>, and <!-- MATH
+ $\bar{a}_j \leq 0$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.62ex; vertical-align: -0.78ex; " SRC="img231.svg"
+ ALT="$\bar{a}_j \leq 0$"></SPAN> if <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.71ex; vertical-align: -0.78ex; " SRC="img232.svg"
+ ALT="$L_j = -\infty$"></SPAN>.
+
+<P>
+The minimum violation of the Farkas constraint is achieved by setting
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.98ex; vertical-align: -1.04ex; " SRC="img233.svg"
+ ALT="$x^*_j := L_j$"></SPAN> for <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.62ex; vertical-align: -0.78ex; " SRC="img234.svg"
+ ALT="$\bar{a}_j &gt; 0$"></SPAN> and <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.98ex; vertical-align: -1.04ex; " SRC="img235.svg"
+ ALT="$x^*_j := U_j$"></SPAN> for
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.62ex; vertical-align: -0.78ex; " SRC="img236.svg"
+ ALT="$\bar{a}_j &lt; 0$"></SPAN>. Then, we can calculate the minimum violation as
+
+<P>
+<DIV class="CENTER">
+<!-- MATH
+ $\beta := \bar{a}^tx^* - \bar{b} =
+\sum\limits_{j:\bar{a}_j>0}\bar{a}_jL_j + \sum\limits_{j:\bar{a}_j<0}\bar{a}_jU_j - \bar{b}$
+ -->
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 5.11ex; vertical-align: -2.85ex; " SRC="img237.svg"
+ ALT="$\beta := \bar{a}^tx^* - \bar{b} =
+\sum\limits_{j:\bar{a}_j&gt;0}\bar{a}_jL_j + \sum\limits_{j:\bar{a}_j&lt;0}\bar{a}_jU_j - \bar{b}$"></SPAN>
+</DIV>
+
+<P>
+where <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.52ex; vertical-align: -0.57ex; " SRC="img238.svg"
+ ALT="$\beta&gt;0$"></SPAN>.
+
+<P>
+The <A HREF="farkasproof.html#attr:FarkasProof">FarkasProof</A> attribute provides
+<SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.52ex; vertical-align: -0.57ex; " SRC="img239.svg"
+ ALT="$\beta$"></SPAN>, and the <A HREF="#attr:FarkasDual">FarkasDual</A> attributes
+provide the <SPAN CLASS="MATH"><IMG
+ STYLE="height: 2.07ex; vertical-align: -0.12ex; " SRC="img240.svg"
+ ALT="$\lambda$"></SPAN> multipliers for the original constraints.
+
+<P>
+These attributes are only available when parameter
+<A HREF="infunbdinfo.html#parameter:InfUnbdInfo">InfUnbdInfo</A> is set to 1.
+
+<P>
+
+<P>
+For examples of how to query or modify attributes, refer to
+our <A HREF="attribute_examples.html#sec:AttributeExamples">Attribute Examples</A>.
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="sos_attributes.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="linear_constraint_attribut.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="sarhsup.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="sos_attributes.html">SOS Attributes</A>
+<B> Up:</B> <A
+ HREF="linear_constraint_attribut.html">Linear Constraint Attributes</A>
+<B> Previous:</B> <A
+ HREF="sarhsup.html">SARHSUp</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>

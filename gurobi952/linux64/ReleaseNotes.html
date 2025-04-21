@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>Gurobi Optimization</title>
+	<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+	<style type="text/css">
+	body {
+		background-color: #FFFFFF;
+		padding: 20px 40px;
+		font-family: Helvetica, Arial, sans-serif;
+		font-size:11pt;
+		line-height:20px;
+		margin:0px;
+		max-width:1200px;
+		margin-right: auto;
+		margin-left: auto;
+	}
+	img {
+		border: none;
+	}
+	h2 {
+		margin: 36px 0 8px;
+	}
+	.menu {
+		padding-bottom: 40px;
+	}
+	.menu td {
+		padding-right: 30px;
+		font-size: 14pt;
+		font-weight: bold;
+	}
+	.menu a {
+		text-decoration: none;
+		color: #292929;
+	}
+	.menu a:hover {
+		color: #909090;
+	}
+	.platforms {
+		border-collapse: collapse;
+	}
+	.platforms td, .platforms th {
+		font-size: 10pt;
+		border: solid 1px black;
+		padding: 4px 8px;
+		text-align: left;
+	}
+	</style>
+</head>
+<body>
+<table class='menu'>
+	<tr>
+		<td><a href="https://www.gurobi.com"><img style='width:211px' src="docs/logo.png" alt="Gurobi Optimization" title="Gurobi Optimization" /></a></td>
+		<td><a href="https://www.gurobi.com">gurobi.com</a></td>
+		<td><a href="docs/refman/refman.html">Reference Manual</a></td>
+		<td><a href="https://support.gurobi.com">Customer Support</a></td>
+	</tr>
+</table>
+<h1>
+	WELCOME
+</h1>
+<p>
+	You have successfully installed version 9.5.2 of the Gurobi Optimizer.
+</p>
+<p>
+	You'll find instructions for setting up your Gurobi license in this document, as well as a list of supported platforms, and Release Notes and guidelines for converting existing Gurobi code to run with this new version. Once you have finished browsing this document, you should refer to the <a href="docs/refman/detailed_release_notes_for.html">Detailed Release Notes</a>, the <a href="docs/quickstart/quickstart.html">Quick Start Guide</a>, the <a href="docs/examples/examples.html">Example Tour</a>, the <a href="docs/refman/refman.html">Reference Manual</a>, or the <a href="docs/remoteservices/remoteservices.html">Remote Services Reference Manual</a> to get started using the Gurobi Optimizer.
+</p>
+<h2>
+	Obtaining Your License
+</h2>
+<p>
+Gurobi Optimizer 9.5 uses the same licenses as versions 9.0 and 9.1, so if you already have a Gurobi 9 license, there's no need to obtain a new one.  Otherwise, you will need to visit the <a href="https://www.gurobi.com/downloads/licenses/license-center">Gurobi License Center</a>. If you are a commercial user under maintenance, you should see your Gurobi 9 license under <a href="https://www.gurobi.com/download/licenses/current">Current Gurobi Licenses</a>.  If you would like to request a free academic license, you can do so from the <a href="https://www.gurobi.com/download/licenses/free-academic">Free Academic License</a> page. Once you have a license on the Gurobi web site, you will need to follow the instructions for installing a license in the <a href="docs/quickstart/quickstart.html">Quick Start Guide</a>.
+</p>
+<h2>
+	Supported Platforms for Version 9.5
+</h2>
+<table class='platforms'>
+	<tr>
+		<th>Platform</th>
+		<th>Operating System</th>
+		<th>Compiler</th>
+		<th>Notes</th>
+	</tr>
+	<tr>
+		<td rowspan="2">Windows 64-bit (win64)</td>
+		<td>Windows 10, 11, Windows Server 2012 R2, 2016, 2019, 2022</td>
+		<td>Visual Studio 2017</td>
+		<td>Use gurobi_c++md2017.lib (e.g.) for C++</td>
+	</tr>
+	<tr>
+		<td>Windows 10, 11, Windows Server 2012 R2, 2016, 2019, 2022</td>
+		<td>Visual Studio 2019</td>
+		<td>Use gurobi_c++md2019.lib (e.g.) for C++</td>
+	</tr>
+	<tr>
+		<td rowspan="4">Linux&reg; x86-64 64-bit (linux64)</td>
+		<td>Red Hat&reg; Enterprise Linux 7 (and the corresponding CentOS distribution), 8</td>
+		<td rowspan="4">GCC >= 4.8</td>
+		<td rowspan="4">Use libgurobi_g++5.2.a for newer C++ compilers</td>
+
+	</tr>
+	<tr>
+		<td>SUSE&reg; Enterprise Linux 12, 15</td>
+	</tr>
+	<tr>
+		<td>Ubuntu&reg; 18.04, 20.04</td>
+	</tr>
+        <tr>
+                <td>Amazon Linux 2</td>
+        </tr>
+	<tr>
+		<td>macOS 64-bit universal2 (macos_universal2)</td>
+		<td>10.15 (Catalina), 11 (Big Sur), 12 (Monterey)</td>
+		<td>Xcode 12/13</td>
+		<td></td>
+	</tr>
+	<tr>
+		<td>AIX&reg; 64-bit (power64)</td>
+		<td>AIX 7.1, 7.2, 7.3</td>
+		<td>XL C/C++ 9</td>
+		<td>Due to limited Python support on AIX, this port does not include the Interactive Shell or the Python libraries.</td>
+	</tr>
+</table>
+Note that the previous <i>mac64</i> port has been replaced by the new <i>macos_universal2</i> port, which supports both Intel and Apple processors.
+<h2>
+	Additional Supported Platform Information
+</h2>
+Gurobi 9.5 supports the following language/platform versions:
+<table class=platforms>
+	<tr>
+		<th>Language</th>
+		<th>Version</th>
+	</tr>
+	<tr>
+		<td>Python</td>
+		<td>2.7, 3.7, 3.8, 3.9, 3.10</td>
+	</tr>
+	<tr>
+		<td>MATLAB</td>
+		<td>R2019a-R2022a</td>
+	</tr>
+	<tr>
+		<td>R</td>
+		<td>4.2</td>
+	</tr>
+	<tr>
+		<td>JDK</td>
+		<td>8, 11, 17</td>
+	</tr>
+	<tr>
+		<td>.NET</td>
+		<td>Core 3.1, 6.0</td>
+	</tr>
+</table>
+<p>
+</p>
+
+<h2>
+	Release Notes for Version 9.5
+</h2>
+<p>
+        In addition to performance enhancements, Gurobi 9.5 adds the following new features:
+</p>
+<ul>
+  <li><b>Norm General Constraint:</b> Our existing general constraint feature allows you to add common higher-level constraints using a convenient shorthand.  This release includes a new vector norm constraint, which allows you to set one decision variable in your optimization model equal to the norm of a list of decision variables.  A number of norms are supported: the 0-norm, 1-norm, 2-norm, and the infinity-norm.  See the <a href="docs/refman/constraints.html#subsubsection:GeneralConstraints">general constraint</a> discussion in the Reference Manual for more information.</li>
+  <li><b>NLP Heuristic for Non-Convex Quadratic Models:</b> We have added a non-linear barrier solver for quickly finding feasible solutions to non-convex quadratic models.  This is controlled with the new <a href="docs/refman/nlpheur.html"><b>NLPHeur</b></a> parameter.</li>
+  <li><b>Work Metric:</b> We now include a deterministic work measure.  The new <a href="docs/refman/work.html"><b>Work</b></a> attribute allows you to query the amount of work performed in an <b>Optimize</b> call, the new <a href="docs/refman/worklimit.html"><b>WorkLimit</b></a> parameter allows you to terminate optimization when the specified work limit has been exceeded, and the new <b>CB_WORK</b> callback value allows you to track this new work metric from a callback.</li>
+  <li><b>Memory Limit:</b> The new <a href="docs/refman/memlimit.html"><b>MemLimit</b></a> parameter allows you to terminate optimization when the memory used by the optimization exceeds the specified value.</li>
+  <li><b>New Cut Type - Lift-and-Project Cuts:</b> This release includes a new cut type, lift-and-project cuts.  The new <a href="docs/refman/liftprojectcuts.html"><b>LiftProjectCuts</b></a> parameter provides some control over the generation of these cuts.</li>
+  <li><b>Force Constraints Into or Out of an IIS:</b> You now have more control over the Irreducible Infeasible Subsystem (IIS) algorithm.  Specifically, you
+    can indicate that certain constraints or bounds should be forced into the IIS, even if the resulting subsystem is not
+    minimal.  Similarly, you can exclude constraints or bounds from the IIS.  This is controlled with the following new attributes:
+    <a href="docs/refman/iislbforce.html"><b>IISLBForce</b></a>,
+    <a href="docs/refman/iisubforce.html"><b>IISUBForce</b></a>,
+    <a href="docs/refman/iisconstrforce.html"><b>IISConstrForce</b></a>,
+    <a href="docs/refman/iissosforce.html"><b>IISSOSForce</b></a>,
+    <a href="docs/refman/iisqconstrforce.html"><b>IISQConstrForce</b></a>, and
+    <a href="docs/refman/iisgenconstrforce.html"><b>IISGenConstrForce</b></a>.</li>
+  <li><b>IIS Callbacks:</b> New IIS callbacks allow you to programatically track the progress of the IIS algorithm.</li>
+  <li><b>SOS Encoding Options:</b> SOS constraints can now be formulated in multiple different ways internally, which can sometimes give better performance.
+    This is controlled with the new <a href="docs/refman/presos1encoding.html"><b>PreSOS1Encoding</b></a> and
+    <a href="docs/refman/presos2encoding.html"><b>PreSOS2Encoding</b></a> parameters.</li>
+  <li><b>New Callback for Exiting the NoRel Heuristic:</b> The new <b>Proceed</b> callback method allows you to smoothly transition from the NoRel heuristic to the standard MIP search.</li>
+  <li><b>Lazy Constraints in the NoRel Heuristic:</b> Lazy constraints are now supported in the NoRel heuristic.  You will receive solution callbacks and be given the opportunity to cut off those solutions with lazy constraints.</li>
+  <li><b>New Simplex Warm Start Options:</b> Several new options are available for starting simplex from a previous solution.  Options are chosen using the new <a href="docs/refman/lpwarmstart.html"><b>LPWarmStart</b></a> parameter.</li>
+  <li><b>Writing Dualized Models:</b> The new .DUA and .DLP file formats allow you to write the dual formulation of an LP problem.</li>
+<li><b>Tuning Tool Enhancements:</b> We added a number of additional controls to our tuning tool, including
+  control over termination (<a href="docs/refman/tunetargetmipgap.html"><b>TuneTargetMIPGap</b></a> and
+    <a href="docs/refman/tunetargettime.html"><b>TuneTargetTime</b>)</a>, and control over how runtimes from multiple trials
+      are aggregated (<a href="docs/refman/tunemetric.html"><b>TuneMetric</b></a>).</li>
+  <li><b>New Parameters and Attributes:</b> In addition to the attributes and parameters directly tied to the new features above, there are three additional new attributes:
+   <ul>
+                <li><a href="docs/refman/maxvio.html"><b>MaxVio</b></a> New attribute that gives the maximum (unscaled) constraint violation for the computed solution.</li>
+                <li><a href="docs/refman/concurrentwinmethod.html"><b>ConcurrentWinMethod</b></a> New attribute that indicates which algorithm prevailed in a concurrent LP solve.</li>
+                <li><a href="docs/refman/poolignore.html"><b>PoolIgnore</b></a> New attribute to select variables that should be ignored when checking whether two solutions differ in the solution pool.</li>
+   </ul> </li>
+</ul>
+<h2>
+	Code Conversion from Version 9.1
+</h2>
+<p>
+If you use Python matrix variable objects (<a href="docs/refman/py_mvar.html#pythonclass:MVar"><b>MVar</b></a>) or matrix constraint objects (<a href="docs/refman/py_mconstr.html#pythonclass:MConstr"><b>MConstr</b></a>), indexing has changed slightly. When accessing a single element, Gurobi 9.5 will now return the corresponding variable or constraint object rather than
+an array of shape <b>(1,)</b>. See the section on <a href="docs/refman/detailed_release_notes_for.html#v95:subsection:Mvar">Indexing of <b>MVar</b> and <b>MConstr</b> objects</a> in the detailed release notes for details.
+</p>
+<p>
+Beyond this, programs that were originally written for version 9.1 of the Gurobi Optimizer generally won't require any code changes to use version 9.5. If you'd like to use the new features, some code changes are required. We have deprecated some methods, which may require you to make changes to your code in a future version. Details are available in the <a href="docs/refman/detailed_release_notes_for.html#v95:subsection:deprecations">detailed release notes</a>.
+</p>
+<h2>
+	License Agreement
+</h2>
+<p>
+	Note that this software is covered by the <a href="EULA.pdf">Gurobi End User License Agreement</a>. By completing the Gurobi installation process and using the software, you are accepting the terms of this agreement.
+</p>
+<p>
+	Thank you for using Gurobi products!
+</p>
+<hr />
+<p>
+	&copy; 2022 Gurobi Optimization. All Rights Reserved.
+</p>
+</body>
+</html>

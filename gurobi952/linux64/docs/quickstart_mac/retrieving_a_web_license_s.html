@@ -1,0 +1,144 @@
+<!DOCTYPE HTML>
+
+<!--Converted with LaTeX2HTML 2021.2 (Released July 1, 2021) -->
+<HTML lang="en">
+<HEAD>
+<TITLE>Retrieving a Web License Service (WLS) client license</TITLE>
+<META NAME="description" CONTENT="Retrieving a Web License Service (WLS) client license">
+<META NAME="keywords" CONTENT="quickstart_mac">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+<META NAME="viewport" CONTENT="width=device-width, initial-scale=1.0">
+<META NAME="Generator" CONTENT="LaTeX2HTML v2021.2">
+
+<LINK REL="STYLESHEET" HREF="quickstart_mac.css">
+
+<LINK REL="next" HREF="setting_up_and_using_a_flo.html">
+<LINK REL="previous" HREF="retrieving_a_named_user_or.html">
+<LINK REL="next" HREF="setting_up_and_using_a_flo.html">
+</HEAD>
+
+<BODY >
+
+<DIV CLASS="navigation"><!--Navigation Panel-->
+<A
+ HREF="setting_up_and_using_a_flo.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="retrieving_and_setting_up_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="retrieving_a_named_user_or.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="setting_up_and_using_a_flo.html">Setting up and using</A>
+<B> Up:</B> <A
+ HREF="retrieving_and_setting_up_.html">Retrieving and Setting Up</A>
+<B> Previous:</B> <A
+ HREF="retrieving_a_named_user_or.html">Retrieving a Named-User or</A>
+<BR>
+<BR></DIV>
+<!--End of Navigation Panel-->
+
+<H2><A ID="SECTION00033000000000000000"></A>
+<A ID="subsection:clientlicenseWLS"></A>
+<BR>
+Retrieving a Web License Service (WLS) client license
+</H2>
+
+<P>
+A WLS license allows you to run Gurobi from within a containerized
+environment.  Your application will need to provide valid credentials
+for your WLS license, either through a license file or through an API
+key.  When your application starts a Gurobi environment, it will
+communicate with the Gurobi WLS server over the Internet to retrieve a
+token that will allow it proceed.
+
+<P>
+While some container environments may run macOS or Windows
+binaries, Gurobi currently only supports Linux containers.
+
+<P>
+The simplest way to use a WLS license is with a <code>gurobi.lic</code>
+license file.  To retrieve one, visit the
+<A ID="tex2html14"
+  HREF="https://license.gurobi.com">Web License Manager</A>
+site, log in to your
+account, click on the Licenses tab, and finally click Download
+for the WLS license you plan to use.
+We recommend that you store the resulting
+<code>gurobi.lic</code> file in <TT>/opt/gurobi</TT>, which
+is the default location on Linux.
+
+<P>
+The <code>gurobi.lic</code> file you get will always
+contain the following three lines:
+<PRE>
+WLSACCESSID=203dec48-e3f8-46ac-0184-92d7d6ded944
+WLSSECRET=a080cce8-4e01-4e36-955e-61592c5630db
+LICENSEID=12127
+</PRE>
+These give the WLS license ID, the access ID for that license, and
+the corresponding secret key.  These credentials are private and
+should not be shared with anyone who is not entitled to use your
+license.
+
+<P>
+As noted earlier, you can also provide your credentials through
+a Gurobi programming language API using an API key.
+
+<P>
+<SPAN  CLASS="textbf">Using a non-default license file location</SPAN>
+
+<P>
+When you run the Mac version of the
+Gurobi Optimizer, it will look for the <code>gurobi.lic</code> key file in
+three different default locations: <TT>/Library/gurobi</TT>,
+<TT>/Library/gurobi952</TT> (for 9.5.2), and
+your home directory.
+
+If you would like to use a non-default license key file location, you
+can do so by setting an
+environment variable <code>GRB_LICENSE_FILE</code> to point to the license
+key file. See <A HREF="setting_environment_variab.html#subsection:setenvvars">Setting environment
+variables</A> for details on how to do this.
+
+<P>
+<EM>Important note: the environment variable should point to the
+license key file itself, not to the directory that contains the file.</EM>
+
+<P>
+<SPAN  CLASS="textbf">Next steps</SPAN>
+
+<P>
+Once you have followed the steps above and obtained
+a license key file, your next step is to
+<A HREF="testing_your_license.html#subsection:testlicense">test your license</A>.
+
+<P>
+
+<DIV CLASS="navigation"><HR>
+<!--Navigation Panel-->
+<A
+ HREF="setting_up_and_using_a_flo.html">
+<IMG WIDTH="37" HEIGHT="24" ALT="next" SRC="next.png"></A> 
+<A
+ HREF="retrieving_and_setting_up_.html">
+<IMG WIDTH="26" HEIGHT="24" ALT="up" SRC="up.png"></A> 
+<A
+ HREF="retrieving_a_named_user_or.html">
+<IMG WIDTH="63" HEIGHT="24" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A
+ HREF="setting_up_and_using_a_flo.html">Setting up and using</A>
+<B> Up:</B> <A
+ HREF="retrieving_and_setting_up_.html">Retrieving and Setting Up</A>
+<B> Previous:</B> <A
+ HREF="retrieving_a_named_user_or.html">Retrieving a Named-User or</A></DIV>
+<!--End of Navigation Panel-->
+
+</BODY>
+</HTML>
