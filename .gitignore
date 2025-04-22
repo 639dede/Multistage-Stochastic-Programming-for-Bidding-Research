@@ -33,3 +33,12 @@ gurobi.lic
 
 # Logs
 *.log
+
+# Optimization solvers and binaries
+Ipopt/
+gurobi952/
+
+# Gurobi files
+gurobi.ilp
+gurobi9.5.2_linux64.tar.gz
+gurobi11.0.1_linux64.tar.gz
