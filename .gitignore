@@ -1,0 +1,35 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.venv/
+venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+.vscode/
+
+# Gurobi license file
+gurobi.lic
+
+# Compressed files
+*.tar.gz
+*.zip
+
+# Data files
+*.csv
+*.xlsx
+*.pkl
+*.h5
+
+# Logs
+*.log
