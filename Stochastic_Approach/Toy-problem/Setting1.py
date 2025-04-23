@@ -2,6 +2,8 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import pyomo.environ as pyo
 import random
@@ -283,9 +285,9 @@ class fw_da_bin(pyo.ConcreteModel):
         # S
         self.Round[0] = math.ceil(math.log2(S_max)) 
         # T_b
-        self.Round[1] = [math.ceil(math.log2(P_r)) for _ in range(self.T)] 
+        self.Round[1] = math.ceil(math.log2(P_r)) 
         # T_Q
-        self.Round[2] = [math.ceil(math.log2(E_0_partial_max)) for _ in range(self.T)] 
+        self.Round[2] = math.ceil(math.log2(E_0_partial_max)) 
         # T_q
         self.Round[3] = math.ceil(math.log2(E_0_sum))
         # T_b_rt
@@ -394,7 +396,7 @@ class fw_da_bin(pyo.ConcreteModel):
             return sum(model.b_E[k]*(2**k) for k in range(self.Round[6] + 1)) == 0
         
         def value_fcn_approx_rule(model, l):
-            return model.theta <= self.psi[l][0] + sum(self.psi[l][1][k]*model.b_S[k] for k in range(self.Round[0] + 1)) + sum(sum(self.psi[l][2][t][k]*model.b_b[t, k] for k in range(self.Round[1][t] + 1)) for t in range(T)) + sum(sum(self.psi[l][3][t][k]*model.b_Q[t, k] for k in range(self.Round[2][t] + 1)) for t in range(T)) + sum(self.psi[l][4][k]*model.b_q[k] for k in range(self.Round[3] + 1)) + sum(self.psi[l][5][k]*model.b_b_rt[k] for k in range(self.Round[4] + 1)) + sum(self.psi[l][6][k]*model.b_q_rt[k] for k in range(self.Round[5] + 1)) + sum(self.psi[l][7][k]*model.b_E[k] for k in range(self.Round[6] + 1))
+            return model.theta <= self.psi[l][0] + sum(self.psi[l][1][k]*model.b_S[k] for k in range(self.Round[0] + 1)) + sum(sum(self.psi[l][2][t][k]*model.b_b[t, k] for k in range(self.Round[1] + 1)) for t in range(T)) + sum(sum(self.psi[l][3][t][k]*model.b_Q[t, k] for k in range(self.Round[2] + 1)) for t in range(T)) + sum(self.psi[l][4][k]*model.b_q[k] for k in range(self.Round[3] + 1)) + sum(self.psi[l][5][k]*model.b_b_rt[k] for k in range(self.Round[4] + 1)) + sum(self.psi[l][6][k]*model.b_q_rt[k] for k in range(self.Round[5] + 1)) + sum(self.psi[l][7][k]*model.b_E[k] for k in range(self.Round[6] + 1))
             
         model.da_bidding_amount = pyo.Constraint(model.TIME, rule = da_bidding_amount_rule)
         model.da_overbid = pyo.Constraint(rule = da_overbid_rule)
@@ -3382,10 +3384,10 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             pyo.value(self.z_S),
             [pyo.value(self.z_T_b[t]) for t in range(self.T - self.stage)],
             [pyo.value(self.z_T_Q[t]) for t in range(self.T - self.stage)],
-            pyo.value(self.T_q),
-            pyo.value(self.T_b_rt),
-            pyo.value(self.T_q_rt),
-            pyo.value(self.T_E)
+            pyo.value(self.z_T_q),
+            pyo.value(self.z_T_b_rt),
+            pyo.value(self.z_T_q_rt),
+            pyo.value(self.z_T_E)
         ]
         
         return z
@@ -3953,7 +3955,6 @@ class fw_rt_Lagrangian_Alt(pyo.ConcreteModel):
     
         return pyo.value(self.objective)
 
-
 ### State Var Binarized version    
 
 class fw_rt_bin(pyo.ConcreteModel):
@@ -4054,18 +4055,20 @@ class fw_rt_bin(pyo.ConcreteModel):
         # S
         self.Round[0] = math.ceil(math.log2(S_max)) 
         # T_b
-        self.Round[1] = [math.ceil(math.log2(P_r)) for _ in range(self.T - 1 - self.stage)] 
+        self.Round[1] = math.ceil(math.log2(P_r))
         # T_Q
-        self.Round[2] = [math.ceil(math.log2(E_0_partial_max)) for _ in range(self.T - 1 - self.stage)] 
+        self.Round[2] = math.ceil(math.log2(E_0_partial_max)) 
         # T_q
         self.Round[3] = math.ceil(math.log2(E_0_sum))
         # T_b_rt
         self.Round[4] = math.ceil(math.log2(P_r))
         # T_q_rt
-        self.Round[5] = math.ceil(math.log2(B))
+        self.Round[5] = math.ceil(math.log2(1.2*E_0_partial_max + B))
         # T_E
-        self.Round[6] = math.ceil(math.log2(1.2*E_0_partial_max))                       
-
+        self.Round[6] = math.ceil(math.log2(1.2*E_0_partial_max))  
+        
+        self.bin_num =  math.ceil(math.log2(P_r) + 1)
+        
     def build_model(self):
         
         model = self.model()
@@ -4082,7 +4085,7 @@ class fw_rt_bin(pyo.ConcreteModel):
         model.q_rt_ROUND = pyo.RangeSet(0, self.Round[5])
         model.E_ROUND = pyo.RangeSet(0, self.Round[6])
         
-        model.BINARIZE = pyo.RangeSet(0, self.bin_num - 1)
+        model.BINARIZE = pyo.RangeSet(0, self.bin_num)
         
         # Vars
         
@@ -4174,44 +4177,50 @@ class fw_rt_bin(pyo.ConcreteModel):
             return model.b_rt_next <= -sum(self.b_b_prev[1][k]*(2**k) for k in range(self.Round[1] + 1))
         
         def da_Q_rule(model):
-            return model.Q_da == self.T_Q_prev[0]
+            return model.Q_da == sum(self.b_Q_prev[0][k]*(2**k) for k in range(self.Round[2] + 1))
         
         def rt_b_rule(model):
-            return model.b_rt == self.T_b_rt_prev
+            return model.b_rt == -sum(self.b_b_rt_prev[k]*(2**k) for k in range(self.Round[4] + 1))
         
         def rt_q_rule(model):
-            return model.q_rt == self.T_q_rt_prev
+            return model.q_rt == sum(self.b_q_rt_prev[k]*(2**k) for k in range(self.Round[5] + 1))
         
         def rt_E_rule(model):
-            return model.E_1 == self.T_E_prev
+            return model.E_1 == sum(self.b_E_prev[k]*(2**k) for k in range(self.Round[6] + 1))
         
         ## State Variable transition Constraints
         
         def State_SOC_rule(model):
-            return model.S == self.S_prev + v*model.c - (1/v)*model.d
-    
-        def State_b_rule(model, t):
-            return model.T_b[t] == self.T_b_prev[t+1]
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) == sum(self.b_S_prev[k]*(2**k) for k in range(self.Round[0] + 1)) + v*model.c - (1/v)*model.d
+
+        def State_SOC_UB_rule(model):
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) <= S_max
         
-        def State_Q_rule(model, t):
-            return model.T_Q[t] == self.T_Q_prev[t+1]
+        def State_SOC_LB_rule(model):
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) >= S_min
+                
+        def State_b_rule(model, t, k):
+            return model.b_b[t, k] == self.b_b_prev[t+1][k]
+        
+        def State_Q_rule(model, t, k):
+            return model.b_Q[t, k] == self.b_Q_prev[t+1][k]
         
         def State_q_rule(model):
-            return model.T_q == self.T_q_prev + model.q_rt_next
+            return sum(model.b_q[k]*(2**k) for k in range(self.Round[3] + 1)) == sum(self.b_q_prev[k]*(2**k) for k in range(self.Round[3] + 1)) + model.q_rt_next
         
         def State_b_rt_rule(model):
-            return model.T_b_rt == model.b_rt_next
+            return sum(model.b_b_rt[k]*(2**k) for k in range(self.Round[4] + 1)) == model.b_rt_next
         
         def State_q_rt_rule(model):
-            return model.T_q_rt == model.q_rt_next
+            return sum(model.b_q_rt[k]*(2**k) for k in range(self.Round[5] + 1)) == model.q_rt_next
         
         def State_E_rule(model):
-            return model.T_E == self.delta_E_0*E_0_partial[self.stage + 1]
+            return sum(model.b_E[k]*(2**k) for k in range(self.Round[6] + 1)) == math.ceil(self.delta_E_0*E_0_partial[self.stage + 1])
         
         ## General Constraints
         
         def overbid_rule(model):
-            return model.T_q <= E_0_sum
+            return sum(model.b_q[k]*(2**k) for k in range(self.Round[3] + 1)) <= E_0_sum
         
         def next_q_rt_rule(model):
             return model.q_rt_next <= self.delta_E_0*E_0_partial[self.stage + 1] + B
@@ -4249,18 +4258,6 @@ class fw_rt_bin(pyo.ConcreteModel):
         
         ### 1. Bilinear -> MIP by binarize b_da, b_rt
         
-        def binarize_b_da_rule_1(model):
-            return model.b_da >= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) - 0.5 
-        
-        def binarize_b_da_rule_2(model):
-            return model.b_da <= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) + 0.5
-
-        def binarize_b_rt_rule_1(model):
-            return model.b_rt >= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) - 0.5 
-        
-        def binarize_b_rt_rule_2(model):
-            return model.b_rt <= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) + 0.5
-        
         def binarize_rule_1_1(model, j):
             return model.w[j] >= 0
         
@@ -4268,10 +4265,10 @@ class fw_rt_bin(pyo.ConcreteModel):
             return model.w[j] <= model.u
         
         def binarize_rule_1_3(model, j):
-            return model.w[j] <= M_gen[self.stage][0]*model.nu[j]
+            return model.w[j] <= M_gen[self.stage][0]*self.b_b_rt_prev[j]
         
         def binarize_rule_1_4(model, j):
-            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - model.nu[j])
+            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - self.b_b_rt_prev[j])
         
         def binarize_rule_2_1(model, i):
             return model.h[i] >= 0
@@ -4280,10 +4277,10 @@ class fw_rt_bin(pyo.ConcreteModel):
             return model.h[i] <= model.m_1
         
         def binarize_rule_2_3(model, i):
-            return model.h[i] <= M_gen[self.stage][0]*model.lamb[i]
+            return model.h[i] <= M_gen[self.stage][0]*self.b_b_prev[0][i]
         
         def binarize_rule_2_4(model, i):
-            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - model.lamb[i])
+            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - self.b_b_prev[0][i])
         
         def binarize_rule_3_1(model, i):
             return model.k[i] >= 0
@@ -4292,10 +4289,10 @@ class fw_rt_bin(pyo.ConcreteModel):
             return model.k[i] <= model.m_2
         
         def binarize_rule_3_3(model, i):
-            return model.k[i] <= M_gen[self.stage][0]*model.lamb[i]
+            return model.k[i] <= M_gen[self.stage][0]*self.b_b_prev[0][i]
         
         def binarize_rule_3_4(model, i):
-            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - model.lamb[i])        
+            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - self.b_b_prev[0][i])        
         
         def binarize_rule_4_1(model, i):
             return model.o[i] >= 0
@@ -4304,10 +4301,10 @@ class fw_rt_bin(pyo.ConcreteModel):
             return model.o[i] <= model.m_3
         
         def binarize_rule_4_3(model, i):
-            return model.o[i] <= M_gen[self.stage][0]*model.nu[i]
+            return model.o[i] <= M_gen[self.stage][0]*self.b_b_rt_prev[i]
         
         def binarize_rule_4_4(model, i):
-            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - model.nu[i])        
+            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - self.b_b_rt_prev[i])        
         
         ### 2. Minmax -> MIP
         
@@ -4381,7 +4378,7 @@ class fw_rt_bin(pyo.ConcreteModel):
         ## Approximated value fcn
         
         def value_fcn_approx_rule(model, l):
-            return model.theta <= self.psi[l][0] + self.psi[l][1]*model.S + sum(self.psi[l][2][t]*model.T_b[t] for t in range(T - 1 - self.stage)) + sum(self.psi[l][3][t]*model.T_Q[t] for t in range(T - 1 - self.stage)) + self.psi[l][4]*model.T_q + self.psi[l][5]*model.T_b_rt + self.psi[l][6]*model.T_q_rt + self.psi[l][7]*model.T_E
+            return model.theta <= self.psi[l][0] + sum(self.psi[l][1][k]*model.b_S[k] for k in range(self.Round[0]+1)) + sum(sum(self.psi[l][2][t][k]*model.b_b[t, k] for k in range(self.Round[1]+1)) for t in range(T - 1 - self.stage)) + sum(sum(self.psi[l][3][t][k]*model.b_Q[t, k] for k in range(self.Round[2]+1)) for t in range(T - 1 - self.stage)) + sum(self.psi[l][4][k]*model.b_q[k] for k in range(self.Round[3]+1)) + sum(self.psi[l][5][k]*model.b_b_rt[k] for k in range(self.Round[4]+1)) + sum(self.psi[l][6][k]*model.b_q_rt[k] for k in range(self.Round[5]+1)) + sum(self.psi[l][7][k]*model.b_E[k] for k in range(self.Round[6]+1))
         
         ## Settlement fcn
         
@@ -4417,6 +4414,8 @@ class fw_rt_bin(pyo.ConcreteModel):
         model.rt_E = pyo.Constraint(rule = rt_E_rule)
         
         model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
+        model.State_SOC_UB = pyo.Constraint(rule = State_SOC_UB_rule)
+        model.State_SOC_LB = pyo.Constraint(rule = State_SOC_LB_rule)
         model.State_b = pyo.Constraint(model.TIME, rule = State_b_rule)
         model.State_Q = pyo.Constraint(model.TIME, rule = State_Q_rule)
         model.State_q = pyo.Constraint(rule = State_q_rule)
@@ -4435,11 +4434,7 @@ class fw_rt_bin(pyo.ConcreteModel):
         model.market_clearing_4 = pyo.Constraint(rule = market_clearing_rule_4)
         model.market_clearing_5 = pyo.Constraint(rule = market_clearing_rule_5)
         model.dispatch = pyo.Constraint(rule = dispatch_rule)
-        
-        model.binarize_b_da_1 = pyo.Constraint(rule = binarize_b_da_rule_1)
-        model.binarize_b_da_2 = pyo.Constraint(rule = binarize_b_da_rule_2)
-        model.binarize_b_rt_1 = pyo.Constraint(rule = binarize_b_rt_rule_1)
-        model.binarize_b_rt_2 = pyo.Constraint(rule = binarize_b_rt_rule_2)                
+                    
         model.binarize_1_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_1)
         model.binarize_1_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_2)
         model.binarize_1_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_3)       
@@ -4512,13 +4507,13 @@ class fw_rt_bin(pyo.ConcreteModel):
             self.solved = True
         State_var = []
         
-        State_var.append(pyo.value(self.S))
-        State_var.append([pyo.value(self.T_b[t]) for t in range(self.T - 1 - self.stage)])
-        State_var.append([pyo.value(self.T_Q[t]) for t in range(self.T - 1 - self.stage)])
-        State_var.append(pyo.value(self.T_q))
-        State_var.append(pyo.value(self.T_b_rt))
-        State_var.append(pyo.value(self.T_q_rt))
-        State_var.append(pyo.value(self.T_E))
+        State_var.append([pyo.value(self.b_S[k]) for k in range(self.Round[0] + 1)])
+        State_var.append([[pyo.value(self.b_b[t, k]) for k in range(self.Round[1][t] + 1)] for t in range(self.T)])
+        State_var.append([[pyo.value(self.b_Q[t, k]) for k in range(self.Round[2][t] + 1)] for t in range(self.T)])
+        State_var.append([pyo.value(self.b_q[k]) for k in range(self.Round[3] + 1)])
+        State_var.append([pyo.value(self.b_b_rt[k]) for k in range(self.Round[4] + 1)])
+        State_var.append([pyo.value(self.b_q_rt[k]) for k in range(self.Round[5] + 1)])
+        State_var.append([pyo.value(self.b_E[k]) for k in range(self.Round[6] + 1)])
         
         return State_var 
 
@@ -4536,9 +4531,9 @@ class fw_rt_bin(pyo.ConcreteModel):
     
         return pyo.value(self.objective)
 
-class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
+class fw_rt_bin_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
-    def __init__(self, stage, T_prev, psi, delta):
+    def __init__(self, stage, b_prev, psi, delta):
         
         super().__init__()
 
@@ -4546,13 +4541,13 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         self.stage = stage
         
-        self.S_prev = T_prev[0]
-        self.T_b_prev = T_prev[1]
-        self.T_Q_prev = T_prev[2]
-        self.T_q_prev = T_prev[3]
-        self.T_b_rt_prev = T_prev[4]
-        self.T_q_rt_prev = T_prev[5]
-        self.T_E_prev = T_prev[6]
+        self.b_S_prev = b_prev[0]
+        self.b_b_prev = b_prev[1]
+        self.b_Q_prev = b_prev[2]
+        self.b_q_prev = b_prev[3]
+        self.b_b_rt_prev = b_prev[4]
+        self.b_q_rt_prev = b_prev[5]
+        self.b_E_prev = b_prev[6]
         
         self.psi = psi
         
@@ -4569,7 +4564,11 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
+        self.Round = []
+        
         self._BigM_setting()
+
+        self._Bin_setting()
 
     def _BigM_setting(self):
         
@@ -4625,6 +4624,25 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
             self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])                              
 
+    def _Bin_setting(self):
+        
+        # S
+        self.Round[0] = math.ceil(math.log2(S_max)) 
+        # T_b
+        self.Round[1] = math.ceil(math.log2(P_r)) 
+        # T_Q
+        self.Round[2] = math.ceil(math.log2(E_0_partial_max)) 
+        # T_q
+        self.Round[3] = math.ceil(math.log2(E_0_sum))
+        # T_b_rt
+        self.Round[4] = math.ceil(math.log2(P_r))
+        # T_q_rt
+        self.Round[5] = math.ceil(math.log2(1.2*E_0_partial_max + B))
+        # T_E
+        self.Round[6] = math.ceil(math.log2(1.2*E_0_partial_max))    
+
+        self.bin_num =  math.ceil(math.log2(P_r) + 1)
+
     def build_model(self):
         
         model = self.model()
@@ -4635,19 +4653,27 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         model.PSIRANGE = pyo.RangeSet(0, len(self.psi) - 1)
         
+        model.S_ROUND = pyo.RangeSet(0, self.Round[0]) 
+        model.b_ROUND = pyo.RangeSet(0, self.Round[1])
+        model.Q_ROUND = pyo.RangeSet(0, self.Round[2])
+        model.q_ROUND = pyo.RangeSet(0, self.Round[3])
+        model.b_rt_ROUND = pyo.RangeSet(0, self.Round[4])
+        model.q_rt_ROUND = pyo.RangeSet(0, self.Round[5])
+        model.E_ROUND = pyo.RangeSet(0, self.Round[6]) 
+               
         model.BINARIZE = pyo.RangeSet(0, self.bin_num - 1)
         
         # Vars
         
         ## auxiliary variable z
         
-        model.z_S = pyo.Var(domain = pyo.Reals)
-        model.z_T_b = pyo.Var(model.Z_TIME, domain = pyo.Reals)
-        model.z_T_Q = pyo.Var(model.Z_TIME, domain = pyo.Reals)
-        model.z_T_q = pyo.Var(domain = pyo.Reals)
-        model.z_T_b_rt = pyo.Var(domain = pyo.Reals)
-        model.z_T_q_rt = pyo.Var(domain = pyo.Reals)
-        model.z_T_E = pyo.Var(domain = pyo.Reals)
+        model.z_b_S = pyo.Var(model.S_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_b = pyo.Var(model.Z_TIME, model.b_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_Q = pyo.Var(model.Z_TIME, model.Q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_q = pyo.Var(model.q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_b_rt = pyo.Var(model.b_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_q_rt = pyo.Var(model.q_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_E = pyo.Var(model.E_ROUND, bounds = (0, 1), domain = pyo.Reals)
         
         ## CTG fcn approx
         
@@ -4664,9 +4690,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.q_rt_next = pyo.Var(domain = pyo.NonNegativeReals)
         
         model.n_rt = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
-        
-        model.lamb = pyo.Var(model.BINARIZE, bounds = (0, 1), domain = pyo.Reals)        
-        model.nu = pyo.Var(model.BINARIZE, bounds = (0, 1), domain = pyo.Reals)
         
         model.w = pyo.Var(model.BINARIZE, domain = pyo.Reals)
         model.h = pyo.Var(model.BINARIZE, domain = pyo.Reals)
@@ -4685,13 +4708,13 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         ## State Vars
         
-        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
-        model.T_b = pyo.Var(model.TIME, domain = pyo.Reals)
-        model.T_Q = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
-        model.T_q = pyo.Var(domain = pyo.NonNegativeReals)
-        model.T_b_rt = pyo.Var(domain = pyo.Reals)
-        model.T_q_rt = pyo.Var(domain = pyo.Reals)
-        model.T_E = pyo.Var(domain = pyo.NonNegativeReals)
+        model.b_S = pyo.Var(model.S_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.b_b = pyo.Var(model.TIME, model.b_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.b_Q = pyo.Var(model.TIME, model.Q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.b_q = pyo.Var(model.q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.b_b_rt = pyo.Var(model.b_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.b_q_rt = pyo.Var(model.q_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.b_E = pyo.Var(model.E_ROUND, bounds = (0, 1), domain = pyo.Reals)
         
         ## min, max reformulation Vars
         
@@ -4722,74 +4745,80 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         ## auxiliary variable z
         
-        def auxiliary_S(model):
-            return model.z_S == self.S_prev
+        def auxiliary_S_rule(model, k):
+            return model.z_b_S[k] == self.b_S_prev[k]
         
-        def auxiliary_T_b(model, t):
-            return model.z_T_b[t] == self.T_b_prev[t]
+        def auxiliary_b_rule(model, t, k):
+            return model.z_b_b[t][k] == self.b_b_prev[t][k]
         
-        def auxiliary_T_Q(model, t):
-            return model.z_T_Q[t] == self.T_Q_prev[t]
+        def auxiliary_Q_rule(model, t, k):
+            return model.z_b_Q[t][k] == self.b_Q_prev[t][k]
         
-        def auxiliary_T_q(model):
-            return model.z_T_q == self.T_q_prev
+        def auxiliary_q_rule(model, k):
+            return model.z_b_q[k] == self.b_q_prev[k]
         
-        def auxiliary_T_b_rt(model):
-            return model.z_T_b_rt == self.T_b_rt_prev
+        def auxiliary_b_rt_rule(model, k):
+            return model.z_b_b_rt[k] == self.b_b_rt_prev[k]
         
-        def auxiliary_T_q_rt(model):
-            return model.z_T_q_rt == self.T_q_rt_prev
+        def auxiliary_q_rt_rule(model, k):
+            return model.z_b_q_rt[k] == self.b_q_rt_prev[k]
         
-        def auxiliary_T_E(model):
-            return model.z_T_E == self.T_E_prev        
+        def auxiliary_E_rule(model, k):
+            return model.z_b_E[k] == self.b_E_prev[k]        
         
         ## Connected to t-1 state 
         
         def da_bidding_price_rule(model):
-            return model.b_da == model.z_T_b[0]
+            return model.b_da == -sum(model.z_b_b[0, k]*(2**k) for k in range(self.Round[1] + 1))
         
         def rt_bidding_price_next_rule(model):
-            return model.b_rt_next <= model.z_T_b[1]
+            return model.b_rt_next <= -sum(model.z_b_b[1, k]*(2**k) for k in range(self.Round[1] + 1))
         
         def da_Q_rule(model):
-            return model.Q_da == model.z_T_Q[0]
+            return model.Q_da == sum(model.z_b_Q[0, k]*(2**k) for k in range(self.Round[2] + 1))
         
         def rt_b_rule(model):
-            return model.b_rt == model.z_T_b_rt
+            return model.b_rt == -sum(model.z_b_b_rt[k]*(2**k) for k in range(self.Round[4] + 1))
         
         def rt_q_rule(model):
-            return model.q_rt == model.z_T_q_rt
+            return model.q_rt == sum(model.z_b_q_rt[k]*(2**k) for k in range(self.Round[5] + 1))
         
         def rt_E_rule(model):
-            return model.E_1 == model.z_T_E
+            return model.E_1 == sum(model.z_b_E[k]*(2**k) for k in range(self.Round[6] + 1))
         
         ## State Variable transition Constraints
         
         def State_SOC_rule(model):
-            return model.S == model.z_S + v*model.c - (1/v)*model.d
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) == sum(model.z_b_S[k]*(2**k) for k in range(self.Round[0] + 1)) + v*model.c - (1/v)*model.d
     
-        def State_b_rule(model, t):
-            return model.T_b[t] == model.z_T_b[t+1]
+        def State_SOC_UB_rule(model):
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) <= S_max
         
-        def State_Q_rule(model, t):
-            return model.T_Q[t] == model.z_T_Q[t+1]
+        def State_SOC_LB_rule(model):
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) >= S_min
+                
+        def State_b_rule(model, t, k):
+            return model.b_b[t, k] == model.z_b_b[t+1][k]
+        
+        def State_Q_rule(model, t, k):
+            return model.b_Q[t, k] == model.z_b_Q[t+1][k]
         
         def State_q_rule(model):
-            return model.T_q == model.z_T_q + model.q_rt_next
+            return sum(model.b_q[k]*(2**k) for k in range(self.Round[3] + 1)) == sum(model.z_b_q[k]*(2**k) for k in range(self.Round[3] + 1)) + model.q_rt_next
         
         def State_b_rt_rule(model):
-            return model.T_b_rt == model.b_rt_next
+            return sum(model.b_b_rt[k]*(2**k) for k in range(self.Round[4] + 1)) == model.b_rt_next
         
         def State_q_rt_rule(model):
-            return model.T_q_rt == model.q_rt_next
+            return sum(model.b_q_rt[k]*(2**k) for k in range(self.Round[5] + 1)) == model.q_rt_next
         
         def State_E_rule(model):
-            return model.T_E == self.delta_E_0*E_0_partial[self.stage + 1]
+            return sum(model.b_E[k]*(2**k) for k in range(self.Round[6] + 1)) == math.ceil(self.delta_E_0*E_0_partial[self.stage + 1])
         
         ## General Constraints
         
         def overbid_rule(model):
-            return model.T_q <= E_0_sum
+            return sum(model.b_q[k]*(2**k) for k in range(self.Round[3] + 1)) <= E_0_sum
         
         def next_q_rt_rule(model):
             return model.q_rt_next <= self.delta_E_0*E_0_partial[self.stage + 1] + B
@@ -4802,6 +4831,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         def electricity_supply_rule(model):
             return model.u == model.g + model.d - model.c
+        
         
         def market_clearing_rule_1(model):
             return model.b_rt - self.P_rt <= self.M_price[0]*(1 - model.n_rt)
@@ -4818,24 +4848,13 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         def market_clearing_rule_5(model):
             return model.Q_rt >= model.q_rt - M_gen[self.stage][0]*(1 - model.n_rt)
         
+        
         def dispatch_rule(model):
             return model.Q_c == (1 + self.delta_c)*model.Q_rt
          
         ## f(t) MIP reformulation
         
         ### 1. Bilinear -> MIP by binarize b_da, b_rt
-        
-        def binarize_b_da_rule_1(model):
-            return model.b_da >= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) - 0.5 
-        
-        def binarize_b_da_rule_2(model):
-            return model.b_da <= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) + 0.5
-
-        def binarize_b_rt_rule_1(model):
-            return model.b_rt >= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) - 0.5 
-        
-        def binarize_b_rt_rule_2(model):
-            return model.b_rt <= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) + 0.5
         
         def binarize_rule_1_1(model, j):
             return model.w[j] >= 0
@@ -4844,10 +4863,10 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             return model.w[j] <= model.u
         
         def binarize_rule_1_3(model, j):
-            return model.w[j] <= M_gen[self.stage][0]*model.nu[j]
+            return model.w[j] <= M_gen[self.stage][0]*model.z_b_b_rt[j]
         
         def binarize_rule_1_4(model, j):
-            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - model.nu[j])
+            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - model.z_b_b_rt[j])
         
         def binarize_rule_2_1(model, i):
             return model.h[i] >= 0
@@ -4856,10 +4875,10 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             return model.h[i] <= model.m_1
         
         def binarize_rule_2_3(model, i):
-            return model.h[i] <= M_gen[self.stage][0]*model.lamb[i]
+            return model.h[i] <= M_gen[self.stage][0]*model.z_b_b[0][i]
         
         def binarize_rule_2_4(model, i):
-            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - model.lamb[i])
+            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - model.z_b_b[0][i])
         
         def binarize_rule_3_1(model, i):
             return model.k[i] >= 0
@@ -4868,10 +4887,10 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             return model.k[i] <= model.m_2
         
         def binarize_rule_3_3(model, i):
-            return model.k[i] <= M_gen[self.stage][0]*model.lamb[i]
+            return model.k[i] <= M_gen[self.stage][0]*model.z_b_b[0][i]
         
         def binarize_rule_3_4(model, i):
-            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - model.lamb[i])        
+            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - model.z_b_b[0][i])        
         
         def binarize_rule_4_1(model, i):
             return model.o[i] >= 0
@@ -4880,10 +4899,10 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             return model.o[i] <= model.m_3
         
         def binarize_rule_4_3(model, i):
-            return model.o[i] <= M_gen[self.stage][0]*model.nu[i]
+            return model.o[i] <= M_gen[self.stage][0]*model.z_b_b_rt[i]
         
         def binarize_rule_4_4(model, i):
-            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - model.nu[i])           
+            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - model.z_b_b_rt[i])        
         
         ### 2. Minmax -> MIP
         
@@ -4952,12 +4971,12 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         def minmax_rule_4_8(model):
             return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
+
         
-                
         ## Approximated value fcn
         
         def value_fcn_approx_rule(model, l):
-            return model.theta <= self.psi[l][0] + self.psi[l][1]*model.S + sum(self.psi[l][2][t]*model.T_b[t] for t in range(T - 1 - self.stage)) + sum(self.psi[l][3][t]*model.T_Q[t] for t in range(T - 1 - self.stage)) + self.psi[l][4]*model.T_q + self.psi[l][5]*model.T_b_rt + self.psi[l][6]*model.T_q_rt + self.psi[l][7]*model.T_E
+            return model.theta <= self.psi[l][0] + sum(self.psi[l][1][k]*model.b_S[k] for k in range(self.Round[0]+1)) + sum(sum(self.psi[l][2][t][k]*model.b_b[t, k] for k in range(self.Round[1]+1)) for t in range(T - 1 - self.stage)) + sum(sum(self.psi[l][3][t][k]*model.b_Q[t, k] for k in range(self.Round[2]+1)) for t in range(T - 1 - self.stage)) + sum(self.psi[l][4][k]*model.b_q[k] for k in range(self.Round[3]+1)) + sum(self.psi[l][5][k]*model.b_b_rt[k] for k in range(self.Round[4]+1)) + sum(self.psi[l][6][k]*model.b_q_rt[k] for k in range(self.Round[5]+1)) + sum(self.psi[l][7][k]*model.b_E[k] for k in range(self.Round[6]+1))
         
         ## Settlement fcn
         
@@ -4985,14 +5004,13 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         def settlement_fcn_rule_7(model):
             return model.f >= model.f_prime - M_set_fcn*(1 - model.n_sum)
         
-        
-        model.auxiliary_S = pyo.Constraint(rule = auxiliary_S)
-        model.auxiliary_T_b = pyo.Constraint(model.Z_TIME, rule = auxiliary_T_b)
-        model.auxiliary_T_Q = pyo.Constraint(model.Z_TIME, rule = auxiliary_T_Q)
-        model.auxiliary_T_q = pyo.Constraint(rule = auxiliary_T_q)
-        model.auxiliary_T_b_rt = pyo.Constraint(rule = auxiliary_T_b_rt)
-        model.auxiliary_T_q_rt = pyo.Constraint(rule = auxiliary_T_q_rt)
-        model.auxiliary_T_E = pyo.Constraint(rule = auxiliary_T_E)
+        model.auxiliary_S = pyo.Constraint(model.S_ROUND, rule = auxiliary_S_rule)
+        model.auxiliary_b = pyo.Constraint(model.Z_TIME, model.b_ROUND, rule = auxiliary_b_rule)
+        model.auxiliary_Q = pyo.Constraint(model.Z_TIME, model.Q_ROUND, rule = auxiliary_Q_rule)
+        model.auxiliary_q = pyo.Constraint(model.q_ROUND, rule = auxiliary_q_rule)
+        model.auxiliary_b_rt = pyo.Constraint(model.b_rt_ROUND, rule = auxiliary_b_rt_rule)
+        model.auxiliary_q_rt = pyo.Constraint(model.q_rt_ROUND, rule = auxiliary_q_rt_rule)
+        model.auxiliary_E = pyo.Constraint(model.E_ROUND, rule = auxiliary_E_rule)
         
         model.da_bidding_price = pyo.Constraint(rule = da_bidding_price_rule)
         model.rt_bidding_price = pyo.Constraint(rule = rt_bidding_price_next_rule)
@@ -5002,6 +5020,8 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.rt_E = pyo.Constraint(rule = rt_E_rule)
         
         model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
+        model.State_SOC_UB = pyo.Constraint(rule = State_SOC_UB_rule)
+        model.State_SOC_LB = pyo.Constraint(rule = State_SOC_LB_rule)
         model.State_b = pyo.Constraint(model.TIME, rule = State_b_rule)
         model.State_Q = pyo.Constraint(model.TIME, rule = State_Q_rule)
         model.State_q = pyo.Constraint(rule = State_q_rule)
@@ -5019,13 +5039,8 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.market_clearing_3 = pyo.Constraint(rule = market_clearing_rule_3)
         model.market_clearing_4 = pyo.Constraint(rule = market_clearing_rule_4)
         model.market_clearing_5 = pyo.Constraint(rule = market_clearing_rule_5)
-        
         model.dispatch = pyo.Constraint(rule = dispatch_rule)
-        
-        model.binarize_b_da_1 = pyo.Constraint(rule = binarize_b_da_rule_1)
-        model.binarize_b_da_2 = pyo.Constraint(rule = binarize_b_da_rule_2)
-        model.binarize_b_rt_1 = pyo.Constraint(rule = binarize_b_rt_rule_1)
-        model.binarize_b_rt_2 = pyo.Constraint(rule = binarize_b_rt_rule_2)                
+                    
         model.binarize_1_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_1)
         model.binarize_1_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_2)
         model.binarize_1_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_3)       
@@ -5057,7 +5072,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.minmax_3_2 = pyo.Constraint(rule = minmax_rule_3_2)
         model.minmax_3_3 = pyo.Constraint(rule = minmax_rule_3_3)
         model.minmax_3_4 = pyo.Constraint(rule = minmax_rule_3_4)
-        
         model.minmax_4_1 = pyo.Constraint(rule = minmax_rule_4_1)
         model.minmax_4_2 = pyo.Constraint(rule = minmax_rule_4_2)
         model.minmax_4_3 = pyo.Constraint(rule = minmax_rule_4_3)
@@ -5075,8 +5089,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.settlement_fcn_5 = pyo.Constraint(rule = settlement_fcn_rule_5)
         model.settlement_fcn_6 = pyo.Constraint(rule = settlement_fcn_rule_6)
         model.settlement_fcn_7 = pyo.Constraint(rule = settlement_fcn_rule_7)
-        
-
         
         model.value_fcn_approx = pyo.Constraint(model.PSIRANGE, rule = value_fcn_approx_rule)
                 
@@ -5106,31 +5118,36 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         if not self.solved:
             results = self.solve()
             if results.solver.termination_condition != pyo.TerminationCondition.optimal:
-                return [3*3600000*(T - self.stage), 0, [0 for _ in range(len(self.T_b_prev))],
-                        [0 for _ in range(len(self.T_Q_prev))], 0, 0, 0, 0]
+                return [3*3600000*(T - self.stage), [0 for _ in range(self.Round[0]+1)], [[0 for _ in range(self.Round[1]+1)] for _ in range(len(self.T_b_prev))],
+                        [[0 for _ in range(self.Round[2]+1)] for _ in range(len(self.T_Q_prev))], [0 for _ in range(self.Round[3]+1)], [0 for _ in range(self.Round[4]+1)], [0 for _ in range(self.Round[5]+1)], [0 for _ in range(self.Round[6]+1)]]
         
         psi = []
         psi.append(pyo.value(self.objective))
-        psi.append(self.dual[self.auxiliary_S])
+        
+        psi.append([self.dual[self.auxiliary_S[k]] for k in range(self.Round[0]+1)])
         
         pi_T_b = []
         for i in range(len(self.T_b_prev)):
-            pi_T_b.append(self.dual[self.auxiliary_T_b[i]])
+            pi_T_b.append([
+                self.dual[self.auxiliary_b[i, k]] for k in range(self.Round[1]+1)
+                ])
         psi.append(pi_T_b)
         
         pi_T_Q = []
         for i in range(len(self.T_Q_prev)):
-            pi_T_Q.append(self.dual[self.auxiliary_T_Q[i]])
+            pi_T_Q.append([
+                self.dual[self.auxiliary_Q[i, k]] for k in range(self.Round[2]+1)
+                ])
         psi.append(pi_T_Q)
         
-        psi.append(self.dual[self.auxiliary_T_q])
-        psi.append(self.dual[self.auxiliary_T_b_rt])
-        psi.append(self.dual[self.auxiliary_T_q_rt])
-        psi.append(self.dual[self.auxiliary_T_E])
+        psi.append([self.dual[self.auxiliary_q[k]] for k in range(self.Round[3]+1)])
+        psi.append([self.dual[self.auxiliary_b_rt[k]] for k in range(self.Round[4]+1)])
+        psi.append([self.dual[self.auxiliary_q_rt[k]] for k in range(self.Round[5]+1)])
+        psi.append([self.dual[self.auxiliary_E[k]] for k in range(self.Round[6]+1)])
         
         return psi
 
-class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward - Strengthened Benders' Cut)
+class fw_rt_bin_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward - Strengthened Benders' Cut)
 
     def __init__(self, stage, pi, psi, delta):
         
@@ -5155,7 +5172,11 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
+        self.Round = []
+        
         self._BigM_setting()
+        
+        self._Bin_setting()
 
     def _BigM_setting(self):
         
@@ -5211,6 +5232,25 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
             self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])                               
 
+    def _Bin_setting(self):
+        
+        # S
+        self.Round[0] = math.ceil(math.log2(S_max)) 
+        # T_b
+        self.Round[1] = math.ceil(math.log2(P_r))
+        # T_Q
+        self.Round[2] = math.ceil(math.log2(E_0_partial_max)) 
+        # T_q
+        self.Round[3] = math.ceil(math.log2(E_0_sum))
+        # T_b_rt
+        self.Round[4] = math.ceil(math.log2(P_r))
+        # T_q_rt
+        self.Round[5] = math.ceil(math.log2(1.2*E_0_partial_max + B))
+        # T_E
+        self.Round[6] = math.ceil(math.log2(1.2*E_0_partial_max))  
+        
+        self.bin_num =  math.ceil(math.log2(P_r) + 1)
+        
     def build_model(self):
         
         model = self.model()
@@ -5221,19 +5261,27 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         model.PSIRANGE = pyo.RangeSet(0, len(self.psi) - 1)
         
+        model.S_ROUND = pyo.RangeSet(0, self.Round[0]) 
+        model.b_ROUND = pyo.RangeSet(0, self.Round[1])
+        model.Q_ROUND = pyo.RangeSet(0, self.Round[2])
+        model.q_ROUND = pyo.RangeSet(0, self.Round[3])
+        model.b_rt_ROUND = pyo.RangeSet(0, self.Round[4])
+        model.q_rt_ROUND = pyo.RangeSet(0, self.Round[5])
+        model.E_ROUND = pyo.RangeSet(0, self.Round[6])
+        
         model.BINARIZE = pyo.RangeSet(0, self.bin_num - 1)
         
         # Vars
         
         ## auxiliary variable z
         
-        model.z_S = pyo.Var(bounds = (S_min, S_max), domain = pyo.Reals)
-        model.z_T_b = pyo.Var(model.Z_TIME, bounds = (-P_r, 0), domain = pyo.Reals)
-        model.z_T_Q = pyo.Var(model.Z_TIME, bounds = (0, 2*B), domain = pyo.Reals)
-        model.z_T_q = pyo.Var(bounds = (0, E_0_sum), domain = pyo.Reals, initialize = 0.0)
-        model.z_T_b_rt = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
-        model.z_T_q_rt = pyo.Var(bounds = (0, 1.2*E_0_partial[self.stage] + B), domain = pyo.Reals)
-        model.z_T_E = pyo.Var(bounds = (0, 1.2*E_0_partial[self.stage]), domain = pyo.Reals)
+        model.z_b_S = pyo.Var(model.S_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_b = pyo.Var(model.Z_TIME, model.b_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_Q = pyo.Var(model.Z_TIME, model.Q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_q = pyo.Var(model.q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_b_rt = pyo.Var(model.b_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_q_rt = pyo.Var(model.q_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_E = pyo.Var(model.E_ROUND, bounds = (0, 1), domain = pyo.Reals)
         
         ## CTG fcn approx
         
@@ -5250,9 +5298,6 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         model.q_rt_next = pyo.Var(domain = pyo.NonNegativeReals)
         
         model.n_rt = pyo.Var(domain = pyo.Binary)
-        
-        model.lamb = pyo.Var(model.BINARIZE, domain = pyo.Binary)        
-        model.nu = pyo.Var(model.BINARIZE, domain = pyo.Binary)
         
         model.w = pyo.Var(model.BINARIZE, domain = pyo.Reals)
         model.h = pyo.Var(model.BINARIZE, domain = pyo.Reals)
@@ -5271,13 +5316,13 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         ## State Vars
         
-        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
-        model.T_b = pyo.Var(model.TIME, domain = pyo.Reals)
-        model.T_Q = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
-        model.T_q = pyo.Var(domain = pyo.NonNegativeReals)
-        model.T_b_rt = pyo.Var(domain = pyo.Reals)
-        model.T_q_rt = pyo.Var(domain = pyo.Reals)
-        model.T_E = pyo.Var(domain = pyo.NonNegativeReals)
+        model.b_S = pyo.Var(model.S_ROUND, domain = pyo.Binary)
+        model.b_b = pyo.Var(model.TIME, model.b_ROUND, domain = pyo.Binary)
+        model.b_Q = pyo.Var(model.TIME, model.Q_ROUND, domain = pyo.Binary)
+        model.b_q = pyo.Var(model.q_ROUND, domain = pyo.Binary)
+        model.b_b_rt = pyo.Var(model.b_rt_ROUND, domain = pyo.Binary)
+        model.b_q_rt = pyo.Var(model.q_rt_ROUND, domain = pyo.Binary)
+        model.b_E = pyo.Var(model.E_ROUND, domain = pyo.Binary)
         
         ## min, max reformulation Vars
         
@@ -5319,51 +5364,58 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         ## Connected to t-1 state 
         
+        
         def da_bidding_price_rule(model):
-            return model.b_da == model.z_T_b[0]
+            return model.b_da == -sum(model.z_b_b[0, k]*(2**k) for k in range(self.Round[1] + 1))
         
         def rt_bidding_price_next_rule(model):
-            return model.b_rt_next <= model.z_T_b[1]
+            return model.b_rt_next <= -sum(model.z_b_b[1, k]*(2**k) for k in range(self.Round[1] + 1))
         
         def da_Q_rule(model):
-            return model.Q_da == model.z_T_Q[0]
+            return model.Q_da == sum(model.z_b_Q[0, k]*(2**k) for k in range(self.Round[2] + 1))
         
         def rt_b_rule(model):
-            return model.b_rt == model.z_T_b_rt
+            return model.b_rt == -sum(model.z_b_b_rt[k]*(2**k) for k in range(self.Round[4] + 1))
         
         def rt_q_rule(model):
-            return model.q_rt == model.z_T_q_rt
+            return model.q_rt == sum(model.z_b_q_rt[k]*(2**k) for k in range(self.Round[5] + 1))
         
         def rt_E_rule(model):
-            return model.E_1 == model.z_T_E
+            return model.E_1 == sum(model.z_b_E[k]*(2**k) for k in range(self.Round[6] + 1))
         
         ## State Variable transition Constraints
         
         def State_SOC_rule(model):
-            return model.S == model.z_S + v*model.c - (1/v)*model.d
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) == sum(model.z_b_S[k]*(2**k) for k in range(self.Round[0] + 1)) + v*model.c - (1/v)*model.d
     
-        def State_b_rule(model, t):
-            return model.T_b[t] == model.z_T_b[t+1]
+        def State_SOC_UB_rule(model):
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) <= S_max
         
-        def State_Q_rule(model, t):
-            return model.T_Q[t] == model.z_T_Q[t+1]
+        def State_SOC_LB_rule(model):
+            return sum(model.b_S[k]*(2**k) for k in range(self.Round[0] + 1)) >= S_min
+                
+        def State_b_rule(model, t, k):
+            return model.b_b[t, k] == model.z_b_b[t+1][k]
+        
+        def State_Q_rule(model, t, k):
+            return model.b_Q[t, k] == model.z_b_Q[t+1][k]
         
         def State_q_rule(model):
-            return model.T_q == model.z_T_q + model.q_rt_next
+            return sum(model.b_q[k]*(2**k) for k in range(self.Round[3] + 1)) == sum(model.z_b_q[k]*(2**k) for k in range(self.Round[3] + 1)) + model.q_rt_next
         
         def State_b_rt_rule(model):
-            return model.T_b_rt == model.b_rt_next
+            return sum(model.b_b_rt[k]*(2**k) for k in range(self.Round[4] + 1)) == model.b_rt_next
         
         def State_q_rt_rule(model):
-            return model.T_q_rt == model.q_rt_next
+            return sum(model.b_q_rt[k]*(2**k) for k in range(self.Round[5] + 1)) == model.q_rt_next
         
         def State_E_rule(model):
-            return model.T_E == self.delta_E_0*E_0_partial[self.stage + 1]
+            return sum(model.b_E[k]*(2**k) for k in range(self.Round[6] + 1)) == math.ceil(self.delta_E_0*E_0_partial[self.stage + 1])
         
         ## General Constraints
         
         def overbid_rule(model):
-            return model.T_q <= E_0_sum
+            return sum(model.b_q[k]*(2**k) for k in range(self.Round[3] + 1)) <= E_0_sum
         
         def next_q_rt_rule(model):
             return model.q_rt_next <= self.delta_E_0*E_0_partial[self.stage + 1] + B
@@ -5376,6 +5428,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         def electricity_supply_rule(model):
             return model.u == model.g + model.d - model.c
+        
         
         def market_clearing_rule_1(model):
             return model.b_rt - self.P_rt <= self.M_price[0]*(1 - model.n_rt)
@@ -5400,18 +5453,6 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         ### 1. Bilinear -> MIP by binarize b_da, b_rt
         
-        def binarize_b_da_rule_1(model):
-            return model.b_da >= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) - 0.5 
-        
-        def binarize_b_da_rule_2(model):
-            return model.b_da <= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) + 0.5
-
-        def binarize_b_rt_rule_1(model):
-            return model.b_rt >= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) - 0.5 
-        
-        def binarize_b_rt_rule_2(model):
-            return model.b_rt <= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) + 0.5
-        
         def binarize_rule_1_1(model, j):
             return model.w[j] >= 0
         
@@ -5419,10 +5460,10 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             return model.w[j] <= model.u
         
         def binarize_rule_1_3(model, j):
-            return model.w[j] <= M_gen[self.stage][0]*model.nu[j]
+            return model.w[j] <= M_gen[self.stage][0]*model.z_b_b_rt[j]
         
         def binarize_rule_1_4(model, j):
-            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - model.nu[j])
+            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - model.z_b_b_rt[j])
         
         def binarize_rule_2_1(model, i):
             return model.h[i] >= 0
@@ -5431,10 +5472,10 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             return model.h[i] <= model.m_1
         
         def binarize_rule_2_3(model, i):
-            return model.h[i] <= M_gen[self.stage][0]*model.lamb[i]
+            return model.h[i] <= M_gen[self.stage][0]*model.z_b_b[0][i]
         
         def binarize_rule_2_4(model, i):
-            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - model.lamb[i])
+            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - model.z_b_b[0][i])
         
         def binarize_rule_3_1(model, i):
             return model.k[i] >= 0
@@ -5443,10 +5484,10 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             return model.k[i] <= model.m_2
         
         def binarize_rule_3_3(model, i):
-            return model.k[i] <= M_gen[self.stage][0]*model.lamb[i]
+            return model.k[i] <= M_gen[self.stage][0]*model.z_b_b[0][i]
         
         def binarize_rule_3_4(model, i):
-            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - model.lamb[i])        
+            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - model.z_b_b[0][i])        
         
         def binarize_rule_4_1(model, i):
             return model.o[i] >= 0
@@ -5455,10 +5496,10 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             return model.o[i] <= model.m_3
         
         def binarize_rule_4_3(model, i):
-            return model.o[i] <= M_gen[self.stage][0]*model.nu[i]
+            return model.o[i] <= M_gen[self.stage][0]*model.z_b_b_rt[i]
         
         def binarize_rule_4_4(model, i):
-            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - model.nu[i])        
+            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - model.z_b_b_rt[i])        
         
         ### 2. Minmax -> MIP
         
@@ -5503,7 +5544,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         def minmax_rule_3_4(model):
             return model.m_3 <= M_gen[self.stage][0]*model.n_3
-
+             
         def minmax_rule_4_1(model):
             return model.m_4_3 >= model.m_4_1
         
@@ -5527,12 +5568,12 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         def minmax_rule_4_8(model):
             return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
-        
+
         
         ## Approximated value fcn
         
         def value_fcn_approx_rule(model, l):
-            return model.theta <= self.psi[l][0] + self.psi[l][1]*model.S + sum(self.psi[l][2][t]*model.T_b[t] for t in range(T - 1 - self.stage)) + sum(self.psi[l][3][t]*model.T_Q[t] for t in range(T - 1 - self.stage)) + self.psi[l][4]*model.T_q + self.psi[l][5]*model.T_b_rt + self.psi[l][6]*model.T_q_rt + self.psi[l][7]*model.T_E
+            return model.theta <= self.psi[l][0] + sum(self.psi[l][1][k]*model.b_S[k] for k in range(self.Round[0]+1)) + sum(sum(self.psi[l][2][t][k]*model.b_b[t, k] for k in range(self.Round[1]+1)) for t in range(T - 1 - self.stage)) + sum(sum(self.psi[l][3][t][k]*model.b_Q[t, k] for k in range(self.Round[2]+1)) for t in range(T - 1 - self.stage)) + sum(self.psi[l][4][k]*model.b_q[k] for k in range(self.Round[3]+1)) + sum(self.psi[l][5][k]*model.b_b_rt[k] for k in range(self.Round[4]+1)) + sum(self.psi[l][6][k]*model.b_q_rt[k] for k in range(self.Round[5]+1)) + sum(self.psi[l][7][k]*model.b_E[k] for k in range(self.Round[6]+1))
         
         ## Settlement fcn
         
@@ -5558,7 +5599,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             return model.f <= M_set_fcn*model.n_sum
         
         def settlement_fcn_rule_7(model):
-            return model.f >= model.f_prime - M_set_fcn*(1 - model.n_sum)   
+            return model.f >= model.f_prime - M_set_fcn*(1 - model.n_sum)
         
         model.da_bidding_price = pyo.Constraint(rule = da_bidding_price_rule)
         model.rt_bidding_price = pyo.Constraint(rule = rt_bidding_price_next_rule)
@@ -5568,6 +5609,8 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         model.rt_E = pyo.Constraint(rule = rt_E_rule)
         
         model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
+        model.State_SOC_UB = pyo.Constraint(rule = State_SOC_UB_rule)
+        model.State_SOC_LB = pyo.Constraint(rule = State_SOC_LB_rule)
         model.State_b = pyo.Constraint(model.TIME, rule = State_b_rule)
         model.State_Q = pyo.Constraint(model.TIME, rule = State_Q_rule)
         model.State_q = pyo.Constraint(rule = State_q_rule)
@@ -5586,11 +5629,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         model.market_clearing_4 = pyo.Constraint(rule = market_clearing_rule_4)
         model.market_clearing_5 = pyo.Constraint(rule = market_clearing_rule_5)
         model.dispatch = pyo.Constraint(rule = dispatch_rule)
-        
-        model.binarize_b_da_1 = pyo.Constraint(rule = binarize_b_da_rule_1)
-        model.binarize_b_da_2 = pyo.Constraint(rule = binarize_b_da_rule_2)
-        model.binarize_b_rt_1 = pyo.Constraint(rule = binarize_b_rt_rule_1)
-        model.binarize_b_rt_2 = pyo.Constraint(rule = binarize_b_rt_rule_2)                
+                    
         model.binarize_1_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_1)
         model.binarize_1_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_2)
         model.binarize_1_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_3)       
@@ -5622,7 +5661,6 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         model.minmax_3_2 = pyo.Constraint(rule = minmax_rule_3_2)
         model.minmax_3_3 = pyo.Constraint(rule = minmax_rule_3_3)
         model.minmax_3_4 = pyo.Constraint(rule = minmax_rule_3_4)
-    
         model.minmax_4_1 = pyo.Constraint(rule = minmax_rule_4_1)
         model.minmax_4_2 = pyo.Constraint(rule = minmax_rule_4_2)
         model.minmax_4_3 = pyo.Constraint(rule = minmax_rule_4_3)
@@ -5647,7 +5685,16 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         def objective_rule(model):
             return (
-                model.theta + model.f - (self.pi[0]*model.z_S + sum(self.pi[1][j]*model.z_T_b[j] for j in range(T - self.stage)) + sum(self.pi[2][j]*model.z_T_Q[j] for j in range(T - self.stage)) + self.pi[3]*model.z_T_q + self.pi[4]*model.z_T_b_rt + self.pi[5]*model.z_T_q_rt + self.pi[6]*model.z_T_E)
+                model.theta 
+                + model.f - (
+                    sum(self.pi[0][k]*model.z_b_S[k] for k in range(self.Round[0]+1))
+                    + sum(sum(self.pi[1][j][k]*model.z_T_b[j][k] for k in range(self.Round[1]+1)) for j in range(T - self.stage)) 
+                    + sum(sum(self.pi[2][j][k]*model.z_T_Q[j][k] for k in range(self.Round[2]+1)) for j in range(T - self.stage)) 
+                    + sum(self.pi[3][k]*model.z_T_q[k] for k in range(self.Round[3]+1)) 
+                    + sum(self.pi[4][k]*model.z_T_b_rt[k] for k in range(self.Round[4]+1)) 
+                    + sum(self.pi[5][k]*model.z_T_q_rt[k] for k in range(self.Round[5]+1)) 
+                    + sum(self.pi[6][k]*model.z_T_E[k] for k in range(self.Round[6]+1))
+                    )
             )
         
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
@@ -5671,13 +5718,13 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             self.solved = True
 
         z = [
-            pyo.value(self.z_S),
-            [pyo.value(self.z_T_b[t]) for t in range(self.T - self.stage)],
-            [pyo.value(self.z_T_Q[t]) for t in range(self.T - self.stage)],
-            pyo.value(self.T_q),
-            pyo.value(self.T_b_rt),
-            pyo.value(self.T_q_rt),
-            pyo.value(self.T_E)
+            [pyo.value(self.z_b_S[k]) for k in range(self.Round[0]+1)],
+            [[pyo.value(self.z_b_b[t][k]) for k in range(self.Round[1]+1)] for t in range(self.T - self.stage)],
+            [[pyo.value(self.z_b_Q[t][k]) for k in range(self.Round[2]+1)] for t in range(self.T - self.stage)],
+            [pyo.value(self.z_b_q[k]) for k in range(self.Round[3]+1)],
+            [pyo.value(self.z_b_b_rt[k]) for k in range(self.Round[4]+1)],
+            [pyo.value(self.z_b_q_rt[k]) for k in range(self.Round[5]+1)],
+            [pyo.value(self.z_b_E[k]) for k in range(self.Round[6]+1)]
         ]
         
         return z
@@ -8805,6 +8852,1548 @@ class fw_rt_last_Lagrangian_Alt(pyo.ConcreteModel):
 
         return pyo.value(self.objective)         
 
+### State Var Binarized version    
+
+class fw_rt_last_bin(pyo.ConcreteModel): 
+    
+    def __init__(self, b_prev, delta):
+        
+        super().__init__()
+
+        self.solved = False
+        
+        self.stage = T - 1
+        
+        self.b_S_prev = b_prev[0]
+        self.b_b_prev = b_prev[1]
+        self.b_Q_prev = b_prev[2]
+        self.b_q_prev = b_prev[3]
+        self.b_b_rt_prev = b_prev[4]
+        self.b_q_rt_prev = b_prev[5]
+        self.b_E_prev = b_prev[6]
+        
+        self.P_da = P_da_partial
+        self.P_rt = delta[1]
+        self.delta_c = delta[2]
+        
+        self.T = T
+        self.bin_num = 7
+
+        self.M_price = [0, 0]
+        self.M_set = [0, 0]
+        
+        self.M_set_decomp = [[0, 0] for i in range(3)]
+        
+        self.Round = []
+        
+        self._BigM_setting()
+        
+        self._Bin_setting()
+
+    def _BigM_setting(self):
+        
+        if self.P_da[self.stage] >=0 and self.P_rt >= 0:
+            
+            self.M_price[0] = 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + self.P_da[self.stage] + 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 + 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_da[self.stage] + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (self.P_rt + 80)*K[self.stage]
+            self.M_set_decomp[1][1] = (self.P_rt + 80)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        elif self.P_da[self.stage] >=0 and self.P_rt < 0:
+            
+            self.M_price[0] = -self.P_rt + 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + self.P_da[self.stage] - 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (-self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_da[self.stage] - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
+            
+            self.M_price[0] = 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - self.P_da[self.stage] + 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (-self.P_da[self.stage] + self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        else:
+            
+            self.M_price[0] = -self.P_rt + 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 - 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - 2*self.P_da[self.stage] - 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (- self.P_da[t] - self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])                              
+ 
+    def _Bin_setting(self):
+        
+        # S
+        self.Round[0] = math.ceil(math.log2(S_max)) 
+        # T_b
+        self.Round[1] = math.ceil(math.log2(P_r))
+        # T_Q
+        self.Round[2] = math.ceil(math.log2(E_0_partial_max)) 
+        # T_q
+        self.Round[3] = math.ceil(math.log2(E_0_sum))
+        # T_b_rt
+        self.Round[4] = math.ceil(math.log2(P_r))
+        # T_q_rt
+        self.Round[5] = math.ceil(math.log2(1.2*E_0_partial_max + B))
+        # T_E
+        self.Round[6] = math.ceil(math.log2(1.2*E_0_partial_max))  
+        
+        self.bin_num =  math.ceil(math.log2(P_r) + 1)
+ 
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.S_ROUND = pyo.RangeSet(0, self.Round[0]) 
+        model.b_ROUND = pyo.RangeSet(0, self.Round[1])
+        model.Q_ROUND = pyo.RangeSet(0, self.Round[2])
+        model.q_ROUND = pyo.RangeSet(0, self.Round[3])
+        model.b_rt_ROUND = pyo.RangeSet(0, self.Round[4])
+        model.q_rt_ROUND = pyo.RangeSet(0, self.Round[5])
+        model.E_ROUND = pyo.RangeSet(0, self.Round[6])
+        
+        model.BINARIZE = pyo.RangeSet(0, self.bin_num - 1)
+        
+        # Vars
+        
+        ## Bidding for next and current stage
+        
+        model.b_da = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
+        model.Q_da = pyo.Var(domain = pyo.NonNegativeReals)
+        model.b_rt = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
+        model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
+        model.Q_rt = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        model.n_rt = pyo.Var(domain = pyo.Binary)    
+        
+        model.w = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.h = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.k = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.o = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        
+        ## Real-Time operation 
+        
+        model.g = pyo.Var(domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        model.E_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        ## State Vars
+        
+        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
+        
+        ## min, max reformulation Vars
+        
+        model.m_1 = pyo.Var(domain = pyo.Reals)
+        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_3 = pyo.Var(domain = pyo.Reals)
+        model.m_4 = pyo.Var(domain = pyo.Reals)
+        model.m_4_1 = pyo.Var(domain = pyo.Reals)
+        model.m_4_2 = pyo.Var(domain = pyo.Reals)
+        model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        
+        model.n_1 = pyo.Var(domain = pyo.Binary)
+        model.n_2 = pyo.Var(domain = pyo.Binary)
+        model.n_3 = pyo.Var(domain = pyo.Binary)
+        model.n_4 = pyo.Var(domain = pyo.Binary)
+        model.n_4_3 = pyo.Var(domain = pyo.Binary)
+        
+        # Experiment for LP relaxation
+        
+        """
+        model.n_rt = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.lamb = pyo.Var(model.BINARIZE, bounds = (0, 1), domain = pyo.Reals)        
+        model.nu = pyo.Var(model.BINARIZE, bounds = (0, 1), domain = pyo.Reals)
+        model.n_1 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_2 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_4_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        """
+        
+        ## settlement_fcn
+        
+        model.f_prime = pyo.Var(domain = pyo.Reals)
+        
+        model.Q_sum = pyo.Var(domain = pyo.NonNegativeReals)
+        model.n_sum = pyo.Var(domain = pyo.Binary)
+        
+        model.f = pyo.Var(domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## Connected to t-1 state 
+        
+        def da_bidding_price_rule(model):
+            return model.b_da == -sum(self.b_b_prev[0][k]*(2**k) for k in range(self.Round[1] + 1))
+        
+        def da_Q_rule(model):
+            return model.Q_da == sum(self.b_Q_prev[0][k]*(2**k) for k in range(self.Round[2] + 1))
+        
+        def rt_b_rule(model):
+            return model.b_rt == -sum(self.b_b_rt_prev[k]*(2**k) for k in range(self.Round[4] + 1))
+        
+        def rt_q_rule(model):
+            return model.q_rt == sum(self.b_q_rt_prev[k]*(2**k) for k in range(self.Round[5] + 1))
+        
+        def rt_E_rule(model):
+            return model.E_1 == sum(self.b_E_prev[k]*(2**k) for k in range(self.Round[6] + 1))
+        
+        ## State Variable transition Constraints
+        
+        def State_SOC_rule(model):
+            return model.S == sum(self.b_S_prev[k]*(2**k) for k in range(self.Round[0] + 1)) + v*model.c - (1/v)*model.d
+        
+        def State_SOC_rule_last(model):
+            return model.S == 0.5*S
+        
+        ## General Constraints
+        
+        def generation_rule(model):
+            return model.g <= model.E_1
+        
+        def charge_rule(model):
+            return model.c <= model.g
+        
+        def electricity_supply_rule(model):
+            return model.u == model.g + model.d - model.c
+        
+        
+        def market_clearing_rule_1(model):
+            return model.b_rt - self.P_rt <= self.M_price[0]*(1 - model.n_rt)
+        
+        def market_clearing_rule_2(model):
+            return self.P_rt - model.b_rt <= self.M_price[1]*model.n_rt 
+        
+        def market_clearing_rule_3(model):
+            return model.Q_rt <= model.q_rt
+        
+        def market_clearing_rule_4(model):
+            return model.Q_rt <= M_gen[self.stage][0]*model.n_rt
+        
+        def market_clearing_rule_5(model):
+            return model.Q_rt >= model.q_rt - M_gen[self.stage][0]*(1 - model.n_rt)
+        
+        
+        def dispatch_rule(model):
+            return model.Q_c == (1 + self.delta_c)*model.Q_rt
+         
+        ## f(t) MIP reformulation
+        
+        ### 1. Bilinear -> MIP by binarize b_da, b_rt
+        
+        def binarize_rule_1_1(model, j):
+            return model.w[j] >= 0
+        
+        def binarize_rule_1_2(model, j):
+            return model.w[j] <= model.u
+        
+        def binarize_rule_1_3(model, j):
+            return model.w[j] <= M_gen[self.stage][0]*self.b_b_rt_prev[j]
+        
+        def binarize_rule_1_4(model, j):
+            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - self.b_b_rt_prev[j])
+        
+        def binarize_rule_2_1(model, i):
+            return model.h[i] >= 0
+        
+        def binarize_rule_2_2(model, i):
+            return model.h[i] <= model.m_1
+        
+        def binarize_rule_2_3(model, i):
+            return model.h[i] <= M_gen[self.stage][0]*self.b_b_prev[0][i]
+        
+        def binarize_rule_2_4(model, i):
+            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - self.b_b_prev[0][i])
+        
+        def binarize_rule_3_1(model, i):
+            return model.k[i] >= 0
+        
+        def binarize_rule_3_2(model, i):
+            return model.k[i] <= model.m_2
+        
+        def binarize_rule_3_3(model, i):
+            return model.k[i] <= M_gen[self.stage][0]*self.b_b_prev[0][i]
+        
+        def binarize_rule_3_4(model, i):
+            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - self.b_b_prev[0][i])        
+        
+        def binarize_rule_4_1(model, i):
+            return model.o[i] >= 0
+        
+        def binarize_rule_4_2(model, i):
+            return model.o[i] <= model.m_3
+        
+        def binarize_rule_4_3(model, i):
+            return model.o[i] <= M_gen[self.stage][0]*self.b_b_rt_prev[i]
+        
+        def binarize_rule_4_4(model, i):
+            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - self.b_b_rt_prev[i])        
+        
+        ### 2. Minmax -> MIP
+        
+        def dummy_rule_4_1(model):
+            return model.m_4_1 == -sum(model.w[j]*(2**j) for j in range(self.bin_num)) - (model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt)
+            
+        def dummy_rule_4_2(model):
+            return model.m_4_2 == (model.m_1 - model.m_2)*self.P_rt + sum((model.h[i] - model.k[i])*(2**i) for i in range(self.bin_num))
+        
+        def minmax_rule_1_1(model):
+            return model.m_1 <= model.Q_da
+        
+        def minmax_rule_1_2(model):
+            return model.m_1 <= model.q_rt
+        
+        def minmax_rule_1_3(model):
+            return model.m_1 >= model.Q_da - (1 - model.n_1)*M_gen[self.stage][0]
+        
+        def minmax_rule_1_4(model):
+            return model.m_1 >= model.q_rt - (model.n_1)*M_gen[self.stage][0]
+        
+        def minmax_rule_2_1(model):
+            return model.m_2 <= model.u
+        
+        def minmax_rule_2_2(model):
+            return model.m_2 <= model.q_rt
+        
+        def minmax_rule_2_3(model):
+            return model.m_2 >= model.u - (1 - model.n_2)*M_gen[self.stage][0]
+        
+        def minmax_rule_2_4(model):
+            return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage][0]
+        
+        def minmax_rule_3_1(model):
+            return model.m_3 >= model.u - model.Q_c
+        
+        def minmax_rule_3_2(model):
+            return model.m_3 >= 0
+        
+        def minmax_rule_3_3(model):
+            return model.m_3 <= model.u - model.Q_c + M_gen[self.stage][1]*(1 - model.n_3)
+        
+        def minmax_rule_3_4(model):
+            return model.m_3 <= M_gen[self.stage][0]*model.n_3
+             
+        def minmax_rule_4_1(model):
+            return model.m_4_3 >= model.m_4_1
+        
+        def minmax_rule_4_2(model):
+            return model.m_4_3 >= model.m_4_2
+        
+        def minmax_rule_4_3(model):
+            return model.m_4_3 <= model.m_4_1 + self.M_set[0]*(1 - model.n_4_3)
+        
+        def minmax_rule_4_4(model):
+            return model.m_4_3 <= model.m_4_2 + self.M_set[1]*model.n_4_3
+        
+        def minmax_rule_4_5(model):
+            return model.m_4 >= model.m_4_3 
+        
+        def minmax_rule_4_6(model):
+            return model.m_4 >= 0
+        
+        def minmax_rule_4_7(model):
+            return model.m_4 <= self.M_set_decomp[2][0]*(1 - model.n_4)
+        
+        def minmax_rule_4_8(model):
+            return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
+        
+        
+        ### settlement_fcn
+        
+        def settlement_fcn_rule(model):
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u 
+        
+        def settlement_fcn_rule_1(model):
+            return model.Q_sum == model.Q_da + model.Q_rt
+        
+        def settlement_fcn_rule_2(model):
+            return model.Q_sum <= M_gen[self.stage][1]*model.n_sum
+        
+        def settlement_fcn_rule_3(model):
+            return model.Q_sum >= epsilon*model.n_sum
+        
+        def settlement_fcn_rule_4(model):
+            return model.f >= 0
+        
+        def settlement_fcn_rule_5(model):
+            return model.f <= model.f_prime
+        
+        def settlement_fcn_rule_6(model):
+            return model.f <= M_set_fcn*model.n_sum
+        
+        def settlement_fcn_rule_7(model):
+            return model.f >= model.f_prime - M_set_fcn*(1 - model.n_sum)
+        
+        model.da_bidding_price = pyo.Constraint(rule = da_bidding_price_rule)
+        model.da_Q = pyo.Constraint(rule = da_Q_rule)
+        model.rt_b = pyo.Constraint(rule = rt_b_rule)
+        model.rt_q = pyo.Constraint(rule = rt_q_rule)
+        model.rt_E = pyo.Constraint(rule = rt_E_rule)
+        
+        model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
+        ## model.State_SOC_last = pyo.Constraint(rule = State_SOC_rule_last)
+
+        model.generation = pyo.Constraint(rule = generation_rule)
+        model.charge = pyo.Constraint(rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(rule = electricity_supply_rule)
+        model.market_clearing_1 = pyo.Constraint(rule = market_clearing_rule_1)
+        model.market_clearing_2 = pyo.Constraint(rule = market_clearing_rule_2)
+        model.market_clearing_3 = pyo.Constraint(rule = market_clearing_rule_3)
+        model.market_clearing_4 = pyo.Constraint(rule = market_clearing_rule_4)
+        model.market_clearing_5 = pyo.Constraint(rule = market_clearing_rule_5)
+        model.dispatch = pyo.Constraint(rule = dispatch_rule)
+                     
+        model.binarize_1_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_1)
+        model.binarize_1_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_2)
+        model.binarize_1_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_3)       
+        model.binarize_1_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_4)
+        model.binarize_2_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_1)
+        model.binarize_2_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_2)
+        model.binarize_2_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_3)
+        model.binarize_2_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_4)
+        model.binarize_3_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_1)
+        model.binarize_3_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_2)
+        model.binarize_3_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_3)
+        model.binarize_3_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_4)
+        model.binarize_4_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_1)
+        model.binarize_4_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_2)
+        model.binarize_4_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_3)
+        model.binarize_4_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_4)
+        
+        model.dummy_4_1 = pyo.Constraint(rule = dummy_rule_4_1)
+        model.dummy_4_2 = pyo.Constraint(rule = dummy_rule_4_2)
+        model.minmax_1_1 = pyo.Constraint(rule = minmax_rule_1_1)
+        model.minmax_1_2 = pyo.Constraint(rule = minmax_rule_1_2)
+        model.minmax_1_3 = pyo.Constraint(rule = minmax_rule_1_3)
+        model.minmax_1_4 = pyo.Constraint(rule = minmax_rule_1_4)
+        model.minmax_2_1 = pyo.Constraint(rule = minmax_rule_2_1)
+        model.minmax_2_2 = pyo.Constraint(rule = minmax_rule_2_2)
+        model.minmax_2_3 = pyo.Constraint(rule = minmax_rule_2_3)
+        model.minmax_2_4 = pyo.Constraint(rule = minmax_rule_2_4)
+        model.minmax_3_1 = pyo.Constraint(rule = minmax_rule_3_1)
+        model.minmax_3_2 = pyo.Constraint(rule = minmax_rule_3_2)
+        model.minmax_3_3 = pyo.Constraint(rule = minmax_rule_3_3)
+        model.minmax_3_4 = pyo.Constraint(rule = minmax_rule_3_4)
+        model.minmax_4_1 = pyo.Constraint(rule = minmax_rule_4_1)
+        model.minmax_4_2 = pyo.Constraint(rule = minmax_rule_4_2)
+        model.minmax_4_3 = pyo.Constraint(rule = minmax_rule_4_3)
+        model.minmax_4_4 = pyo.Constraint(rule = minmax_rule_4_4)
+        model.minmax_4_5 = pyo.Constraint(rule = minmax_rule_4_5)
+        model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
+        model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
+        model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+       
+        model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
+        model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
+        model.settlement_fcn_2 = pyo.Constraint(rule = settlement_fcn_rule_2)
+        model.settlement_fcn_3 = pyo.Constraint(rule = settlement_fcn_rule_3)
+        model.settlement_fcn_4 = pyo.Constraint(rule = settlement_fcn_rule_4)
+        model.settlement_fcn_5 = pyo.Constraint(rule = settlement_fcn_rule_5)
+        model.settlement_fcn_6 = pyo.Constraint(rule = settlement_fcn_rule_6)
+        model.settlement_fcn_7 = pyo.Constraint(rule = settlement_fcn_rule_7)
+                         
+        # Obj Fcn
+        
+        def objective_rule(model):
+            return (
+                model.f
+            )
+        
+        model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
+
+    def solve(self):
+        
+        self.build_model()
+        SOLVER.solve(self)
+        self.solved = True
+
+    def get_settlement_fcn_value(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True
+        
+        return pyo.value(self.f)
+
+    def get_objective_value(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return pyo.value(self.objective)
+ 
+class fw_rt_last_bin_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
+           
+    def __init__(self, b_prev, delta):
+        
+        super().__init__()
+
+        self.solved = False
+        
+        self.stage = T - 1
+        
+        self.b_S_prev = b_prev[0]
+        self.b_b_prev = b_prev[1]
+        self.b_Q_prev = b_prev[2]
+        self.b_q_prev = b_prev[3]
+        self.b_b_rt_prev = b_prev[4]
+        self.b_q_rt_prev = b_prev[5]
+        self.b_E_prev = b_prev[6]
+        
+        self.P_da = P_da_partial
+        self.P_rt = delta[1]
+        self.delta_c = delta[2]
+        
+        self.T = T
+        self.bin_num = 7
+
+        self.M_price = [0, 0]
+        self.M_set = [0, 0]
+        
+        self.M_set_decomp = [[0, 0] for i in range(3)]
+        
+        self.Round = []
+        
+        self._BigM_setting()
+
+        self._Bin_setting()
+
+    def _BigM_setting(self):
+        
+        if self.P_da[self.stage] >=0 and self.P_rt >= 0:
+            
+            self.M_price[0] = 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + self.P_da[self.stage] + 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 + 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_da[self.stage] + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (self.P_rt + 80)*K[self.stage]
+            self.M_set_decomp[1][1] = (self.P_rt + 80)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        elif self.P_da[self.stage] >=0 and self.P_rt < 0:
+            
+            self.M_price[0] = -self.P_rt + 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + self.P_da[self.stage] - 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (-self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_da[self.stage] - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
+            
+            self.M_price[0] = 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - self.P_da[self.stage] + 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (-self.P_da[self.stage] + self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        else:
+            
+            self.M_price[0] = -self.P_rt + 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 - 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - 2*self.P_da[self.stage] - 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (- self.P_da[t] - self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])                             
+
+    def _Bin_setting(self):
+        
+        # S
+        self.Round[0] = math.ceil(math.log2(S_max)) 
+        # T_b
+        self.Round[1] = math.ceil(math.log2(P_r)) 
+        # T_Q
+        self.Round[2] = math.ceil(math.log2(E_0_partial_max)) 
+        # T_q
+        self.Round[3] = math.ceil(math.log2(E_0_sum))
+        # T_b_rt
+        self.Round[4] = math.ceil(math.log2(P_r))
+        # T_q_rt
+        self.Round[5] = math.ceil(math.log2(1.2*E_0_partial_max + B))
+        # T_E
+        self.Round[6] = math.ceil(math.log2(1.2*E_0_partial_max))    
+
+        self.bin_num =  math.ceil(math.log2(P_r) + 1)
+
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.Z_TIME = pyo.RangeSet(0, 0)
+        
+        model.S_ROUND = pyo.RangeSet(0, self.Round[0]) 
+        model.b_ROUND = pyo.RangeSet(0, self.Round[1])
+        model.Q_ROUND = pyo.RangeSet(0, self.Round[2])
+        model.q_ROUND = pyo.RangeSet(0, self.Round[3])
+        model.b_rt_ROUND = pyo.RangeSet(0, self.Round[4])
+        model.q_rt_ROUND = pyo.RangeSet(0, self.Round[5])
+        model.E_ROUND = pyo.RangeSet(0, self.Round[6]) 
+        
+        model.BINARIZE = pyo.RangeSet(0, self.bin_num - 1)
+        
+        # Vars
+        
+        ## auxiliary variable z
+        
+        model.z_b_S = pyo.Var(model.S_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_b = pyo.Var(model.Z_TIME, model.b_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_Q = pyo.Var(model.Z_TIME, model.Q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_q = pyo.Var(model.q_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_b_rt = pyo.Var(model.b_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_q_rt = pyo.Var(model.q_rt_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        model.z_b_E = pyo.Var(model.E_ROUND, bounds = (0, 1), domain = pyo.Reals)
+        
+        ## Bidding for next and current stage
+        
+        model.b_da = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
+        model.Q_da = pyo.Var(domain = pyo.NonNegativeReals)
+        model.b_rt = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
+        model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
+        model.Q_rt = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        model.n_rt = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        #model.n_rt = pyo.Var(domain = pyo.Binary)     
+        
+        model.w = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.h = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.k = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.o = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        
+        ## Real-Time operation 
+        
+        model.g = pyo.Var(domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        model.E_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        ## State Vars
+        
+        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
+        
+        ## min, max reformulation Vars
+        
+        model.m_1 = pyo.Var(domain = pyo.Reals)
+        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_3 = pyo.Var(domain = pyo.Reals)
+        model.m_4 = pyo.Var(domain = pyo.Reals)
+        model.m_4_1 = pyo.Var(domain = pyo.Reals)
+        model.m_4_2 = pyo.Var(domain = pyo.Reals)
+        model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        
+        model.n_1 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_2 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_4_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        
+        ## settlement_fcn
+        
+        model.f_prime = pyo.Var(domain = pyo.Reals)
+        
+        
+        model.Q_sum = pyo.Var(domain = pyo.NonNegativeReals)
+        model.n_sum = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        
+        model.f = pyo.Var(domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## auxiliary variable z
+        
+        def auxiliary_S_rule(model, k):
+            return model.z_b_S[k] == self.b_S_prev[k]
+        
+        def auxiliary_b_rule(model, t, k):
+            return model.z_b_b[t][k] == self.b_b_prev[t][k]
+        
+        def auxiliary_Q_rule(model, t, k):
+            return model.z_b_Q[t][k] == self.b_Q_prev[t][k]
+        
+        def auxiliary_q_rule(model, k):
+            return model.z_b_q[k] == self.b_q_prev[k]
+        
+        def auxiliary_b_rt_rule(model, k):
+            return model.z_b_b_rt[k] == self.b_b_rt_prev[k]
+        
+        def auxiliary_q_rt_rule(model, k):
+            return model.z_b_q_rt[k] == self.b_q_rt_prev[k]
+        
+        def auxiliary_E_rule(model, k):
+            return model.z_b_E[k] == self.b_E_prev[k]        
+        
+        ## Connected to t-1 state 
+        
+        def da_bidding_price_rule(model):
+            return model.b_da == -sum(model.z_b_b[0, k]*(2**k) for k in range(self.Round[1] + 1))
+        
+        def da_Q_rule(model):
+            return model.Q_da == sum(model.z_b_Q[0, k]*(2**k) for k in range(self.Round[2] + 1))
+        
+        def rt_b_rule(model):
+            return model.b_rt == -sum(model.z_b_b_rt[k]*(2**k) for k in range(self.Round[4] + 1))
+        
+        def rt_q_rule(model):
+            return model.q_rt == sum(model.z_b_q_rt[k]*(2**k) for k in range(self.Round[5] + 1))
+        
+        def rt_E_rule(model):
+            return model.E_1 == sum(model.z_b_E[k]*(2**k) for k in range(self.Round[6] + 1))
+        
+        ## State Variable transition Constraints
+        
+        def State_SOC_rule(model):
+            return model.S == sum(model.z_b_S[k]*(2**k) for k in range(self.Round[0] + 1)) + v*model.c - (1/v)*model.d
+        
+        def State_SOC_rule_last(model):
+            return model.S == 0.5*S
+        
+        ## General Constraints
+        
+        def generation_rule(model):
+            return model.g <= model.E_1
+        
+        def charge_rule(model):
+            return model.c <= model.g
+        
+        def electricity_supply_rule(model):
+            return model.u == model.g + model.d - model.c
+        
+        
+        def market_clearing_rule_1(model):
+            return model.b_rt - self.P_rt <= self.M_price[0]*(1 - model.n_rt)
+        
+        def market_clearing_rule_2(model):
+            return self.P_rt - model.b_rt <= self.M_price[1]*model.n_rt 
+        
+        def market_clearing_rule_3(model):
+            return model.Q_rt <= model.q_rt
+        
+        def market_clearing_rule_4(model):
+            return model.Q_rt <= M_gen[self.stage][0]*model.n_rt
+        
+        def market_clearing_rule_5(model):
+            return model.Q_rt >= model.q_rt - M_gen[self.stage][0]*(1 - model.n_rt)
+        
+        def dispatch_rule(model):
+            return model.Q_c == (1 + self.delta_c)*model.Q_rt
+         
+        ## f(t) MIP reformulation
+        
+        ### 1. Bilinear -> MIP by binarize b_da, b_rt
+        
+        def binarize_rule_1_1(model, j):
+            return model.w[j] >= 0
+        
+        def binarize_rule_1_2(model, j):
+            return model.w[j] <= model.u
+        
+        def binarize_rule_1_3(model, j):
+            return model.w[j] <= M_gen[self.stage][0]*model.z_b_b_rt[j]
+        
+        def binarize_rule_1_4(model, j):
+            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - model.z_b_b_rt[j])
+        
+        def binarize_rule_2_1(model, i):
+            return model.h[i] >= 0
+        
+        def binarize_rule_2_2(model, i):
+            return model.h[i] <= model.m_1
+        
+        def binarize_rule_2_3(model, i):
+            return model.h[i] <= M_gen[self.stage][0]*model.z_b_b[0][i]
+        
+        def binarize_rule_2_4(model, i):
+            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - model.z_b_b[0][i])
+        
+        def binarize_rule_3_1(model, i):
+            return model.k[i] >= 0
+        
+        def binarize_rule_3_2(model, i):
+            return model.k[i] <= model.m_2
+        
+        def binarize_rule_3_3(model, i):
+            return model.k[i] <= M_gen[self.stage][0]*model.z_b_b[0][i]
+        
+        def binarize_rule_3_4(model, i):
+            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - model.z_b_b[0][i])        
+        
+        def binarize_rule_4_1(model, i):
+            return model.o[i] >= 0
+        
+        def binarize_rule_4_2(model, i):
+            return model.o[i] <= model.m_3
+        
+        def binarize_rule_4_3(model, i):
+            return model.o[i] <= M_gen[self.stage][0]*model.z_b_b_rt[i]
+        
+        def binarize_rule_4_4(model, i):
+            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - model.z_b_b_rt[i])        
+        
+        ### 2. Minmax -> MIP
+        
+        def dummy_rule_4_1(model):
+            return model.m_4_1 == -sum(model.w[j]*(2**j) for j in range(self.bin_num)) - (model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt)
+            
+        def dummy_rule_4_2(model):
+            return model.m_4_2 == (model.m_1 - model.m_2)*self.P_rt + sum((model.h[i] - model.k[i])*(2**i) for i in range(self.bin_num))
+        
+        def minmax_rule_1_1(model):
+            return model.m_1 <= model.Q_da
+        
+        def minmax_rule_1_2(model):
+            return model.m_1 <= model.q_rt
+        
+        def minmax_rule_1_3(model):
+            return model.m_1 >= model.Q_da - (1 - model.n_1)*M_gen[self.stage][0]
+        
+        def minmax_rule_1_4(model):
+            return model.m_1 >= model.q_rt - (model.n_1)*M_gen[self.stage][0]
+        
+        def minmax_rule_2_1(model):
+            return model.m_2 <= model.u
+        
+        def minmax_rule_2_2(model):
+            return model.m_2 <= model.q_rt
+        
+        def minmax_rule_2_3(model):
+            return model.m_2 >= model.u - (1 - model.n_2)*M_gen[self.stage][0]
+        
+        def minmax_rule_2_4(model):
+            return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage][0]
+        
+        def minmax_rule_3_1(model):
+            return model.m_3 >= model.u - model.Q_c
+        
+        def minmax_rule_3_2(model):
+            return model.m_3 >= 0
+        
+        def minmax_rule_3_3(model):
+            return model.m_3 <= model.u - model.Q_c + M_gen[self.stage][1]*(1 - model.n_3)
+        
+        def minmax_rule_3_4(model):
+            return model.m_3 <= M_gen[self.stage][0]*model.n_3
+             
+        def minmax_rule_4_1(model):
+            return model.m_4_3 >= model.m_4_1
+        
+        def minmax_rule_4_2(model):
+            return model.m_4_3 >= model.m_4_2
+        
+        def minmax_rule_4_3(model):
+            return model.m_4_3 <= model.m_4_1 + self.M_set[0]*(1 - model.n_4_3)
+        
+        def minmax_rule_4_4(model):
+            return model.m_4_3 <= model.m_4_2 + self.M_set[1]*model.n_4_3
+        
+        def minmax_rule_4_5(model):
+            return model.m_4 >= model.m_4_3 
+        
+        def minmax_rule_4_6(model):
+            return model.m_4 >= 0
+        
+        def minmax_rule_4_7(model):
+            return model.m_4 <= self.M_set_decomp[2][0]*(1 - model.n_4)
+        
+        def minmax_rule_4_8(model):
+            return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
+  
+        ### settlement_fcn
+        
+        def settlement_fcn_rule(model):
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u 
+        
+        def settlement_fcn_rule_1(model):
+            return model.Q_sum == model.Q_da + model.Q_rt
+        
+        def settlement_fcn_rule_2(model):
+            return model.Q_sum <= M_gen[self.stage][1]*model.n_sum
+        
+        def settlement_fcn_rule_3(model):
+            return model.Q_sum >= epsilon*model.n_sum
+        
+        def settlement_fcn_rule_4(model):
+            return model.f >= 0
+        
+        def settlement_fcn_rule_5(model):
+            return model.f <= model.f_prime
+        
+        def settlement_fcn_rule_6(model):
+            return model.f <= M_set_fcn*model.n_sum
+        
+        def settlement_fcn_rule_7(model):
+            return model.f >= model.f_prime - M_set_fcn*(1 - model.n_sum)  
+        
+        model.auxiliary_S = pyo.Constraint(rule = auxiliary_S_rule)
+        model.auxiliary_b = pyo.Constraint(model.Z_TIME, rule = auxiliary_b_rule)
+        model.auxiliary_Q = pyo.Constraint(model.Z_TIME, rule = auxiliary_Q_rule)
+        model.auxiliary_q = pyo.Constraint(rule = auxiliary_q_rule)
+        model.auxiliary_b_rt = pyo.Constraint(rule = auxiliary_b_rt_rule)
+        model.auxiliary_q_rt = pyo.Constraint(rule = auxiliary_q_rt_rule)
+        model.auxiliary_E = pyo.Constraint(rule = auxiliary_E_rule)
+        
+        model.da_bidding_price = pyo.Constraint(rule = da_bidding_price_rule)
+        model.da_Q = pyo.Constraint(rule = da_Q_rule)
+        model.rt_b = pyo.Constraint(rule = rt_b_rule)
+        model.rt_q = pyo.Constraint(rule = rt_q_rule)
+        model.rt_E = pyo.Constraint(rule = rt_E_rule)
+        
+        model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
+        ## model.State_SOC_last = pyo.Constraint(rule = State_SOC_rule_last)
+
+        model.generation = pyo.Constraint(rule = generation_rule)
+        model.charge = pyo.Constraint(rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(rule = electricity_supply_rule)
+        model.market_clearing_1 = pyo.Constraint(rule = market_clearing_rule_1)
+        model.market_clearing_2 = pyo.Constraint(rule = market_clearing_rule_2)
+        model.market_clearing_3 = pyo.Constraint(rule = market_clearing_rule_3)
+        model.market_clearing_4 = pyo.Constraint(rule = market_clearing_rule_4)
+        model.market_clearing_5 = pyo.Constraint(rule = market_clearing_rule_5)
+        
+        model.dispatch = pyo.Constraint(rule = dispatch_rule)
+                     
+        model.binarize_1_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_1)
+        model.binarize_1_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_2)
+        model.binarize_1_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_3)       
+        model.binarize_1_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_4)
+        model.binarize_2_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_1)
+        model.binarize_2_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_2)
+        model.binarize_2_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_3)
+        model.binarize_2_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_4)
+        model.binarize_3_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_1)
+        model.binarize_3_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_2)
+        model.binarize_3_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_3)
+        model.binarize_3_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_4)
+        model.binarize_4_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_1)
+        model.binarize_4_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_2)
+        model.binarize_4_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_3)
+        model.binarize_4_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_4)
+        
+        model.dummy_4_1 = pyo.Constraint(rule = dummy_rule_4_1)
+        model.dummy_4_2 = pyo.Constraint(rule = dummy_rule_4_2)
+        model.minmax_1_1 = pyo.Constraint(rule = minmax_rule_1_1)
+        model.minmax_1_2 = pyo.Constraint(rule = minmax_rule_1_2)
+        model.minmax_1_3 = pyo.Constraint(rule = minmax_rule_1_3)
+        model.minmax_1_4 = pyo.Constraint(rule = minmax_rule_1_4)
+        model.minmax_2_1 = pyo.Constraint(rule = minmax_rule_2_1)
+        model.minmax_2_2 = pyo.Constraint(rule = minmax_rule_2_2)
+        model.minmax_2_3 = pyo.Constraint(rule = minmax_rule_2_3)
+        model.minmax_2_4 = pyo.Constraint(rule = minmax_rule_2_4)
+        model.minmax_3_1 = pyo.Constraint(rule = minmax_rule_3_1)
+        model.minmax_3_2 = pyo.Constraint(rule = minmax_rule_3_2)
+        model.minmax_3_3 = pyo.Constraint(rule = minmax_rule_3_3)
+        model.minmax_3_4 = pyo.Constraint(rule = minmax_rule_3_4)
+    
+        model.minmax_4_1 = pyo.Constraint(rule = minmax_rule_4_1)
+        model.minmax_4_2 = pyo.Constraint(rule = minmax_rule_4_2)
+        model.minmax_4_3 = pyo.Constraint(rule = minmax_rule_4_3)
+        model.minmax_4_4 = pyo.Constraint(rule = minmax_rule_4_4)
+        model.minmax_4_5 = pyo.Constraint(rule = minmax_rule_4_5)
+        model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
+        model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
+        model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+               
+        model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
+        model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
+        model.settlement_fcn_2 = pyo.Constraint(rule = settlement_fcn_rule_2)
+        model.settlement_fcn_3 = pyo.Constraint(rule = settlement_fcn_rule_3)
+        model.settlement_fcn_4 = pyo.Constraint(rule = settlement_fcn_rule_4)
+        model.settlement_fcn_5 = pyo.Constraint(rule = settlement_fcn_rule_5)
+        model.settlement_fcn_6 = pyo.Constraint(rule = settlement_fcn_rule_6)
+        model.settlement_fcn_7 = pyo.Constraint(rule = settlement_fcn_rule_7)    
+        
+
+        
+        # Dual(Shadow price)
+          
+        model.dual = pyo.Suffix(direction = pyo.Suffix.IMPORT)
+          
+        # Obj Fcn
+        
+        def objective_rule(model):
+            return (
+                model.f
+            )
+        
+        model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
+
+    def solve(self):
+        self.build_model()
+        self.solver_results = SOLVER.solve(self, tee=False)
+        if self.solver_results.solver.termination_condition == pyo.TerminationCondition.optimal:
+            self.solved = True
+        else:
+            self.solved = False
+        return self.solver_results
+
+    def get_cut_coefficients(self):
+        if not self.solved:
+            results = self.solve()
+            if results.solver.termination_condition != pyo.TerminationCondition.optimal:
+                return [3*3600000, 0, [0 for _ in range(len(self.T_b_prev))],
+                        [0 for _ in range(len(self.T_Q_prev))], 0, 0, 0, 0]
+        
+        psi = []
+        psi.append(pyo.value(self.objective))
+        psi.append(self.dual[self.auxiliary_S])
+        
+        pi_T_b = []
+        for i in range(len(self.T_b_prev)):
+            pi_T_b.append(self.dual[self.auxiliary_T_b[i]])
+        psi.append(pi_T_b)
+        
+        pi_T_Q = []
+        for i in range(len(self.T_Q_prev)):
+            pi_T_Q.append(self.dual[self.auxiliary_T_Q[i]])
+        psi.append(pi_T_Q)
+        
+        psi.append(self.dual[self.auxiliary_T_q])
+        psi.append(self.dual[self.auxiliary_T_b_rt])
+        psi.append(self.dual[self.auxiliary_T_q_rt])
+        psi.append(self.dual[self.auxiliary_T_E])
+        
+        return psi  
+    
+class fw_rt_last_bin_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengthened Benders' Cut)
+           
+    def __init__(self, pi, delta):
+        
+        super().__init__()
+
+        self.solved = False
+
+        self.pi = pi
+        
+        self.stage = T - 1
+
+        self.P_da = P_da_partial
+        self.P_rt = delta[1]
+        self.delta_c = delta[2]
+        
+        self.T = T
+        self.bin_num = 7
+
+        self.M_price = [0, 0]
+        self.M_set = [0, 0]
+        
+        self.M_set_decomp = [[0, 0] for i in range(3)]
+        
+        self._BigM_setting()
+
+    def _BigM_setting(self):
+        
+        if self.P_da[self.stage] >=0 and self.P_rt >= 0:
+            
+            self.M_price[0] = 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + self.P_da[self.stage] + 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 + 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_da[self.stage] + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (self.P_rt + 80)*K[self.stage]
+            self.M_set_decomp[1][1] = (self.P_rt + 80)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        elif self.P_da[self.stage] >=0 and self.P_rt < 0:
+            
+            self.M_price[0] = -self.P_rt + 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + self.P_da[self.stage] - 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (-self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_da[self.stage] - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
+            
+            self.M_price[0] = 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 + 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - self.P_da[self.stage] + 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (-self.P_da[self.stage] + self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 + self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])
+
+        else:
+            
+            self.M_price[0] = -self.P_rt + 1
+            self.M_price[1] = self.P_rt + 81
+            self.M_set[0] = (160 - 2*self.P_rt)*K[self.stage]
+            self.M_set[1] = (80 - 2*self.P_da[self.stage] - 2*self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][0] = (- self.P_da[t] - self.P_rt)*K[self.stage]
+            self.M_set_decomp[0][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][0] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[1][1] = (80 - self.P_rt)*K[self.stage]
+            self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+            self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])                              
+
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.Z_TIME = pyo.RangeSet(0, 0)
+        
+        model.BINARIZE = pyo.RangeSet(0, self.bin_num - 1)
+        
+        # Vars
+        
+        ## auxiliary variable z
+        
+        model.z_S = pyo.Var(bounds = (S_min, S_max), domain = pyo.Reals)
+        model.z_T_b = pyo.Var(model.Z_TIME, bounds = (-P_r, 0), domain = pyo.Reals)
+        model.z_T_Q = pyo.Var(model.Z_TIME, bounds = (0, 2*B), domain = pyo.Reals)
+        model.z_T_q = pyo.Var(domain = pyo.Reals, bounds = (0, E_0_sum), initialize = 0.0)
+        model.z_T_b_rt = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
+        model.z_T_q_rt = pyo.Var(bounds = (0, 1.2*E_0_partial[self.stage] + B), domain = pyo.Reals)
+        model.z_T_E = pyo.Var(bounds = (0, 1.2*E_0_partial[self.stage]), domain = pyo.Reals)
+        
+        ## Bidding for next and current stage
+        
+        model.b_da = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
+        model.Q_da = pyo.Var(domain = pyo.NonNegativeReals)
+        model.b_rt = pyo.Var(bounds = (-P_r, 0), domain = pyo.Reals)
+        model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
+        model.Q_rt = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        model.n_rt = pyo.Var(domain = pyo.Binary)
+        
+        model.lamb = pyo.Var(model.BINARIZE, domain = pyo.Binary)        
+        model.nu = pyo.Var(model.BINARIZE, domain = pyo.Binary)
+        
+        model.w = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.h = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.k = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        model.o = pyo.Var(model.BINARIZE, domain = pyo.Reals)
+        
+        ## Real-Time operation 
+        
+        model.g = pyo.Var(domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        model.E_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        
+        ## State Vars
+        
+        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
+        
+        ## min, max reformulation Vars
+        
+        model.m_1 = pyo.Var(domain = pyo.Reals)
+        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_3 = pyo.Var(domain = pyo.Reals)
+        model.m_4 = pyo.Var(domain = pyo.Reals)
+        model.m_4_1 = pyo.Var(domain = pyo.Reals)
+        model.m_4_2 = pyo.Var(domain = pyo.Reals)
+        model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        
+        model.n_1 = pyo.Var(domain = pyo.Binary)
+        model.n_2 = pyo.Var(domain = pyo.Binary)
+        model.n_3 = pyo.Var(domain = pyo.Binary)
+        model.n_4 = pyo.Var(domain = pyo.Binary)
+        model.n_4_3 = pyo.Var(domain = pyo.Binary)
+        
+        # Experiment for LP relaxation
+        """
+        model.n_rt = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.lamb = pyo.Var(model.BINARIZE, bounds = (0, 1), domain = pyo.Reals)        
+        model.nu = pyo.Var(model.BINARIZE, bounds = (0, 1), domain = pyo.Reals)
+        model.n_1 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_2 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_4_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        """
+        ## settlement_fcn
+        
+        model.f_prime = pyo.Var(domain = pyo.Reals)
+        
+        model.Q_sum = pyo.Var(domain = pyo.NonNegativeReals)
+        model.n_sum = pyo.Var(domain = pyo.Binary)
+        
+        model.f = pyo.Var(domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## Connected to t-1 state 
+        
+        def da_bidding_price_rule(model):
+            return model.b_da == model.z_T_b[0]
+        
+        def da_Q_rule(model):
+            return model.Q_da == model.z_T_Q[0]
+        
+        def rt_b_rule(model):
+            return model.b_rt == model.z_T_b_rt
+        
+        def rt_q_rule(model):
+            return model.q_rt == model.z_T_q_rt
+        
+        def rt_E_rule(model):
+            return model.E_1 == model.z_T_E
+        
+        ## State Variable transition Constraints
+        
+        def State_SOC_rule(model):
+            return model.S == model.z_S + v*model.c - (1/v)*model.d
+        
+        def State_SOC_rule_last(model):
+            return model.S == 0.5*S
+        
+        ## General Constraints
+        
+        def generation_rule(model):
+            return model.g <= model.E_1
+        
+        def charge_rule(model):
+            return model.c <= model.g
+        
+        def electricity_supply_rule(model):
+            return model.u == model.g + model.d - model.c
+        
+        
+        def market_clearing_rule_1(model):
+            return model.b_rt - self.P_rt <= self.M_price[0]*(1 - model.n_rt)
+        
+        def market_clearing_rule_2(model):
+            return self.P_rt - model.b_rt <= self.M_price[1]*model.n_rt 
+        
+        def market_clearing_rule_3(model):
+            return model.Q_rt <= model.q_rt
+        
+        def market_clearing_rule_4(model):
+            return model.Q_rt <= M_gen[self.stage][0]*model.n_rt
+        
+        def market_clearing_rule_5(model):
+            return model.Q_rt >= model.q_rt - M_gen[self.stage][0]*(1 - model.n_rt)
+        
+        
+        def dispatch_rule(model):
+            return model.Q_c == (1 + self.delta_c)*model.Q_rt
+         
+        ## f(t) MIP reformulation
+        
+        ### 1. Bilinear -> MIP by binarize b_da, b_rt
+        
+        def binarize_b_da_rule_1(model):
+            return model.b_da >= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) - 0.5 
+        
+        def binarize_b_da_rule_2(model):
+            return model.b_da <= -sum(model.lamb[i]*(2**i) for i in range(self.bin_num)) + 0.5
+
+        def binarize_b_rt_rule_1(model):
+            return model.b_rt >= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) - 0.5 
+        
+        def binarize_b_rt_rule_2(model):
+            return model.b_rt <= -sum(model.nu[j]*(2**j) for j in range(self.bin_num)) + 0.5
+        
+        def binarize_rule_1_1(model, j):
+            return model.w[j] >= 0
+        
+        def binarize_rule_1_2(model, j):
+            return model.w[j] <= model.u
+        
+        def binarize_rule_1_3(model, j):
+            return model.w[j] <= M_gen[self.stage][0]*model.nu[j]
+        
+        def binarize_rule_1_4(model, j):
+            return model.w[j] >= model.u - M_gen[self.stage][0]*(1 - model.nu[j])
+        
+        def binarize_rule_2_1(model, i):
+            return model.h[i] >= 0
+        
+        def binarize_rule_2_2(model, i):
+            return model.h[i] <= model.m_1
+        
+        def binarize_rule_2_3(model, i):
+            return model.h[i] <= M_gen[self.stage][0]*model.lamb[i]
+        
+        def binarize_rule_2_4(model, i):
+            return model.h[i] >= model.m_1 - M_gen[self.stage][0]*(1 - model.lamb[i])
+        
+        def binarize_rule_3_1(model, i):
+            return model.k[i] >= 0
+        
+        def binarize_rule_3_2(model, i):
+            return model.k[i] <= model.m_2
+        
+        def binarize_rule_3_3(model, i):
+            return model.k[i] <= M_gen[self.stage][0]*model.lamb[i]
+        
+        def binarize_rule_3_4(model, i):
+            return model.k[i] >= model.m_2 - M_gen[self.stage][0]*(1 - model.lamb[i])        
+        
+        def binarize_rule_4_1(model, i):
+            return model.o[i] >= 0
+        
+        def binarize_rule_4_2(model, i):
+            return model.o[i] <= model.m_3
+        
+        def binarize_rule_4_3(model, i):
+            return model.o[i] <= M_gen[self.stage][0]*model.nu[i]
+        
+        def binarize_rule_4_4(model, i):
+            return model.o[i] >= model.m_3 - M_gen[self.stage][0]*(1 - model.nu[i])        
+        
+        ### 2. Minmax -> MIP
+        
+        def dummy_rule_4_1(model):
+            return model.m_4_1 == -sum(model.w[j]*(2**j) for j in range(self.bin_num)) - (model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt)
+            
+        def dummy_rule_4_2(model):
+            return model.m_4_2 == (model.m_1 - model.m_2)*self.P_rt + sum((model.h[i] - model.k[i])*(2**i) for i in range(self.bin_num))
+        
+        def minmax_rule_1_1(model):
+            return model.m_1 <= model.Q_da
+        
+        def minmax_rule_1_2(model):
+            return model.m_1 <= model.q_rt
+        
+        def minmax_rule_1_3(model):
+            return model.m_1 >= model.Q_da - (1 - model.n_1)*M_gen[self.stage][0]
+        
+        def minmax_rule_1_4(model):
+            return model.m_1 >= model.q_rt - (model.n_1)*M_gen[self.stage][0]
+        
+        def minmax_rule_2_1(model):
+            return model.m_2 <= model.u
+        
+        def minmax_rule_2_2(model):
+            return model.m_2 <= model.q_rt
+        
+        def minmax_rule_2_3(model):
+            return model.m_2 >= model.u - (1 - model.n_2)*M_gen[self.stage][0]
+        
+        def minmax_rule_2_4(model):
+            return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage][0]
+        
+        def minmax_rule_3_1(model):
+            return model.m_3 >= model.u - model.Q_c
+        
+        def minmax_rule_3_2(model):
+            return model.m_3 >= 0
+        
+        def minmax_rule_3_3(model):
+            return model.m_3 <= model.u - model.Q_c + M_gen[self.stage][1]*(1 - model.n_3)
+        
+        def minmax_rule_3_4(model):
+            return model.m_3 <= M_gen[self.stage][0]*model.n_3
+    
+        def minmax_rule_4_1(model):
+            return model.m_4_3 >= model.m_4_1
+        
+        def minmax_rule_4_2(model):
+            return model.m_4_3 >= model.m_4_2
+        
+        def minmax_rule_4_3(model):
+            return model.m_4_3 <= model.m_4_1 + self.M_set[0]*(1 - model.n_4_3)
+        
+        def minmax_rule_4_4(model):
+            return model.m_4_3 <= model.m_4_2 + self.M_set[1]*model.n_4_3
+        
+        def minmax_rule_4_5(model):
+            return model.m_4 >= model.m_4_3 
+        
+        def minmax_rule_4_6(model):
+            return model.m_4 >= 0
+        
+        def minmax_rule_4_7(model):
+            return model.m_4 <= self.M_set_decomp[2][0]*(1 - model.n_4)
+        
+        def minmax_rule_4_8(model):
+            return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4   
+        
+        ### settlement_fcn
+        
+        def settlement_fcn_rule(model):
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u 
+        
+        def settlement_fcn_rule_1(model):
+            return model.Q_sum == model.Q_da + model.Q_rt
+        
+        def settlement_fcn_rule_2(model):
+            return model.Q_sum <= M_gen[self.stage][1]*model.n_sum
+        
+        def settlement_fcn_rule_3(model):
+            return model.Q_sum >= epsilon*model.n_sum
+        
+        def settlement_fcn_rule_4(model):
+            return model.f >= 0
+        
+        def settlement_fcn_rule_5(model):
+            return model.f <= model.f_prime
+        
+        def settlement_fcn_rule_6(model):
+            return model.f <= M_set_fcn*model.n_sum
+        
+        def settlement_fcn_rule_7(model):
+            return model.f >= model.f_prime - M_set_fcn*(1 - model.n_sum)   
+        
+        model.da_bidding_price = pyo.Constraint(rule = da_bidding_price_rule)
+        model.da_Q = pyo.Constraint(rule = da_Q_rule)
+        model.rt_b = pyo.Constraint(rule = rt_b_rule)
+        model.rt_q = pyo.Constraint(rule = rt_q_rule)
+        model.rt_E = pyo.Constraint(rule = rt_E_rule)
+        
+        model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
+        ## model.State_SOC_last = pyo.Constraint(rule = State_SOC_rule_last)
+
+        model.generation = pyo.Constraint(rule = generation_rule)
+        model.charge = pyo.Constraint(rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(rule = electricity_supply_rule)
+        model.market_clearing_1 = pyo.Constraint(rule = market_clearing_rule_1)
+        model.market_clearing_2 = pyo.Constraint(rule = market_clearing_rule_2)
+        model.market_clearing_3 = pyo.Constraint(rule = market_clearing_rule_3)
+        model.market_clearing_4 = pyo.Constraint(rule = market_clearing_rule_4)
+        model.market_clearing_5 = pyo.Constraint(rule = market_clearing_rule_5)
+        model.dispatch = pyo.Constraint(rule = dispatch_rule)
+        
+        model.binarize_b_da_1 = pyo.Constraint(rule = binarize_b_da_rule_1)
+        model.binarize_b_da_2 = pyo.Constraint(rule = binarize_b_da_rule_2)
+        model.binarize_b_rt_1 = pyo.Constraint(rule = binarize_b_rt_rule_1)
+        model.binarize_b_rt_2 = pyo.Constraint(rule = binarize_b_rt_rule_2)                
+        model.binarize_1_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_1)
+        model.binarize_1_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_2)
+        model.binarize_1_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_3)       
+        model.binarize_1_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_1_4)
+        model.binarize_2_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_1)
+        model.binarize_2_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_2)
+        model.binarize_2_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_3)
+        model.binarize_2_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_2_4)
+        model.binarize_3_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_1)
+        model.binarize_3_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_2)
+        model.binarize_3_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_3)
+        model.binarize_3_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_3_4)
+        model.binarize_4_1 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_1)
+        model.binarize_4_2 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_2)
+        model.binarize_4_3 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_3)
+        model.binarize_4_4 = pyo.Constraint(model.BINARIZE, rule = binarize_rule_4_4)
+        
+        model.dummy_4_1 = pyo.Constraint(rule = dummy_rule_4_1)
+        model.dummy_4_2 = pyo.Constraint(rule = dummy_rule_4_2)
+        model.minmax_1_1 = pyo.Constraint(rule = minmax_rule_1_1)
+        model.minmax_1_2 = pyo.Constraint(rule = minmax_rule_1_2)
+        model.minmax_1_3 = pyo.Constraint(rule = minmax_rule_1_3)
+        model.minmax_1_4 = pyo.Constraint(rule = minmax_rule_1_4)
+        model.minmax_2_1 = pyo.Constraint(rule = minmax_rule_2_1)
+        model.minmax_2_2 = pyo.Constraint(rule = minmax_rule_2_2)
+        model.minmax_2_3 = pyo.Constraint(rule = minmax_rule_2_3)
+        model.minmax_2_4 = pyo.Constraint(rule = minmax_rule_2_4)
+        model.minmax_3_1 = pyo.Constraint(rule = minmax_rule_3_1)
+        model.minmax_3_2 = pyo.Constraint(rule = minmax_rule_3_2)
+        model.minmax_3_3 = pyo.Constraint(rule = minmax_rule_3_3)
+        model.minmax_3_4 = pyo.Constraint(rule = minmax_rule_3_4)
+    
+        model.minmax_4_1 = pyo.Constraint(rule = minmax_rule_4_1)
+        model.minmax_4_2 = pyo.Constraint(rule = minmax_rule_4_2)
+        model.minmax_4_3 = pyo.Constraint(rule = minmax_rule_4_3)
+        model.minmax_4_4 = pyo.Constraint(rule = minmax_rule_4_4)
+        model.minmax_4_5 = pyo.Constraint(rule = minmax_rule_4_5)
+        model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
+        model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
+        model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+               
+        model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
+        model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
+        model.settlement_fcn_2 = pyo.Constraint(rule = settlement_fcn_rule_2)
+        model.settlement_fcn_3 = pyo.Constraint(rule = settlement_fcn_rule_3)
+        model.settlement_fcn_4 = pyo.Constraint(rule = settlement_fcn_rule_4)
+        model.settlement_fcn_5 = pyo.Constraint(rule = settlement_fcn_rule_5)
+        model.settlement_fcn_6 = pyo.Constraint(rule = settlement_fcn_rule_6)
+        model.settlement_fcn_7 = pyo.Constraint(rule = settlement_fcn_rule_7)    
+          
+        # Obj Fcn
+        
+        def objective_rule(model):
+            return (
+                model.f - (self.pi[0]*model.z_S + sum(self.pi[1][j]*model.z_T_b[j] for j in range(1)) + sum(self.pi[2][j]*model.z_T_Q[j] for j in range(1)) + self.pi[3]*model.z_T_q + self.pi[4]*model.z_T_b_rt + self.pi[5]*model.z_T_q_rt + self.pi[6]*model.z_T_E)
+            )
+        
+        model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
+
+    def solve(self):
+        
+        self.build_model()
+        SOLVER.solve(self)
+        self.solved = True
+
+    def get_objective_value(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        return pyo.value(self.objective)         
+
+    def get_auxiliary_value(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        z = [
+            pyo.value(self.z_S),
+            [pyo.value(self.z_T_b[t]) for t in range(self.T - self.stage)],
+            [pyo.value(self.z_T_Q[t]) for t in range(self.T - self.stage)],
+            pyo.value(self.z_T_q),
+            pyo.value(self.z_T_b_rt),
+            pyo.value(self.z_T_q_rt),
+            pyo.value(self.z_T_E)
+        ]
+        
+        return z
+      
+
 ## Dual Problem
 
 class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
@@ -8837,13 +10426,13 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
         
         model.theta = pyo.Var(domain = pyo.Reals)
         
-        model.pi_S = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
-        model.pi_T_b = pyo.Var(model.TIME, bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
-        model.pi_T_Q = pyo.Var(model.TIME, bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
-        model.pi_T_q = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
-        model.pi_T_b_rt = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
-        model.pi_T_q_rt = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
-        model.pi_T_E = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
+        model.pi_S = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_T_b = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
+        model.pi_T_Q = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
+        model.pi_T_q = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_T_b_rt = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_T_q_rt = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_T_E = pyo.Var(domain = pyo.Reals, initialize = 0.0)
         
         model.y_S = pyo.Var(domain = pyo.Reals, initialize = 0.0)
         model.y_T_b = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
@@ -8922,7 +10511,7 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
         def initialize_theta_rule(model):
             return model.theta >= 0
         
-        #model.initialize_theta = pyo.Constraint(rule = initialize_theta_rule)
+        model.initialize_theta = pyo.Constraint(rule = initialize_theta_rule)
         
         model.dual_fcn_approx = pyo.ConstraintList() 
         
@@ -10744,7 +12333,7 @@ class SDDiPModel:
             pi = pi_LP
             pi_min = pi_LP
             
-            reg = 0.0001
+            reg = 0.000001
             lev = 0.9
             gap = 1       
             lamb = 0
@@ -10867,7 +12456,7 @@ class SDDiPModel:
                 pi = pi_LP
                 pi_min = pi_LP
                                 
-                reg = 0.0001
+                reg = 0.000001
                 lev = 0.5
                 gap = 1
                 lamb = 0
@@ -11156,12 +12745,12 @@ if __name__ == "__main__":
         plt.show()
 
         #print(f"Solving T-stage DEF took {time_DEF:.2f} seconds.\n")
-        print(f"SDDiP (cut='B') for {BigM_mode} took {time_SDDiP_1:.2f} seconds.\n")
-        print(f"SDDiP (cut='SB') for {BigM_mode} took {time_SDDiP_2:.2f} seconds.\n")
+        print(f"SDDiP (cut='SB') for {BigM_mode} took {time_SDDiP_1:.2f} seconds.\n")
+        print(f"SDDiP (cut='L-sub') for {BigM_mode} took {time_SDDiP_2:.2f} seconds.\n")
         #print(f"SDDiP (cut='SB-Alt') took {time_SDDiP_3:.2f} seconds.\n")   
              
-        print(f"SDDiP optimality for {BigM_mode} gap for B = {gap_SDDiP_1:.4f}")
-        print(f"SDDiP optimality for {BigM_mode} gap for SB = {gap_SDDiP_2:.4f}")    
+        print(f"SDDiP optimality for {BigM_mode} gap for SB = {gap_SDDiP_1:.4f}")
+        print(f"SDDiP optimality for {BigM_mode} gap for L-sub = {gap_SDDiP_2:.4f}")    
         #print(f"SDDiP optimality gap for SB-Alt = {gap_SDDiP_3:.4f}")    
         
     for mode in ['BigM']:    
