@@ -19,7 +19,7 @@ from Scenarios import Scenario
 solver='gurobi'
    
 SOLVER=pyo.SolverFactory(solver)
-SOLVER.options['TimeLimit'] = 20
+SOLVER.options['TimeLimit'] = 120
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
@@ -31,7 +31,20 @@ T = 24
 
 E_0 = Scenario.E_0
 E_0_daily = Scenario.E_0_daily
+delta_E_daily = Scenario.delta_E_daily
 P_da_daily = Scenario.day_ahead_prices_daily
+P_rt_daily = Scenario.real_time_prices_daily
+
+print(len(E_0_daily), len(delta_E_daily), len(P_da_daily), len(P_rt_daily))
+
+print(
+    f"""
+E_0 = {E_0_daily[15]} 
+delta_E = {delta_E_daily[15]}
+P_da = {P_da_daily[15]}
+P_rt = {P_rt_daily[15]}
+    """
+)
 
 scenario_generator = Scenario.Setting2_scenario(E_0)
 
@@ -42,20 +55,22 @@ for t in range(T):
 
 exp_P_da = scenario_generator.exp_P_da
 exp_P_rt = scenario_generator.exp_P_rt
+
 C = 21022.1
-S = C*1.5
-B = C*0.5
+S = C*3
+B = C
 S_min = 0.1*S
 S_max = 0.9*S
 P_r = 80
 P_max = 270
+P_c = 22.05
 v = 0.95
 
 
 K = [1.22*E_0[t] + 1.01*B for t in range(T)]
 
-M_price = 400
-M_gen = [3*K[t] for t in range(T)]
+M_price = 500
+M_gen = [4*K[t] for t in range(T)]
 M_set_fcn = 15000000
 
 epsilon = 0.0000000000000000001
@@ -64,19 +79,22 @@ epsilon = 0.0000000000000000001
 
 class Deterministic_Setting(pyo.ConcreteModel):
     
-    def __init__(self, E_0, P_da, scenario):
+    def __init__(self, E_0, P_da, P_rt, delta_E, scenario):
         
         super().__init__()
 
         self.solved = False
-        self.scenario = scenario
-        
+
         self.E_0 = E_0
         self.P_da = P_da
         
-        self.delta_E = []
-        self.P_rt = []
+        self.scenario = scenario
+        
+        self.delta_E = delta_E
+        self.P_rt = P_rt
         self.delta_c = []
+        
+        print(f"deltaE = {self.delta_E}")
         
         self.T = T
         self.bin_num = 7
@@ -98,7 +116,7 @@ class Deterministic_Setting(pyo.ConcreteModel):
     
     def _BigM_setting(self):
         
-        self.M_gen = [3*self.K[t] for t in range(T)]
+        self.M_gen = [4*self.K[t] for t in range(T)]
         
         for t in range(self.T):   
              
@@ -150,8 +168,8 @@ class Deterministic_Setting(pyo.ConcreteModel):
         
         for t in range(self.T):
             
-            self.delta_E.append(self.scenario[t][0])
-            self.P_rt.append(self.scenario[t][1])
+            #self.delta_E.append(self.scenario[t][0])
+            #self.P_rt.append(self.scenario[t][1])
             self.delta_c.append(self.scenario[t][2])
             
     def build_model(self):    
@@ -200,12 +218,19 @@ class Deterministic_Setting(pyo.ConcreteModel):
         model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_6 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
         
         model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_c = pyo.Var(model.TIME, domain = pyo.Binary)
                 
         model.f_prime = pyo.Var(model.TIME, domain = pyo.Reals)
         
@@ -386,13 +411,13 @@ class Deterministic_Setting(pyo.ConcreteModel):
             return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*self.M_gen[t]
         
         def minmax_rule_3_1(model, t):
-            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.12*C
+            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C + S)
         
         def minmax_rule_3_2(model, t):
             return model.m_3[t] >= 0
         
         def minmax_rule_3_3(model, t):
-            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.12*C + self.M_gen[t]*(1 - model.n_3[t])
+            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.08*(C + S) + self.M_gen[t]*(1 - model.n_3[t])
         
         def minmax_rule_3_4(model, t):
             return model.m_3[t] <= self.M_gen[t]*model.n_3[t]
@@ -421,10 +446,67 @@ class Deterministic_Setting(pyo.ConcreteModel):
         def minmax_rule_4_8(model, t):
             return model.m_4[t] <= model.m_4_3[t] + self.M_set_decomp[t][2][1]*model.n_4[t]
         
+        
+        def minmax_rule_5_1(model, t):
+            return model.m_5[t] <= model.q_da[t]
+        
+        def minmax_rule_5_2(model, t):
+            return model.m_5[t] <= model.q_rt[t]
+        
+        def minmax_rule_5_3(model, t):
+            return model.m_5[t] >= model.q_da[t] - M_gen[t]*(1 - model.n_5[t])
+        
+        def minmax_rule_5_4(model, t):
+            return model.m_5[t] >= model.q_rt[t] - M_gen[t]*(model.n_5[t])
+        
+        def minmax_rule_6_1(model, t):
+            return model.m_6[t] <= model.m_5[t]
+        
+        def minmax_rule_6_2(model, t):
+            return model.m_6[t] <= model.u[t]
+        
+        def minmax_rule_6_3(model, t):
+            return model.m_6[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_6[t])
+        
+        def minmax_rule_6_4(model, t):
+            return model.m_6[t] >= model.u[t] - M_gen[t]*model.n_6[t]
+        
+        
+        def bin_c_rule_1(model, t):
+            return model.q_rt[t] - model.Q_c[t] <= M_gen[t]*model.n_c[t]
+        
+        def bin_c_rule_2(model, t):
+            return model.Q_c[t] - model.q_rt[t] <= M_gen[t]*(1 - model.n_c[t])
+        
+        
+        def minmax_rule_7_1(model, t):
+            return model.m_7[t] >= 0
+        
+        def minmax_rule_7_2(model, t):
+            return model.m_7[t] <= model.m_5[t]
+        
+        def minmax_rule_7_3(model, t):
+            return model.m_7[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_7_4(model, t):
+            return model.m_7[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_c[t])
+        
+        def minmax_rule_8_1(model, t):
+            return model.m_8[t] >= 0
+        
+        def minmax_rule_8_2(model, t):
+            return model.m_8[t] <= model.m_6[t]
+        
+        def minmax_rule_8_3(model, t):
+            return model.m_8[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_8_4(model, t):
+            return model.m_8[t] >= model.m_6[t] - M_gen[t]*(1 - model.n_c[t])
+        
         ## Settlement fcn
         
         def settlement_fcn_rule(model, t):
-            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.P_rt[t] + self.m_4[t] - (self.P_rt[t] - model.b_rt[t])*model.m_3[t] + P_r*model.u[t] 
+            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.P_rt[t] + self.m_4[t] - (self.P_rt[t] - model.b_da[t])*model.m_3[t] + P_r*model.u[t] + P_c*(model.m_6[t] - model.m_7[t] + model.m_8[t])
         
         def settlement_fcn_rule_1(model, t):
             return model.Q_sum[t] == model.Q_da[t] + model.Q_rt[t]
@@ -516,6 +598,29 @@ class Deterministic_Setting(pyo.ConcreteModel):
         model.minmax_4_7 = pyo.Constraint(model.TIME, rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(model.TIME, rule = minmax_rule_4_8)
 
+        model.minmax_5_1 = pyo.Constraint(model.TIME, rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(model.TIME, rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(model.TIME, rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(model.TIME, rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(model.TIME, rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(model.TIME, rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(model.TIME, rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(model.TIME, rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(model.TIME, rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(model.TIME, rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(model.TIME, rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(model.TIME, rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(model.TIME, rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(model.TIME, rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(model.TIME, rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(model.TIME, rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(model.TIME, rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(model.TIME, rule=minmax_rule_8_4)
+
         model.settlement_fcn = pyo.Constraint(model.TIME, rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_1)
         model.settlement_fcn_2 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_2)
@@ -546,6 +651,74 @@ class Deterministic_Setting(pyo.ConcreteModel):
     
         return pyo.value(self.objective)
 
+    def get_objective_part_value(self):
+        
+        part1 = sum(pyo.value(self.Q_da[t] * self.P_da[t] + (self.u[t] - self.Q_da[t]) * self.P_rt[t]) for t in range(self.T))
+        part2_1 = sum(pyo.value(self.m_4_1[t]) for t in range(self.T))
+        part2_2 = sum(pyo.value(self.m_4_2[t]) for t in range(self.T))
+        part2 = sum(pyo.value(self.m_4[t]) for t in range(self.T))
+        part3 = sum(pyo.value(-(self.P_rt[t] - self.b_da[t]) * self.m_3[t]) for t in range(self.T))
+        part4 = sum(pyo.value(P_c * (self.m_6[t] - self.m_7[t] + self.m_8[t])) for t in range(self.T))
+        part5 = sum(pyo.value(P_r * self.u[t]) for t in range(self.T))
+        
+        return [part1, part2_1, part2_2, part2, part3, part4, part5]
+        
+    def get_b_da_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.b_da[t]) for t in range(self.T)] 
+
+    def get_b_rt_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.b_rt[t]) for t in range(self.T)] 
+
+    def get_q_da_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.q_da[t]) for t in range(self.T)] 
+  
+    def get_q_rt_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.q_rt[t]) for t in range(self.T)]   
+    
+    def get_Q_da_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.Q_da[t]) for t in range(self.T)] 
+
+    def get_Q_rt_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.Q_rt[t]) for t in range(self.T)] 
+
+    def get_Q_c_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.Q_c[t]) for t in range(self.T)]    
+
     def get_u_value(self):
         
         if not self.solved:
@@ -553,22 +726,30 @@ class Deterministic_Setting(pyo.ConcreteModel):
             self.solved = True
     
         return [pyo.value(self.u[t]) for t in range(self.T)] 
+
+    def get_S_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
     
+        return [pyo.value(self.S[t]) for t in range(self.T)] 
     
 class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
     
-    def __init__(self, E_0, P_da, scenario):
+    def __init__(self, E_0, P_da, P_rt, delta_E, scenario):
         
         super().__init__()
 
         self.solved = False
-        self.scenario = scenario
-        
+
         self.E_0 = E_0
         self.P_da = P_da
         
-        self.delta_E = []
-        self.P_rt = []
+        self.scenario = scenario
+        
+        self.delta_E = delta_E
+        self.P_rt = P_rt
         self.delta_c = []
         
         self.T = T
@@ -591,7 +772,7 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
     
     def _BigM_setting(self):
         
-        self.M_gen = [3*self.K[t] for t in range(T)]
+        self.M_gen = [4*self.K[t] for t in range(T)]
         
         for t in range(self.T):   
              
@@ -643,8 +824,8 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         
         for t in range(self.T):
             
-            self.delta_E.append(self.scenario[t][0])
-            self.P_rt.append(self.scenario[t][1])
+            #self.delta_E.append(self.scenario[t][0])
+            #self.P_rt.append(self.scenario[t][1])
             self.delta_c.append(self.scenario[t][2])
             
     def build_model(self):    
@@ -693,12 +874,19 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_6 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
         
         model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_c = pyo.Var(model.TIME, domain = pyo.Binary)
                 
         model.f_prime = pyo.Var(model.TIME, domain = pyo.Reals)
         
@@ -876,13 +1064,13 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
             return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*self.M_gen[t]
         
         def minmax_rule_3_1(model, t):
-            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.12*C
+            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C+S)
         
         def minmax_rule_3_2(model, t):
             return model.m_3[t] >= 0
         
         def minmax_rule_3_3(model, t):
-            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.12*C + self.M_gen[t]*(1 - model.n_3[t])
+            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.08*(C+S) + self.M_gen[t]*(1 - model.n_3[t])
         
         def minmax_rule_3_4(model, t):
             return model.m_3[t] <= self.M_gen[t]*model.n_3[t]
@@ -910,11 +1098,68 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         
         def minmax_rule_4_8(model, t):
             return model.m_4[t] <= model.m_4_3[t] + self.M_set_decomp[t][2][1]*model.n_4[t]
+
+
+        def minmax_rule_5_1(model, t):
+            return model.m_5[t] <= model.q_da[t]
+        
+        def minmax_rule_5_2(model, t):
+            return model.m_5[t] <= model.q_rt[t]
+        
+        def minmax_rule_5_3(model, t):
+            return model.m_5[t] >= model.q_da[t] - M_gen[t]*(1 - model.n_5[t])
+        
+        def minmax_rule_5_4(model, t):
+            return model.m_5[t] >= model.q_rt[t] - M_gen[t]*(model.n_5[t])
+        
+        def minmax_rule_6_1(model, t):
+            return model.m_6[t] <= model.m_5[t]
+        
+        def minmax_rule_6_2(model, t):
+            return model.m_6[t] <= model.u[t]
+        
+        def minmax_rule_6_3(model, t):
+            return model.m_6[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_6[t])
+        
+        def minmax_rule_6_4(model, t):
+            return model.m_6[t] >= model.u[t] - M_gen[t]*model.n_6[t]
+        
+        
+        def bin_c_rule_1(model, t):
+            return model.q_rt[t] - model.Q_c[t] <= M_gen[t]*model.n_c[t]
+        
+        def bin_c_rule_2(model, t):
+            return model.Q_c[t] - model.q_rt[t] <= M_gen[t]*(1 - model.n_c[t])
+        
+        
+        def minmax_rule_7_1(model, t):
+            return model.m_7[t] >= 0
+        
+        def minmax_rule_7_2(model, t):
+            return model.m_7[t] <= model.m_5[t]
+        
+        def minmax_rule_7_3(model, t):
+            return model.m_7[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_7_4(model, t):
+            return model.m_7[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_c[t])
+        
+        def minmax_rule_8_1(model, t):
+            return model.m_8[t] >= 0
+        
+        def minmax_rule_8_2(model, t):
+            return model.m_8[t] <= model.m_6[t]
+        
+        def minmax_rule_8_3(model, t):
+            return model.m_8[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_8_4(model, t):
+            return model.m_8[t] >= model.m_6[t] - M_gen[t]*(1 - model.n_c[t])
         
         ## Settlement fcn
         
         def settlement_fcn_rule(model, t):
-            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.P_rt[t] + self.m_4[t] - (self.P_rt[t] - model.b_rt[t])*model.m_3[t] + P_r*model.u[t] 
+            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.P_rt[t] + self.m_4[t] - (self.P_rt[t] - model.b_da[t])*model.m_3[t] + P_r*model.u[t] + P_c*(model.m_6[t] - model.m_7[t] + model.m_8[t])
         
         def settlement_fcn_rule_1(model, t):
             return model.Q_sum[t] == model.Q_da[t] + model.Q_rt[t]
@@ -1004,6 +1249,29 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         model.minmax_4_7 = pyo.Constraint(model.TIME, rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(model.TIME, rule = minmax_rule_4_8)
 
+        model.minmax_5_1 = pyo.Constraint(model.TIME, rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(model.TIME, rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(model.TIME, rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(model.TIME, rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(model.TIME, rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(model.TIME, rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(model.TIME, rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(model.TIME, rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(model.TIME, rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(model.TIME, rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(model.TIME, rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(model.TIME, rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(model.TIME, rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(model.TIME, rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(model.TIME, rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(model.TIME, rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(model.TIME, rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(model.TIME, rule=minmax_rule_8_4)
+
         model.settlement_fcn = pyo.Constraint(model.TIME, rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_1)
         model.settlement_fcn_2 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_2)
@@ -1033,6 +1301,74 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
     
         return pyo.value(self.objective)
 
+    def get_objective_part_value(self):
+        
+        part1 = sum(pyo.value(self.Q_da[t] * self.P_da[t] + (self.u[t] - self.Q_da[t]) * self.P_rt[t]) for t in range(self.T))
+        part2_1 = sum(pyo.value(self.m_4_1[t]) for t in range(self.T))
+        part2_2 = sum(pyo.value(self.m_4_2[t]) for t in range(self.T))
+        part2 = sum(pyo.value(self.m_4[t]) for t in range(self.T))
+        part3 = sum(pyo.value(-(self.P_rt[t] - self.b_da[t]) * self.m_3[t]) for t in range(self.T))
+        part4 = sum(pyo.value(P_c * (self.m_6[t] - self.m_7[t] + self.m_8[t])) for t in range(self.T))
+        part5 = sum(pyo.value(P_r * self.u[t]) for t in range(self.T))
+        
+        return [part1, part2_1, part2_2, part2, part3, part4, part5]
+      
+    def get_b_da_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.b_da[t]) for t in range(self.T)] 
+
+    def get_b_rt_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.b_rt[t]) for t in range(self.T)] 
+
+    def get_q_da_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.q_da[t]) for t in range(self.T)] 
+  
+    def get_q_rt_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.q_rt[t]) for t in range(self.T)]   
+    
+    def get_Q_da_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.Q_da[t]) for t in range(self.T)] 
+
+    def get_Q_rt_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.Q_rt[t]) for t in range(self.T)] 
+
+    def get_Q_c_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
+        return [pyo.value(self.Q_c[t]) for t in range(self.T)]    
+
     def get_u_value(self):
         
         if not self.solved:
@@ -1044,7 +1380,7 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
 
 # Subproblems for Rolling Horizon
 
-class Rolling_da(pyo.ConcreteModel):
+class Rolling_da(pyo.ConcreteModel): # t = -2
     
     def __init__(self):
         
@@ -1052,7 +1388,7 @@ class Rolling_da(pyo.ConcreteModel):
 
         self.solved = False
         
-        self.P_da = exp_P_da
+        self.exp_P_da = exp_P_da
         
         self.exp_delta_E = [0 for t in range(T)]
         self.exp_P_rt = exp_P_rt
@@ -1065,10 +1401,7 @@ class Rolling_da(pyo.ConcreteModel):
         self.bin_num = 7
         
         self.sol_b_da = []
-        self.sol_Q_da = []
-        self.sol_b_rt = 0
-        self.sol_q_rt = 0
-        self.sol_S = 0.5*S
+        self.sol_q_da = []
         
         self._BigM_setting()
         self._solve()
@@ -1078,33 +1411,33 @@ class Rolling_da(pyo.ConcreteModel):
         
         for t in range(self.T):   
              
-            if self.P_da[t] >=0 and self.exp_P_rt[t] >= 0:
+            if self.exp_P_da[t] >=0 and self.exp_P_rt[t] >= 0:
                 
-                self.M_set[t][0] = (160 + self.P_da[t] + 2*self.exp_P_rt[t])*K[t]
+                self.M_set[t][0] = (160 + self.exp_P_da[t] + 2*self.exp_P_rt[t])*K[t]
                 self.M_set[t][1] = (80 + 2*self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][0][0] = (self.exp_P_rt[t])*K[t]
-                self.M_set_decomp[t][0][1] = (80 + self.P_da[t] + self.exp_P_rt[t])*K[t]
+                self.M_set_decomp[t][0][1] = (80 + self.exp_P_da[t] + self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][1][0] = (self.exp_P_rt[t] + 80)*K[t]
                 self.M_set_decomp[t][1][1] = (self.exp_P_rt[t] + 80)*K[t]
                 self.M_set_decomp[t][2][0] = max(self.M_set_decomp[t][0][0], self.M_set_decomp[t][1][0])
                 self.M_set_decomp[t][2][1] = min(self.M_set_decomp[t][0][1], self.M_set_decomp[t][1][1])
 
-            elif self.P_da[t] >=0 and self.exp_P_rt[t] < 0:
+            elif self.exp_P_da[t] >=0 and self.exp_P_rt[t] < 0:
                 
-                self.M_set[t][0] = (160 + self.P_da[t] - 2*self.exp_P_rt[t])*K[t]
+                self.M_set[t][0] = (160 + self.exp_P_da[t] - 2*self.exp_P_rt[t])*K[t]
                 self.M_set[t][1] = (80 - 2*self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][0][0] = (-self.exp_P_rt[t])*K[t]
-                self.M_set_decomp[t][0][1] = (80 + self.P_da[t] - self.exp_P_rt)*K[t]
+                self.M_set_decomp[t][0][1] = (80 + self.exp_P_da[t] - self.exp_P_rt)*K[t]
                 self.M_set_decomp[t][1][0] = (80 - self.exp_P_rt)*K[t]
                 self.M_set_decomp[t][1][1] = (80 - self.exp_P_rt)*K[t]
                 self.M_set_decomp[t][2][0] = max(self.M_set_decomp[t][0][0], self.M_set_decomp[t][1][0])
                 self.M_set_decomp[t][2][1] = min(self.M_set_decomp[t][0][1], self.M_set_decomp[t][1][1])
 
-            elif self.P_da[t] < 0 and self.exp_P_rt[t] >= 0:
+            elif self.exp_P_da[t] < 0 and self.exp_P_rt[t] >= 0:
                 
                 self.M_set[t][0] = (160 + 2*self.exp_P_rt[t])*K[t]
-                self.M_set[t][1] = (80 - self.P_da[t] + 2*self.exp_P_rt[t])*K[t]
-                self.M_set_decomp[t][0][0] = (-self.P_da[t] + self.exp_P_rt[t])*K[t]
+                self.M_set[t][1] = (80 - self.exp_P_da[t] + 2*self.exp_P_rt[t])*K[t]
+                self.M_set_decomp[t][0][0] = (-self.exp_P_da[t] + self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][0][1] = (80 + self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][1][0] = (80 + self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][1][1] = (80 + self.exp_P_rt[t])*K[t]
@@ -1114,8 +1447,8 @@ class Rolling_da(pyo.ConcreteModel):
             else:
                 
                 self.M_set[t][0] = (160 - 2*self.exp_P_rt[t])*K[t]
-                self.M_set[t][1] = (80 - 2*self.P_da[t] - 2*self.exp_P_rt[t])*K[t]
-                self.M_set_decomp[t][0][0] = (- self.P_da[t] - self.exp_P_rt[t])*K[t]
+                self.M_set[t][1] = (80 - 2*self.exp_P_da[t] - 2*self.exp_P_rt[t])*K[t]
+                self.M_set_decomp[t][0][0] = (- self.exp_P_da[t] - self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][0][1] = (80 - self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][1][0] = (80 - self.exp_P_rt[t])*K[t]
                 self.M_set_decomp[t][1][1] = (80 - self.exp_P_rt[t])*K[t]
@@ -1168,12 +1501,19 @@ class Rolling_da(pyo.ConcreteModel):
         model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_6 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
         
         model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_c = pyo.Var(model.TIME, domain = pyo.Binary)
                 
         model.f_prime = pyo.Var(model.TIME, domain = pyo.Reals)
         
@@ -1191,6 +1531,578 @@ class Rolling_da(pyo.ConcreteModel):
         
         def da_overbid_rule(model):
             return sum(model.q_da[t] for t in range(self.T)) <= E_0_sum
+        
+        def da_market_clearing_1_rule(model, t):
+            return model.b_da[t] - self.exp_P_da[t] <= M_price*(1 - model.n_da[t])
+        
+        def da_market_clearing_2_rule(model, t):
+            return self.exp_P_da[t] - model.b_da[t] <= M_price*model.n_da[t]
+        
+        def da_market_clearing_3_rule(model, t):
+            return model.Q_da[t] <= model.q_da[t]
+        
+        def da_market_clearing_4_rule(model, t):
+            return model.Q_da[t] <= M_gen[t]*model.n_da[t]
+        
+        def da_market_clearing_5_rule(model, t):
+            return model.Q_da[t] >= model.q_da[t] - M_gen[t]*(1 - model.n_da[t])
+        
+        def da_State_SOC_rule(model):
+            return model.S[-1] == 0.5*S
+        
+        ## Real-Time Market rules
+        
+        def rt_E_rule(model, t):
+            return model.E_1[t] == E_0[t]
+        
+        def rt_bidding_price_rule(model, t):
+            return model.b_rt[t] <= model.b_da[t]
+        
+        def rt_bidding_amount_rule(model, t):
+            return model.q_rt[t] <= model.E_1[t] + B
+        
+        def rt_overbid_rule(model):
+            return sum(model.q_rt[t] for t in range(self.T)) <= E_0_sum
+        
+        def rt_market_clearing_rule_1(model, t):
+            return model.b_rt[t] - self.exp_P_rt[t] <= M_price*(1 - model.n_rt[t])
+        
+        def rt_market_clearing_rule_2(model, t):
+            return self.exp_P_rt[t] - model.b_rt[t] <= M_price*model.n_rt[t] 
+        
+        def rt_market_clearing_rule_3(model, t):
+            return model.Q_rt[t] <= model.q_rt[t]
+        
+        def rt_market_clearing_rule_4(model, t):
+            return model.Q_rt[t] <= M_gen[t]*model.n_rt[t]
+        
+        def rt_market_clearing_rule_5(model, t):
+            return model.Q_rt[t] >= model.q_rt[t] - M_gen[t]*(1 - model.n_rt[t])
+        
+        def dispatch_rule(model, t):
+            return model.Q_c[t] == model.Q_rt[t]
+        
+        def generation_rule(model, t):
+            return model.g[t] <= model.E_1[t]
+        
+        def charge_rule(model, t):
+            return model.c[t] <= model.g[t]
+        
+        def electricity_supply_rule(model, t):
+            return model.u[t] == model.g[t] + model.d[t] - model.c[t]
+
+        def State_SOC_rule(model, t):
+            return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
+        
+        def last_SOC_rule(model):
+            return model.S[T-1] == 0.5*S
+        
+        ## f(t) MIP reformulation
+        
+        ### 1. Bilinear -> MIP by binarize b_da, b_rt
+        
+        def binarize_b_da_rule_1(model, t):
+            return model.b_da[t] >= -sum(model.lamb[t, i]*(2**i) for i in range(self.bin_num)) - 0.5 
+        
+        def binarize_b_da_rule_2(model, t):
+            return model.b_da[t] <= -sum(model.lamb[t, i]*(2**i) for i in range(self.bin_num)) + 0.5
+
+        def binarize_b_rt_rule_1(model, t):
+            return model.b_rt[t] >= -sum(model.nu[t, j]*(2**j) for j in range(self.bin_num)) - 0.5 
+        
+        def binarize_b_rt_rule_2(model, t):
+            return model.b_rt[t] <= -sum(model.nu[t, j]*(2**j) for j in range(self.bin_num)) + 0.5
+        
+        def binarize_rule_1_1(model, t, j):
+            return model.w[t, j] >= 0
+        
+        def binarize_rule_1_2(model, t, j):
+            return model.w[t, j] <= model.u[t]
+        
+        def binarize_rule_1_3(model, t, j):
+            return model.w[t, j] <= M_gen[t]*model.nu[t, j]
+        
+        def binarize_rule_1_4(model, t, j):
+            return model.w[t, j] >= model.u[t] - M_gen[t]*(1-model.nu[t, j])
+        
+        def binarize_rule_2_1(model, t, i):
+            return model.h[t, i] >= 0
+        
+        def binarize_rule_2_2(model, t, i):
+            return model.h[t, i] <= model.m_1[t]
+        
+        def binarize_rule_2_3(model, t, i):
+            return model.h[t, i] <= M_gen[t]*model.lamb[t, i]
+        
+        def binarize_rule_2_4(model, t, i):
+            return model.h[t, i] >= model.m_1[t] - M_gen[t]*(1 - model.lamb[t, i])
+        
+        def binarize_rule_3_1(model, t, i):
+            return model.k[t, i] >= 0
+        
+        def binarize_rule_3_2(model, t, i):
+            return model.k[t, i] <= model.m_2[t]
+        
+        def binarize_rule_3_3(model, t, i):
+            return model.k[t, i] <= M_gen[t]*model.lamb[t, i]
+        
+        def binarize_rule_3_4(model, t, i):
+            return model.k[t, i] >= model.m_2[t] - M_gen[t]*(1 - model.lamb[t, i])        
+        
+        def binarize_rule_4_1(model, t, i):
+            return model.o[t, i] >= 0
+        
+        def binarize_rule_4_2(model, t, i):
+            return model.o[t, i] <= model.m_3[t]
+        
+        def binarize_rule_4_3(model, t, i):
+            return model.o[t, i] <= M_gen[t]*model.nu[t, i]
+        
+        def binarize_rule_4_4(model, t, i):
+            return model.o[t, i] >= model.m_3[t] - M_gen[t]*(1 - model.nu[t, i])        
+        
+        ### 2. Minmax -> MIP
+        
+        def dummy_rule_4_1(model, t):
+            return model.m_4_1[t] == -sum(model.w[t, j]*(2**j) for j in range(self.bin_num)) - (model.Q_da[t]*self.exp_P_da[t] + (model.u[t] - model.Q_da[t])*self.exp_P_rt[t])
+            
+        def dummy_rule_4_2(model, t):
+            return model.m_4_2[t] == (model.m_1[t] - model.m_2[t])*self.exp_P_rt[t] + sum((model.h[t, i] - model.k[t, i])*(2**i) for i in range(self.bin_num))
+        
+        def minmax_rule_1_1(model, t):
+            return model.m_1[t] <= model.Q_da[t]
+        
+        def minmax_rule_1_2(model, t):
+            return model.m_1[t] <= model.q_rt[t]
+        
+        def minmax_rule_1_3(model, t):
+            return model.m_1[t] >= model.Q_da[t] - (1 - model.n_1[t])*M_gen[t]
+        
+        def minmax_rule_1_4(model, t):
+            return model.m_1[t] >= model.q_rt[t] - (model.n_1[t])*M_gen[t]
+        
+        def minmax_rule_2_1(model, t):
+            return model.m_2[t] <= model.u[t]
+        
+        def minmax_rule_2_2(model, t):
+            return model.m_2[t] <= model.q_rt[t]
+        
+        def minmax_rule_2_3(model, t):
+            return model.m_2[t] >= model.u[t] - (1 - model.n_2[t])*M_gen[t]
+        
+        def minmax_rule_2_4(model, t):
+            return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*M_gen[t]
+        
+        def minmax_rule_3_1(model, t):
+            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C + S)
+        
+        def minmax_rule_3_2(model, t):
+            return model.m_3[t] >= 0
+        
+        def minmax_rule_3_3(model, t):
+            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.08*(C + S) + M_gen[t]*(1 - model.n_3[t])
+        
+        def minmax_rule_3_4(model, t):
+            return model.m_3[t] <= M_gen[t]*model.n_3[t]
+             
+        def minmax_rule_4_1(model, t):
+            return model.m_4_3[t] >= model.m_4_1[t]
+        
+        def minmax_rule_4_2(model, t):
+            return model.m_4_3[t] >= model.m_4_2[t]
+        
+        def minmax_rule_4_3(model, t):
+            return model.m_4_3[t] <= model.m_4_1[t] + self.M_set[t][0]*(1 - model.n_4_3[t])
+        
+        def minmax_rule_4_4(model, t):
+            return model.m_4_3[t] <= model.m_4_2[t] + self.M_set[t][1]*model.n_4_3[t]
+        
+        def minmax_rule_4_5(model, t):
+            return model.m_4[t] >= model.m_4_3[t] 
+        
+        def minmax_rule_4_6(model, t):
+            return model.m_4[t] >= 0
+        
+        def minmax_rule_4_7(model, t):
+            return model.m_4[t] <= self.M_set_decomp[t][2][0]*(1 - model.n_4[t])
+        
+        def minmax_rule_4_8(model, t):
+            return model.m_4[t] <= model.m_4_3[t] + self.M_set_decomp[t][2][1]*model.n_4[t]
+        
+        
+        def minmax_rule_5_1(model, t):
+            return model.m_5[t] <= model.q_da[t]
+        
+        def minmax_rule_5_2(model, t):
+            return model.m_5[t] <= model.q_rt[t]
+        
+        def minmax_rule_5_3(model, t):
+            return model.m_5[t] >= model.q_da[t] - M_gen[t]*(1 - model.n_5[t])
+        
+        def minmax_rule_5_4(model, t):
+            return model.m_5[t] >= model.q_rt[t] - M_gen[t]*(model.n_5[t])
+        
+        def minmax_rule_6_1(model, t):
+            return model.m_6[t] <= model.m_5[t]
+        
+        def minmax_rule_6_2(model, t):
+            return model.m_6[t] <= model.u[t]
+        
+        def minmax_rule_6_3(model, t):
+            return model.m_6[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_6[t])
+        
+        def minmax_rule_6_4(model, t):
+            return model.m_6[t] >= model.u[t] - M_gen[t]*model.n_6[t]
+        
+        
+        def bin_c_rule_1(model, t):
+            return model.q_rt[t] - model.Q_c[t] <= M_gen[t]*model.n_c[t]
+        
+        def bin_c_rule_2(model, t):
+            return model.Q_c[t] - model.q_rt[t] <= M_gen[t]*(1 - model.n_c[t])
+        
+        
+        def minmax_rule_7_1(model, t):
+            return model.m_7[t] >= 0
+        
+        def minmax_rule_7_2(model, t):
+            return model.m_7[t] <= model.m_5[t]
+        
+        def minmax_rule_7_3(model, t):
+            return model.m_7[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_7_4(model, t):
+            return model.m_7[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_c[t])
+        
+        def minmax_rule_8_1(model, t):
+            return model.m_8[t] >= 0
+        
+        def minmax_rule_8_2(model, t):
+            return model.m_8[t] <= model.m_6[t]
+        
+        def minmax_rule_8_3(model, t):
+            return model.m_8[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_8_4(model, t):
+            return model.m_8[t] >= model.m_6[t] - M_gen[t]*(1 - model.n_c[t])
+        
+        ## Settlement fcn
+        
+        def settlement_fcn_rule(model, t):
+            return model.f_prime[t] == model.Q_da[t]*self.exp_P_da[t] + (model.u[t] - model.Q_da[t])*self.exp_P_rt[t] + self.m_4[t] - self.exp_P_rt[t]*model.m_3[t] - sum((2**j)*model.o[t, j] for j in range(self.bin_num)) + P_r*model.u[t] + P_c*(model.m_6[t] - model.m_7[t] + model.m_8[t]) 
+        
+        def settlement_fcn_rule_1(model, t):
+            return model.Q_sum[t] == model.Q_da[t] + model.Q_rt[t]
+        
+        def settlement_fcn_rule_2(model, t):
+            return model.Q_sum[t] <= M_gen[t]*model.n_sum[t]
+        
+        def settlement_fcn_rule_3(model, t):
+            return model.Q_sum[t] >= epsilon*model.n_sum[t]
+        
+        def settlement_fcn_rule_4(model, t):
+            return model.f[t] >= 0
+        
+        def settlement_fcn_rule_5(model, t):
+            return model.f[t] <= model.f_prime[t]
+        
+        def settlement_fcn_rule_6(model, t):
+            return model.f[t] <= M_set_fcn*model.n_sum[t]
+        
+        def settlement_fcn_rule_7(model, t):
+            return model.f[t] >= model.f_prime[t] - M_set_fcn*(1 - model.n_sum[t])
+        
+        model.da_bidding_amount = pyo.Constraint(model.TIME, rule = da_bidding_amount_rule)
+        model.da_overbid = pyo.Constraint(rule = da_overbid_rule)
+        model.da_market_clearing_1 = pyo.Constraint(model.TIME, rule = da_market_clearing_1_rule)
+        model.da_market_clearing_2 = pyo.Constraint(model.TIME, rule = da_market_clearing_2_rule)
+        model.da_market_clearing_3 = pyo.Constraint(model.TIME, rule = da_market_clearing_3_rule)
+        model.da_market_clearing_4 = pyo.Constraint(model.TIME, rule = da_market_clearing_4_rule)
+        model.da_market_clearing_5 = pyo.Constraint(model.TIME, rule = da_market_clearing_5_rule)
+        model.da_State_SOC = pyo.Constraint(rule = da_State_SOC_rule)
+        model.rt_E = pyo.Constraint(model.TIME, rule = rt_E_rule)
+        model.rt_bidding_price = pyo.Constraint(model.TIME, rule = rt_bidding_price_rule)
+        model.rt_bidding_amount = pyo.Constraint(model.TIME, rule = rt_bidding_amount_rule)
+        model.rt_overbid = pyo.Constraint(rule = rt_overbid_rule)
+        model.rt_market_clearing_1 = pyo.Constraint(model.TIME, rule = rt_market_clearing_rule_1)
+        model.rt_market_clearing_2 = pyo.Constraint(model.TIME, rule = rt_market_clearing_rule_2)
+        model.rt_market_clearing_3 = pyo.Constraint(model.TIME, rule = rt_market_clearing_rule_3)
+        model.rt_market_clearing_4 = pyo.Constraint(model.TIME, rule = rt_market_clearing_rule_4)
+        model.rt_market_clearing_5 = pyo.Constraint(model.TIME, rule = rt_market_clearing_rule_5)
+        model.dispatch = pyo.Constraint(model.TIME, rule = dispatch_rule)
+        model.generation = pyo.Constraint(model.TIME, rule = generation_rule)
+        model.charge = pyo.Constraint(model.TIME, rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(model.TIME, rule = electricity_supply_rule)
+        model.State_SOC = pyo.Constraint(model.TIME, rule = State_SOC_rule)
+        model.last_SOC = pyo.Constraint(rule = last_SOC_rule)
+        
+        model.binarize_b_da_1 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_1)
+        model.binarize_b_da_2 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_2)
+        model.binarize_b_rt_1 = pyo.Constraint(model.TIME, rule = binarize_b_rt_rule_1)
+        model.binarize_b_rt_2 = pyo.Constraint(model.TIME, rule = binarize_b_rt_rule_2)                
+        model.binarize_1_1 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_1_1)
+        model.binarize_1_2 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_1_2)
+        model.binarize_1_3 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_1_3)       
+        model.binarize_1_4 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_1_4)
+        model.binarize_2_1 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_2_1)
+        model.binarize_2_2 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_2_2)
+        model.binarize_2_3 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_2_3)
+        model.binarize_2_4 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_2_4)
+        model.binarize_3_1 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_3_1)
+        model.binarize_3_2 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_3_2)
+        model.binarize_3_3 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_3_3)
+        model.binarize_3_4 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_3_4)
+        model.binarize_4_1 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_4_1)
+        model.binarize_4_2 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_4_2)
+        model.binarize_4_3 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_4_3)
+        model.binarize_4_4 = pyo.Constraint(model.TIME, model.BINARIZE, rule = binarize_rule_4_4)
+        
+        model.dummy_4_1 = pyo.Constraint(model.TIME, rule = dummy_rule_4_1)
+        model.dummy_4_2 = pyo.Constraint(model.TIME, rule = dummy_rule_4_2)
+        model.minmax_1_1 = pyo.Constraint(model.TIME, rule = minmax_rule_1_1)
+        model.minmax_1_2 = pyo.Constraint(model.TIME, rule = minmax_rule_1_2)
+        model.minmax_1_3 = pyo.Constraint(model.TIME, rule = minmax_rule_1_3)
+        model.minmax_1_4 = pyo.Constraint(model.TIME, rule = minmax_rule_1_4)
+        model.minmax_2_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_1)
+        model.minmax_2_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_2)
+        model.minmax_2_3 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3)
+        model.minmax_2_4 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4)
+        model.minmax_3_1 = pyo.Constraint(model.TIME, rule = minmax_rule_3_1)
+        model.minmax_3_2 = pyo.Constraint(model.TIME, rule = minmax_rule_3_2)
+        model.minmax_3_3 = pyo.Constraint(model.TIME, rule = minmax_rule_3_3)
+        model.minmax_3_4 = pyo.Constraint(model.TIME, rule = minmax_rule_3_4)
+        model.minmax_4_1 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1)
+        model.minmax_4_2 = pyo.Constraint(model.TIME, rule = minmax_rule_4_2)
+        model.minmax_4_3 = pyo.Constraint(model.TIME, rule = minmax_rule_4_3)
+        model.minmax_4_4 = pyo.Constraint(model.TIME, rule = minmax_rule_4_4)
+        model.minmax_4_5 = pyo.Constraint(model.TIME, rule = minmax_rule_4_5)
+        model.minmax_4_6 = pyo.Constraint(model.TIME, rule = minmax_rule_4_6)
+        model.minmax_4_7 = pyo.Constraint(model.TIME, rule = minmax_rule_4_7)
+        model.minmax_4_8 = pyo.Constraint(model.TIME, rule = minmax_rule_4_8)
+
+        model.minmax_5_1 = pyo.Constraint(model.TIME, rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(model.TIME, rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(model.TIME, rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(model.TIME, rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(model.TIME, rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(model.TIME, rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(model.TIME, rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(model.TIME, rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(model.TIME, rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(model.TIME, rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(model.TIME, rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(model.TIME, rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(model.TIME, rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(model.TIME, rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(model.TIME, rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(model.TIME, rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(model.TIME, rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(model.TIME, rule=minmax_rule_8_4)
+
+        model.settlement_fcn = pyo.Constraint(model.TIME, rule = settlement_fcn_rule)
+        model.settlement_fcn_1 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_1)
+        model.settlement_fcn_2 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_2)
+        model.settlement_fcn_3 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_3)
+        model.settlement_fcn_4 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_4)
+        model.settlement_fcn_5 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_5)
+        model.settlement_fcn_6 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_6)
+        model.settlement_fcn_7 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_7)
+                
+        # Obj Fcn
+
+        model.objective = pyo.Objective(
+            expr = sum(model.f[t] for t in model.TIME), 
+            sense = pyo.maximize
+            )
+    
+    def _solve(self):
+        
+        self.build_model()
+        SOLVER.solve(self)
+        self.solved = True
+        
+    def _solution_value(self):
+        
+        if not self.solved:
+            self._solve()
+            self.solved = True
+        
+        for t in range(T):
+            self.sol_b_da.append(pyo.value(self.b_da[t]))
+            self.sol_q_da.append(pyo.value(self.q_da[t]))
+
+class Rolling_rt_init(pyo.ConcreteModel): # t = -1
+
+    def __init__(self, da, P_da):
+        
+        super().__init__()
+        
+        self.solved = False
+        self.stage = 0
+        
+        self.b_da_prev = da[0]
+        self.q_da_prev = da[1]
+        
+        self.P_da = P_da
+        
+        self.exp_delta_E = [0 for t in range(T)]
+        self.exp_P_rt = exp_P_rt
+        self.exp_delta_c = [0 for t in range(T)]
+        
+        self.delta_E = 0
+        
+        self.M_set = [[0, 0] for t in range(T)]
+        self.M_set_decomp = [[[0, 0] for i in range(3)] for t in range(T)]
+
+        self.T = T
+        self.bin_num = 7
+        
+        self.sol_Q_da = []
+        
+        self.sol_b_rt = 0
+        self.sol_q_rt = 0
+        self.sol_S = 0
+        self.sol_E_1 = 0
+        self.sol_T_q = 0
+        
+        self._BigM_setting()
+        self._solve()
+        self._solution_value()
+ 
+    def _BigM_setting(self):        
+
+        for t in range(self.T-self.stage):   
+             
+            if self.P_da[t] >=0 and self.exp_P_rt[t] >= 0:
+                
+                self.M_set[t][0] = (160 + self.P_da[t] + 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set[t][1] = (80 + 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][0] = (self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][1] = (80 + self.P_da[t] + self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][1][0] = (self.exp_P_rt[t] + 80)*K[t+self.stage]
+                self.M_set_decomp[t][1][1] = (self.exp_P_rt[t] + 80)*K[t]+self.stage
+                self.M_set_decomp[t][2][0] = max(self.M_set_decomp[t][0][0], self.M_set_decomp[t][1][0])
+                self.M_set_decomp[t][2][1] = min(self.M_set_decomp[t][0][1], self.M_set_decomp[t][1][1])
+
+            elif self.P_da[t] >=0 and self.exp_P_rt[t] < 0:
+                
+                self.M_set[t][0] = (160 + self.P_da[t] - 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set[t][1] = (80 - 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][0] = (-self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][1] = (80 + self.P_da[t] - self.exp_P_rt)*K[t+self.stage]
+                self.M_set_decomp[t][1][0] = (80 - self.exp_P_rt)*K[t+self.stage]
+                self.M_set_decomp[t][1][1] = (80 - self.exp_P_rt)*K[t+self.stage]
+                self.M_set_decomp[t][2][0] = max(self.M_set_decomp[t][0][0], self.M_set_decomp[t][1][0])
+                self.M_set_decomp[t][2][1] = min(self.M_set_decomp[t][0][1], self.M_set_decomp[t][1][1])
+
+            elif self.P_da[t] < 0 and self.exp_P_rt[t] >= 0:
+                
+                self.M_set[t][0] = (160 + 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set[t][1] = (80 - self.P_da[t] + 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][0] = (-self.P_da[t] + self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][1] = (80 + self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][1][0] = (80 + self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][1][1] = (80 + self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][2][0] = max(self.M_set_decomp[t][0][0], self.M_set_decomp[t][1][0])
+                self.M_set_decomp[t][2][1] = min(self.M_set_decomp[t][0][1], self.M_set_decomp[t][1][1])
+
+            else:
+                
+                self.M_set[t][0] = (160 - 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set[t][1] = (80 - 2*self.P_da[t] - 2*self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][0] = (- self.P_da[t] - self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][0][1] = (80 - self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][1][0] = (80 - self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][1][1] = (80 - self.exp_P_rt[t])*K[t+self.stage]
+                self.M_set_decomp[t][2][0] = max(self.M_set_decomp[t][0][0], self.M_set_decomp[t][1][0])
+                self.M_set_decomp[t][2][1] = min(self.M_set_decomp[t][0][1], self.M_set_decomp[t][1][1]) 
+      
+    def build_model(self):    
+        
+        model = self.model()
+        
+        model.TIME = pyo.RangeSet(0, T-1-self.stage)
+        model.RT_BID_TIME = pyo.RangeSet(1, T-1-self.stage)
+        model.E_1_TIME = pyo.RangeSet(2, T-1-self.stage)
+        model.TIME_ESS = pyo.RangeSet(-1, T-1-self.stage)
+        model.BINARIZE = pyo.RangeSet(0, self.bin_num - 1)
+        
+        # Vars
+
+        model.b_da = pyo.Var(model.TIME, bounds = (-P_r, 0), domain = pyo.Reals)
+        model.b_rt = pyo.Var(model.TIME, bounds = (-P_r, 0), domain = pyo.Reals)
+        
+        model.q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.Q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.q_rt = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.Q_rt = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        model.T_q_next = pyo.Var(bounds = (0, E_0_sum), domain = pyo.NonNegativeReals)
+        
+        model.n_da = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_rt = pyo.Var(model.TIME, domain = pyo.Binary)
+        
+        model.lamb = pyo.Var(model.TIME, model.BINARIZE, domain = pyo.Binary)        
+        model.nu = pyo.Var(model.TIME, model.BINARIZE, domain = pyo.Binary)
+        
+        model.w = pyo.Var(model.TIME, model.BINARIZE, domain = pyo.Reals)
+        model.h = pyo.Var(model.TIME, model.BINARIZE, domain = pyo.Reals)
+        model.k = pyo.Var(model.TIME, model.BINARIZE, domain = pyo.Reals)
+        model.o = pyo.Var(model.TIME, model.BINARIZE, domain = pyo.Reals)
+        
+        model.g = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        model.S = pyo.Var(model.TIME_ESS, bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
+
+        model.E_1 = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        model.m_1 = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.m_2 = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.m_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_4 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_6 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
+        
+        model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_c = pyo.Var(model.TIME, domain = pyo.Binary)
+                
+        model.f_prime = pyo.Var(model.TIME, domain = pyo.Reals)
+        
+        model.Q_sum = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.n_sum = pyo.Var(model.TIME, domain = pyo.Binary)
+        
+        model.f = pyo.Var(model.TIME, domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## Connected to previous solutions
+        
+        def prev_1_rule(model, t):
+            return model.b_da[t] == self.b_da_prev[t]
+        
+        def prev_2_rule(model, t):
+            return model.q_da[t] == self.q_da_prev[t]
+        
+        ## Day-Ahead Market Rules
         
         def da_market_clearing_1_rule(model, t):
             return model.b_da[t] - self.P_da[t] <= M_price*(1 - model.n_da[t])
@@ -1254,6 +2166,12 @@ class Rolling_da(pyo.ConcreteModel):
         def State_SOC_rule(model, t):
             return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
         
+        def State_SOC_rule(model, t):
+            return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
+        
+        def last_SOC_rule(model):
+            return model.S[T-1] == 0.5*S   
+             
         ## f(t) MIP reformulation
         
         ### 1. Bilinear -> MIP by binarize b_da, b_rt
@@ -1351,13 +2269,13 @@ class Rolling_da(pyo.ConcreteModel):
             return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*M_gen[t]
         
         def minmax_rule_3_1(model, t):
-            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.12*C
+            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C + S)
         
         def minmax_rule_3_2(model, t):
             return model.m_3[t] >= 0
         
         def minmax_rule_3_3(model, t):
-            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.12*C + M_gen[t]*(1 - model.n_3[t])
+            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.08*(C + S) + M_gen[t]*(1 - model.n_3[t])
         
         def minmax_rule_3_4(model, t):
             return model.m_3[t] <= M_gen[t]*model.n_3[t]
@@ -1386,10 +2304,67 @@ class Rolling_da(pyo.ConcreteModel):
         def minmax_rule_4_8(model, t):
             return model.m_4[t] <= model.m_4_3[t] + self.M_set_decomp[t][2][1]*model.n_4[t]
         
+        
+        def minmax_rule_5_1(model, t):
+            return model.m_5[t] <= model.q_da[t]
+        
+        def minmax_rule_5_2(model, t):
+            return model.m_5[t] <= model.q_rt[t]
+        
+        def minmax_rule_5_3(model, t):
+            return model.m_5[t] >= model.q_da[t] - M_gen[t]*(1 - model.n_5[t])
+        
+        def minmax_rule_5_4(model, t):
+            return model.m_5[t] >= model.q_rt[t] - M_gen[t]*(model.n_5[t])
+        
+        def minmax_rule_6_1(model, t):
+            return model.m_6[t] <= model.m_5[t]
+        
+        def minmax_rule_6_2(model, t):
+            return model.m_6[t] <= model.u[t]
+        
+        def minmax_rule_6_3(model, t):
+            return model.m_6[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_6[t])
+        
+        def minmax_rule_6_4(model, t):
+            return model.m_6[t] >= model.u[t] - M_gen[t]*model.n_6[t]
+        
+        
+        def bin_c_rule_1(model, t):
+            return model.q_rt[t] - model.Q_c[t] <= M_gen[t]*model.n_c[t]
+        
+        def bin_c_rule_2(model, t):
+            return model.Q_c[t] - model.q_rt[t] <= M_gen[t]*(1 - model.n_c[t])
+        
+        
+        def minmax_rule_7_1(model, t):
+            return model.m_7[t] >= 0
+        
+        def minmax_rule_7_2(model, t):
+            return model.m_7[t] <= model.m_5[t]
+        
+        def minmax_rule_7_3(model, t):
+            return model.m_7[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_7_4(model, t):
+            return model.m_7[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_c[t])
+        
+        def minmax_rule_8_1(model, t):
+            return model.m_8[t] >= 0
+        
+        def minmax_rule_8_2(model, t):
+            return model.m_8[t] <= model.m_6[t]
+        
+        def minmax_rule_8_3(model, t):
+            return model.m_8[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_8_4(model, t):
+            return model.m_8[t] >= model.m_6[t] - M_gen[t]*(1 - model.n_c[t])
+        
         ## Settlement fcn
         
         def settlement_fcn_rule(model, t):
-            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.exp_P_rt[t] + self.m_4[t] - self.exp_P_rt[t]*model.m_3[t] - sum((2**j)*model.o[t, j] for j in range(self.bin_num)) + P_r*model.u[t] 
+            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.exp_P_rt[t] + self.m_4[t] - self.exp_P_rt[t]*model.m_3[t] - sum((2**j)*model.o[t, j] for j in range(self.bin_num)) + P_r*model.u[t] + P_c*(model.m_6[t] - model.m_7[t] + model.m_8[t]) 
         
         def settlement_fcn_rule_1(model, t):
             return model.Q_sum[t] == model.Q_da[t] + model.Q_rt[t]
@@ -1412,8 +2387,8 @@ class Rolling_da(pyo.ConcreteModel):
         def settlement_fcn_rule_7(model, t):
             return model.f[t] >= model.f_prime[t] - M_set_fcn*(1 - model.n_sum[t])
         
-        model.da_bidding_amount = pyo.Constraint(model.TIME, rule = da_bidding_amount_rule)
-        model.da_overbid = pyo.Constraint(rule = da_overbid_rule)
+        model.prev_1 = pyo.Constraint(model.TIME, rule = prev_1_rule)
+        model.prev_2 = pyo.Constraint(model.TIME, rule = prev_2_rule)
         model.da_market_clearing_1 = pyo.Constraint(model.TIME, rule = da_market_clearing_1_rule)
         model.da_market_clearing_2 = pyo.Constraint(model.TIME, rule = da_market_clearing_2_rule)
         model.da_market_clearing_3 = pyo.Constraint(model.TIME, rule = da_market_clearing_3_rule)
@@ -1434,6 +2409,7 @@ class Rolling_da(pyo.ConcreteModel):
         model.charge = pyo.Constraint(model.TIME, rule = charge_rule)
         model.electricity_supply = pyo.Constraint(model.TIME, rule = electricity_supply_rule)
         model.State_SOC = pyo.Constraint(model.TIME, rule = State_SOC_rule)
+        model.last_SOC = pyo.Constraint(rule = last_SOC_rule)
 
         model.binarize_b_da_1 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_1)
         model.binarize_b_da_2 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_2)
@@ -1479,6 +2455,29 @@ class Rolling_da(pyo.ConcreteModel):
         model.minmax_4_7 = pyo.Constraint(model.TIME, rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(model.TIME, rule = minmax_rule_4_8)
 
+        model.minmax_5_1 = pyo.Constraint(model.TIME, rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(model.TIME, rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(model.TIME, rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(model.TIME, rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(model.TIME, rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(model.TIME, rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(model.TIME, rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(model.TIME, rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(model.TIME, rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(model.TIME, rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(model.TIME, rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(model.TIME, rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(model.TIME, rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(model.TIME, rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(model.TIME, rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(model.TIME, rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(model.TIME, rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(model.TIME, rule=minmax_rule_8_4)
+
         model.settlement_fcn = pyo.Constraint(model.TIME, rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_1)
         model.settlement_fcn_2 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_2)
@@ -1508,17 +2507,24 @@ class Rolling_da(pyo.ConcreteModel):
             self.solved = True
         
         for t in range(T):
-            self.sol_b_da.append(pyo.value(self.b_da[t]))
-            self.sol_Q_da.append(pyo.value(self.q_da[t]))
-            
+            self.sol_Q_da.append(pyo.value(self.Q_da[t]))
+        
         self.sol_b_rt = pyo.value(self.b_rt[0])
         self.sol_q_rt = pyo.value(self.q_rt[0])
         self.sol_S = 0.5*S
         self.sol_E_1 = 0   
-
+            
+    def get_objective_value(self):
+        
+        if not self.solved:
+            self._solve()
+            self.solved = True
+    
+        return pyo.value(self.f[0])    
+                  
 class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
     
-    def __init__(self, t, da, b_rt, q_rt, S, E_1, T_q, delta):
+    def __init__(self, t, da, b_rt, q_rt, S, E_1, T_q, P_da, delta):
         
         super().__init__()
 
@@ -1533,7 +2539,7 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
         self.E_1_prev = E_1
         self.T_q = T_q
         
-        self.P_da = [exp_P_da[t] for t in range(self.stage, T)]
+        self.P_da = [P_da[t] for t in range(self.stage, T)]
         
         self.exp_P_rt = [exp_P_rt[t] for t in range(self.stage, T)]
         
@@ -1557,7 +2563,7 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
         self._solve()
         self._solution_value()
     
-    def _BigM_setting(self):
+    def _BigM_setting(self):        
         
         if self.P_da[0] >=0 and self.P_rt >= 0:
             
@@ -1699,12 +2705,19 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
         model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_6 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
         
         model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_c = pyo.Var(model.TIME, domain = pyo.Binary)
                 
         model.f_prime = pyo.Var(model.TIME, domain = pyo.Reals)
         
@@ -1793,6 +2806,9 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
 
         def State_SOC_rule(model, t):
             return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
+        
+        def last_SOC_rule(model):
+            return model.S[T-1-self.stage] == 0.5*S
         
         ## f(t) MIP reformulation
         
@@ -1897,13 +2913,13 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
             return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*M_gen[self.stage+t]
         
         def minmax_rule_3_1(model, t):
-            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.12*C
+            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C + S)
         
         def minmax_rule_3_2(model, t):
             return model.m_3[t] >= 0
         
         def minmax_rule_3_3(model, t):
-            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.12*C + M_gen[self.stage+t]*(1 - model.n_3[t])
+            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.08*(C + S) + M_gen[self.stage+t]*(1 - model.n_3[t])
         
         def minmax_rule_3_4(model, t):
             return model.m_3[t] <= M_gen[self.stage+t]*model.n_3[t]
@@ -1932,13 +2948,70 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
         def minmax_rule_4_8(model, t):
             return model.m_4[t] <= model.m_4_3[t] + self.M_set_decomp[t][2][1]*model.n_4[t]
         
+        
+        def minmax_rule_5_1(model, t):
+            return model.m_5[t] <= model.q_da[t]
+        
+        def minmax_rule_5_2(model, t):
+            return model.m_5[t] <= model.q_rt[t]
+        
+        def minmax_rule_5_3(model, t):
+            return model.m_5[t] >= model.q_da[t] - M_gen[self.stage+t]*(1 - model.n_5[t])
+        
+        def minmax_rule_5_4(model, t):
+            return model.m_5[t] >= model.q_rt[t] - M_gen[self.stage+t]*(model.n_5[t])
+        
+        def minmax_rule_6_1(model, t):
+            return model.m_6[t] <= model.m_5[t]
+        
+        def minmax_rule_6_2(model, t):
+            return model.m_6[t] <= model.u[t]
+        
+        def minmax_rule_6_3(model, t):
+            return model.m_6[t] >= model.m_5[t] - M_gen[self.stage+t]*(1 - model.n_6[t])
+        
+        def minmax_rule_6_4(model, t):
+            return model.m_6[t] >= model.u[t] - M_gen[self.stage+t]*model.n_6[t]
+        
+        
+        def bin_c_rule_1(model, t):
+            return model.q_rt[t] - model.Q_c[t] <= M_gen[self.stage+t]*model.n_c[t]
+        
+        def bin_c_rule_2(model, t):
+            return model.Q_c[t] - model.q_rt[t] <= M_gen[self.stage+t]*(1 - model.n_c[t])
+        
+        
+        def minmax_rule_7_1(model, t):
+            return model.m_7[t] >= 0
+        
+        def minmax_rule_7_2(model, t):
+            return model.m_7[t] <= model.m_5[t]
+        
+        def minmax_rule_7_3(model, t):
+            return model.m_7[t] <= M_gen[self.stage+t]*model.n_c[t]
+        
+        def minmax_rule_7_4(model, t):
+            return model.m_7[t] >= model.m_5[t] - M_gen[self.stage+t]*(1 - model.n_c[t])
+        
+        def minmax_rule_8_1(model, t):
+            return model.m_8[t] >= 0
+        
+        def minmax_rule_8_2(model, t):
+            return model.m_8[t] <= model.m_6[t]
+        
+        def minmax_rule_8_3(model, t):
+            return model.m_8[t] <= M_gen[self.stage+t]*model.n_c[t]
+        
+        def minmax_rule_8_4(model, t):
+            return model.m_8[t] >= model.m_6[t] - M_gen[self.stage+t]*(1 - model.n_c[t])
+        
         ## Settlement fcn
         
         def settlement_fcn_current_rule(model):
-            return model.f_prime[0] == model.Q_da[0]*self.P_da[0] + (model.u[0] - model.Q_da[0])*self.P_rt + self.m_4[0] - self.P_rt*model.m_3[0] - sum((2**j)*model.o[0, j] for j in range(self.bin_num)) + P_r*model.u[0] 
+            return model.f_prime[0] == model.Q_da[0]*self.P_da[0] + (model.u[0] - model.Q_da[0])*self.P_rt + self.m_4[0] - self.P_rt*model.m_3[0] - sum((2**j)*model.o[0, j] for j in range(self.bin_num)) + P_r*model.u[0] + P_c*(model.m_6[0] - model.m_7[0] + model.m_8[0])
         
         def settlement_fcn_rule(model, t):
-            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.exp_P_rt[t] + self.m_4[t] - self.exp_P_rt[t]*model.m_3[t] - sum((2**j)*model.o[t, j] for j in range(self.bin_num)) + P_r*model.u[t] 
+            return model.f_prime[t] == model.Q_da[t]*self.P_da[t] + (model.u[t] - model.Q_da[t])*self.exp_P_rt[t] + self.m_4[t] - self.exp_P_rt[t]*model.m_3[t] - sum((2**j)*model.o[t, j] for j in range(self.bin_num)) + P_r*model.u[t] + P_c*(model.m_6[t] - model.m_7[t] + model.m_8[t])
         
         def settlement_fcn_rule_1(model, t):
             return model.Q_sum[t] == model.Q_da[t] + model.Q_rt[t]
@@ -1986,6 +3059,7 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
         model.charge = pyo.Constraint(model.TIME, rule = charge_rule)
         model.electricity_supply = pyo.Constraint(model.TIME, rule = electricity_supply_rule)
         model.State_SOC = pyo.Constraint(model.TIME, rule = State_SOC_rule)
+        model.last_SOC = pyo.Constraint(rule = last_SOC_rule)
 
         model.binarize_b_da_1 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_1)
         model.binarize_b_da_2 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_2)
@@ -2033,6 +3107,29 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
         model.minmax_4_7 = pyo.Constraint(model.TIME, rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(model.TIME, rule = minmax_rule_4_8)
 
+        model.minmax_5_1 = pyo.Constraint(model.TIME, rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(model.TIME, rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(model.TIME, rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(model.TIME, rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(model.TIME, rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(model.TIME, rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(model.TIME, rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(model.TIME, rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(model.TIME, rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(model.TIME, rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(model.TIME, rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(model.TIME, rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(model.TIME, rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(model.TIME, rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(model.TIME, rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(model.TIME, rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(model.TIME, rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(model.TIME, rule=minmax_rule_8_4)
+
         model.settlement_fcn_current = pyo.Constraint(rule = settlement_fcn_current_rule)
         model.settlement_fcn = pyo.Constraint(model.RT_BID_TIME, rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_1)
@@ -2078,7 +3175,7 @@ class Rolling_rt(pyo.ConcreteModel): # t = 0, ..., 22
 
 class Rolling_rt_last(pyo.ConcreteModel): # t = 23
     
-    def __init__(self, da, b_rt, q_rt, S, E_1, delta):
+    def __init__(self, da, b_rt, q_rt, S, E_1, P_da, delta):
         
         super().__init__()
 
@@ -2093,7 +3190,7 @@ class Rolling_rt_last(pyo.ConcreteModel): # t = 23
         self.S_prev = S
         self.E_1_prev = E_1
         
-        self.P_da = exp_P_da[T-1]
+        self.P_da = P_da[self.stage]
         
         self.delta_E = delta[0]
         self.P_rt = delta[1]
@@ -2200,12 +3297,19 @@ class Rolling_rt_last(pyo.ConcreteModel): # t = 23
         model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_6 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
         
         model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_c = pyo.Var(model.TIME, domain = pyo.Binary)
                 
         model.f_prime = pyo.Var(model.TIME, domain = pyo.Reals)
         
@@ -2269,6 +3373,9 @@ class Rolling_rt_last(pyo.ConcreteModel): # t = 23
 
         def State_SOC_rule(model, t):
             return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
+        
+        def last_SOC_rule(model):
+            return model.S[T-1-self.stage] == 0.5*S
         
         ## f(t) MIP reformulation
         
@@ -2367,16 +3474,16 @@ class Rolling_rt_last(pyo.ConcreteModel): # t = 23
             return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*M_gen[self.stage+t]
         
         def minmax_rule_3_1(model, t):
-            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.12*C
+            return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C + S)
         
         def minmax_rule_3_2(model, t):
             return model.m_3[t] >= 0
         
         def minmax_rule_3_3(model, t):
-            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.12*C + M_gen[self.stage+t]*(1 - model.n_3[t])
+            return model.m_3[t] <= model.u[t] - model.Q_c[t] - 0.08*(C + S) + M_gen[t]*(1 - model.n_3[t])
         
         def minmax_rule_3_4(model, t):
-            return model.m_3[t] <= M_gen[self.stage+t]*model.n_3[t]
+            return model.m_3[t] <= M_gen[t]*model.n_3[t]
              
         def minmax_rule_4_1(model, t):
             return model.m_4_3[t] >= model.m_4_1[t]
@@ -2402,10 +3509,67 @@ class Rolling_rt_last(pyo.ConcreteModel): # t = 23
         def minmax_rule_4_8(model, t):
             return model.m_4[t] <= model.m_4_3[t] + self.M_set_decomp[t][2][1]*model.n_4[t]
         
+        
+        def minmax_rule_5_1(model, t):
+            return model.m_5[t] <= model.q_da[t]
+        
+        def minmax_rule_5_2(model, t):
+            return model.m_5[t] <= model.q_rt[t]
+        
+        def minmax_rule_5_3(model, t):
+            return model.m_5[t] >= model.q_da[t] - M_gen[t]*(1 - model.n_5[t])
+        
+        def minmax_rule_5_4(model, t):
+            return model.m_5[t] >= model.q_rt[t] - M_gen[t]*(model.n_5[t])
+        
+        def minmax_rule_6_1(model, t):
+            return model.m_6[t] <= model.m_5[t]
+        
+        def minmax_rule_6_2(model, t):
+            return model.m_6[t] <= model.u[t]
+        
+        def minmax_rule_6_3(model, t):
+            return model.m_6[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_6[t])
+        
+        def minmax_rule_6_4(model, t):
+            return model.m_6[t] >= model.u[t] - M_gen[t]*model.n_6[t]
+        
+        
+        def bin_c_rule_1(model, t):
+            return model.q_rt[t] - model.Q_c[t] <= M_gen[t]*model.n_c[t]
+        
+        def bin_c_rule_2(model, t):
+            return model.Q_c[t] - model.q_rt[t] <= M_gen[t]*(1 - model.n_c[t])
+        
+        
+        def minmax_rule_7_1(model, t):
+            return model.m_7[t] >= 0
+        
+        def minmax_rule_7_2(model, t):
+            return model.m_7[t] <= model.m_5[t]
+        
+        def minmax_rule_7_3(model, t):
+            return model.m_7[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_7_4(model, t):
+            return model.m_7[t] >= model.m_5[t] - M_gen[t]*(1 - model.n_c[t])
+        
+        def minmax_rule_8_1(model, t):
+            return model.m_8[t] >= 0
+        
+        def minmax_rule_8_2(model, t):
+            return model.m_8[t] <= model.m_6[t]
+        
+        def minmax_rule_8_3(model, t):
+            return model.m_8[t] <= M_gen[t]*model.n_c[t]
+        
+        def minmax_rule_8_4(model, t):
+            return model.m_8[t] >= model.m_6[t] - M_gen[t]*(1 - model.n_c[t])
+        
         ## Settlement fcn
         
         def settlement_fcn_current_rule(model):
-            return model.f_prime[0] == model.Q_da[0]*self.P_da + (model.u[0] - model.Q_da[0])*self.P_rt + self.m_4[0] - self.P_rt*model.m_3[0] - sum((2**j)*model.o[0, j] for j in range(self.bin_num)) + P_r*model.u[0] 
+            return model.f_prime[0] == model.Q_da[0]*self.P_da + (model.u[0] - model.Q_da[0])*self.P_rt + self.m_4[0] - self.P_rt*model.m_3[0] - sum((2**j)*model.o[0, j] for j in range(self.bin_num)) + P_c*(model.m_6[0] - model.m_7[0] + model.m_8[0]) 
         
         def settlement_fcn_rule_1(model, t):
             return model.Q_sum[t] == model.Q_da[t] + model.Q_rt[t]
@@ -2444,6 +3608,7 @@ class Rolling_rt_last(pyo.ConcreteModel): # t = 23
         model.charge = pyo.Constraint(model.TIME, rule = charge_rule)
         model.electricity_supply = pyo.Constraint(model.TIME, rule = electricity_supply_rule)
         model.State_SOC = pyo.Constraint(model.TIME, rule = State_SOC_rule)
+        model.last_SOC = pyo.Constraint(rule = last_SOC_rule)
 
         model.binarize_b_da_1 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_1)
         model.binarize_b_da_2 = pyo.Constraint(model.TIME, rule = binarize_b_da_rule_2)
@@ -2488,6 +3653,29 @@ class Rolling_rt_last(pyo.ConcreteModel): # t = 23
         model.minmax_4_6 = pyo.Constraint(model.TIME, rule = minmax_rule_4_6)
         model.minmax_4_7 = pyo.Constraint(model.TIME, rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(model.TIME, rule = minmax_rule_4_8)
+
+        model.minmax_5_1 = pyo.Constraint(model.TIME, rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(model.TIME, rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(model.TIME, rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(model.TIME, rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(model.TIME, rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(model.TIME, rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(model.TIME, rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(model.TIME, rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(model.TIME, rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(model.TIME, rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(model.TIME, rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(model.TIME, rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(model.TIME, rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(model.TIME, rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(model.TIME, rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(model.TIME, rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(model.TIME, rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(model.TIME, rule=minmax_rule_8_4)
 
         model.settlement_fcn_current = pyo.Constraint(rule = settlement_fcn_current_rule)
         model.settlement_fcn_1 = pyo.Constraint(model.TIME, rule = settlement_fcn_rule_1)
@@ -2679,6 +3867,8 @@ class fw_da(pyo.ConcreteModel):
             self.solved = True        
 
         return pyo.value(self.objective)        
+
+
             
 ## stage = 0, 1, ..., T-1
 
@@ -2827,12 +4017,19 @@ class fw_rt(pyo.ConcreteModel):
         model.m_4_1 = pyo.Var(domain = pyo.Reals)
         model.m_4_2 = pyo.Var(domain = pyo.Reals)
         model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        model.m_5 = pyo.Var(domain = pyo.Reals)
+        model.m_6 = pyo.Var(domain = pyo.Reals)
+        model.m_7 = pyo.Var(domain = pyo.Reals)
+        model.m_8 = pyo.Var(domain = pyo.Reals)
         
         model.n_1 = pyo.Var(domain = pyo.Binary)
         model.n_2 = pyo.Var(domain = pyo.Binary)
         model.n_3 = pyo.Var(domain = pyo.Binary)
         model.n_4 = pyo.Var(domain = pyo.Binary)
         model.n_4_3 = pyo.Var(domain = pyo.Binary)
+        model.n_5 = pyo.Var(domain = pyo.Binary)
+        model.n_6 = pyo.Var(domain = pyo.Binary)
+        model.n_c = pyo.Var(domain = pyo.Binary)
         
         #model.n_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         #model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
@@ -3026,16 +4223,16 @@ class fw_rt(pyo.ConcreteModel):
             return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage]
         
         def minmax_rule_3_1(model):
-            return model.m_3 >= model.u - model.Q_c - 0.12*C
+            return model.m_3 >= model.u - model.Q_c - 0.08*(C + S)
         
         def minmax_rule_3_2(model):
             return model.m_3 >= 0
         
         def minmax_rule_3_3(model):
-            return model.m_3 <= model.u - model.Q_c - 0.12*C + M_gen[self.stage]*(1 - model.n_3)
+            return model.m_3 <= model.u - model.Q_c - 0.08*(C + S) + self.M_gen[self.stage]*(1 - model.n_3)
         
         def minmax_rule_3_4(model):
-            return model.m_3 <= M_gen[self.stage]*model.n_3
+            return model.m_3 <= self.M_gen[self.stage]*model.n_3
              
         def minmax_rule_4_1(model):
             return model.m_4_3 >= model.m_4_1
@@ -3060,6 +4257,63 @@ class fw_rt(pyo.ConcreteModel):
         
         def minmax_rule_4_8(model):
             return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
+        
+        
+        def minmax_rule_5_1(model):
+            return model.m_5 <= model.q_da
+        
+        def minmax_rule_5_2(model):
+            return model.m_5 <= model.q_rt
+        
+        def minmax_rule_5_3(model):
+            return model.m_5 >= model.q_da - M_gen[self.stage]*(1 - model.n_5)
+        
+        def minmax_rule_5_4(model):
+            return model.m_5 >= model.q_rt - M_gen[self.stage]*(model.n_5)
+        
+        def minmax_rule_6_1(model):
+            return model.m_6 <= model.m_5
+        
+        def minmax_rule_6_2(model):
+            return model.m_6 <= model.u
+        
+        def minmax_rule_6_3(model):
+            return model.m_6 >= model.m_5 - M_gen[self.stage]*(1 - model.n_6)
+        
+        def minmax_rule_6_4(model):
+            return model.m_6 >= model.u - M_gen[self.stage]*model.n_6
+        
+        
+        def bin_c_rule_1(model):
+            return model.q_rt - model.Q_c <= M_gen[self.stage]*model.n_c
+        
+        def bin_c_rule_2(model):
+            return model.Q_c - model.q_rt <= M_gen[self.stage]*(1 - model.n_c)
+        
+        
+        def minmax_rule_7_1(model):
+            return model.m_7 >= 0
+        
+        def minmax_rule_7_2(model):
+            return model.m_7 <= model.m_5
+        
+        def minmax_rule_7_3(model):
+            return model.m_7 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_7_4(model):
+            return model.m_7 >= model.m_5 - M_gen[self.stage]*(1 - model.n_c)
+        
+        def minmax_rule_8_1(model):
+            return model.m_8 >= 0
+        
+        def minmax_rule_8_2(model):
+            return model.m_8 <= model.m_6
+        
+        def minmax_rule_8_3(model):
+            return model.m_8 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_8_4(model):
+            return model.m_8 >= model.m_6 - M_gen[self.stage]*(1 - model.n_c)
 
         
         ## Approximated value fcn
@@ -3070,7 +4324,7 @@ class fw_rt(pyo.ConcreteModel):
         ## Settlement fcn
         
         def settlement_fcn_rule(model):
-            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u 
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u + P_c*(model.m_6 - model.m_7 + model.m_8)
         
         def settlement_fcn_rule_1(model):
             return model.Q_sum == model.Q_da + model.Q_rt
@@ -3163,6 +4417,29 @@ class fw_rt(pyo.ConcreteModel):
         model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
         model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+        
+        model.minmax_5_1 = pyo.Constraint(rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(rule=minmax_rule_8_4)
         
         model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
@@ -3945,19 +5222,26 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         ## min, max reformulation Vars
         
-        model.m_1 = pyo.Var(domain = pyo.Reals)
-        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        model.m_2 = pyo.Var(domain = pyo.NonNegativeReals)
         model.m_3 = pyo.Var(domain = pyo.Reals)
         model.m_4 = pyo.Var(domain = pyo.Reals)
         model.m_4_1 = pyo.Var(domain = pyo.Reals)
         model.m_4_2 = pyo.Var(domain = pyo.Reals)
         model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        model.m_5 = pyo.Var(domain = pyo.Reals)
+        model.m_6 = pyo.Var(domain = pyo.Reals)
+        model.m_7 = pyo.Var(domain = pyo.Reals)
+        model.m_8 = pyo.Var(domain = pyo.Reals)
         
         model.n_1 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_2 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_4_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_5 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_6 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_c = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         
         ## settlement_fcn_Vars
         
@@ -4169,17 +5453,17 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage]
         
         def minmax_rule_3_1(model):
-            return model.m_3 >= model.u - model.Q_c - 0.12*C
+            return model.m_3 >= model.u - model.Q_c - 0.08*(C + S)
         
         def minmax_rule_3_2(model):
             return model.m_3 >= 0
         
         def minmax_rule_3_3(model):
-            return model.m_3 <= model.u - model.Q_c - 0.12*C + M_gen[self.stage]*(1 - model.n_3)
+            return model.m_3 <= model.u - model.Q_c - 0.08*(C + S) + self.M_gen[self.stage]*(1 - model.n_3)
         
         def minmax_rule_3_4(model):
-            return model.m_3 <= M_gen[self.stage]*model.n_3
-        
+            return model.m_3 <= self.M_gen[self.stage]*model.n_3
+             
         def minmax_rule_4_1(model):
             return model.m_4_3 >= model.m_4_1
         
@@ -4204,6 +5488,63 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         def minmax_rule_4_8(model):
             return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
         
+        
+        def minmax_rule_5_1(model):
+            return model.m_5 <= model.q_da
+        
+        def minmax_rule_5_2(model):
+            return model.m_5 <= model.q_rt
+        
+        def minmax_rule_5_3(model):
+            return model.m_5 >= model.q_da - M_gen[self.stage]*(1 - model.n_5)
+        
+        def minmax_rule_5_4(model):
+            return model.m_5 >= model.q_rt - M_gen[self.stage]*(model.n_5)
+        
+        def minmax_rule_6_1(model):
+            return model.m_6 <= model.m_5
+        
+        def minmax_rule_6_2(model):
+            return model.m_6 <= model.u
+        
+        def minmax_rule_6_3(model):
+            return model.m_6 >= model.m_5 - M_gen[self.stage]*(1 - model.n_6)
+        
+        def minmax_rule_6_4(model):
+            return model.m_6 >= model.u - M_gen[self.stage]*model.n_6
+        
+        
+        def bin_c_rule_1(model):
+            return model.q_rt - model.Q_c <= M_gen[self.stage]*model.n_c
+        
+        def bin_c_rule_2(model):
+            return model.Q_c - model.q_rt <= M_gen[self.stage]*(1 - model.n_c)
+        
+        
+        def minmax_rule_7_1(model):
+            return model.m_7 >= 0
+        
+        def minmax_rule_7_2(model):
+            return model.m_7 <= model.m_5
+        
+        def minmax_rule_7_3(model):
+            return model.m_7 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_7_4(model):
+            return model.m_7 >= model.m_5 - M_gen[self.stage]*(1 - model.n_c)
+        
+        def minmax_rule_8_1(model):
+            return model.m_8 >= 0
+        
+        def minmax_rule_8_2(model):
+            return model.m_8 <= model.m_6
+        
+        def minmax_rule_8_3(model):
+            return model.m_8 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_8_4(model):
+            return model.m_8 >= model.m_6 - M_gen[self.stage]*(1 - model.n_c)
+        
                 
         ## Approximated value fcn
         
@@ -4213,7 +5554,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         ## Settlement fcn
         
         def settlement_fcn_rule(model):
-            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u 
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u + P_c*(model.m_6 - model.m_7 + model.m_8)
         
         def settlement_fcn_rule_1(model):
             return model.Q_sum == model.Q_da + model.Q_rt
@@ -4315,6 +5656,29 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
         model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+        
+        model.minmax_5_1 = pyo.Constraint(rule = minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(rule = minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(rule = minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(rule = minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(rule = minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(rule = minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(rule = minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(rule = minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(rule = bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(rule = bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(rule = minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(rule = minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(rule = minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(rule = minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(rule = minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(rule = minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(rule = minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(rule = minmax_rule_8_4)
         
         model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
@@ -5145,19 +6509,26 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         ## min, max reformulation Vars
         
-        model.m_1 = pyo.Var(domain = pyo.Reals)
-        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        model.m_2 = pyo.Var(domain = pyo.NonNegativeReals)
         model.m_3 = pyo.Var(domain = pyo.Reals)
         model.m_4 = pyo.Var(domain = pyo.Reals)
         model.m_4_1 = pyo.Var(domain = pyo.Reals)
         model.m_4_2 = pyo.Var(domain = pyo.Reals)
         model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        model.m_5 = pyo.Var(domain = pyo.Reals)
+        model.m_6 = pyo.Var(domain = pyo.Reals)
+        model.m_7 = pyo.Var(domain = pyo.Reals)
+        model.m_8 = pyo.Var(domain = pyo.Reals)
         
         model.n_1 = pyo.Var(domain = pyo.Binary)
         model.n_2 = pyo.Var(domain = pyo.Binary)
         model.n_3 = pyo.Var(domain = pyo.Binary)
         model.n_4 = pyo.Var(domain = pyo.Binary)
         model.n_4_3 = pyo.Var(domain = pyo.Binary)
+        model.n_5 = pyo.Var(domain = pyo.Binary)
+        model.n_6 = pyo.Var(domain = pyo.Binary)
+        model.n_c = pyo.Var(domain = pyo.Binary)
         
         #model.n_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         #model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
@@ -5350,17 +6721,17 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage]
         
         def minmax_rule_3_1(model):
-            return model.m_3 >= model.u - model.Q_c - 0.12*C
+            return model.m_3 >= model.u - model.Q_c - 0.08*(C + S)
         
         def minmax_rule_3_2(model):
             return model.m_3 >= 0
         
         def minmax_rule_3_3(model):
-            return model.m_3 <= model.u - model.Q_c - 0.12*C + M_gen[self.stage]*(1 - model.n_3)
+            return model.m_3 <= model.u - model.Q_c - 0.08*(C + S) + self.M_gen[self.stage]*(1 - model.n_3)
         
         def minmax_rule_3_4(model):
-            return model.m_3 <= M_gen[self.stage]*model.n_3
-          
+            return model.m_3 <= self.M_gen[self.stage]*model.n_3
+             
         def minmax_rule_4_1(model):
             return model.m_4_3 >= model.m_4_1
         
@@ -5383,7 +6754,64 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
             return model.m_4 <= self.M_set_decomp[2][0]*(1 - model.n_4)
         
         def minmax_rule_4_8(model):
-            return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4 
+            return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
+        
+        
+        def minmax_rule_5_1(model):
+            return model.m_5 <= model.q_da
+        
+        def minmax_rule_5_2(model):
+            return model.m_5 <= model.q_rt
+        
+        def minmax_rule_5_3(model):
+            return model.m_5 >= model.q_da - M_gen[self.stage]*(1 - model.n_5)
+        
+        def minmax_rule_5_4(model):
+            return model.m_5 >= model.q_rt - M_gen[self.stage]*(model.n_5)
+        
+        def minmax_rule_6_1(model):
+            return model.m_6 <= model.m_5
+        
+        def minmax_rule_6_2(model):
+            return model.m_6 <= model.u
+        
+        def minmax_rule_6_3(model):
+            return model.m_6 >= model.m_5 - M_gen[self.stage]*(1 - model.n_6)
+        
+        def minmax_rule_6_4(model):
+            return model.m_6 >= model.u - M_gen[self.stage]*model.n_6
+        
+        
+        def bin_c_rule_1(model):
+            return model.q_rt - model.Q_c <= M_gen[self.stage]*model.n_c
+        
+        def bin_c_rule_2(model):
+            return model.Q_c - model.q_rt <= M_gen[self.stage]*(1 - model.n_c)
+        
+        
+        def minmax_rule_7_1(model):
+            return model.m_7 >= 0
+        
+        def minmax_rule_7_2(model):
+            return model.m_7 <= model.m_5
+        
+        def minmax_rule_7_3(model):
+            return model.m_7 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_7_4(model):
+            return model.m_7 >= model.m_5 - M_gen[self.stage]*(1 - model.n_c)
+        
+        def minmax_rule_8_1(model):
+            return model.m_8 >= 0
+        
+        def minmax_rule_8_2(model):
+            return model.m_8 <= model.m_6
+        
+        def minmax_rule_8_3(model):
+            return model.m_8 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_8_4(model):
+            return model.m_8 >= model.m_6 - M_gen[self.stage]*(1 - model.n_c)
         
         
         ## Approximated value fcn
@@ -5394,7 +6822,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         ## Settlement fcn
         
         def settlement_fcn_rule(model):
-            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u 
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u + P_c*(model.m_6 - model.m_7 + model.m_8)
         
         def settlement_fcn_rule_1(model):
             return model.Q_sum == model.Q_da + model.Q_rt
@@ -5487,6 +6915,29 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
         model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+
+        model.minmax_5_1 = pyo.Constraint(rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(rule=minmax_rule_8_4)
         
         model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
@@ -6202,19 +7653,26 @@ class fw_rt_last(pyo.ConcreteModel):
         
         ## min, max reformulation Vars
         
-        model.m_1 = pyo.Var(domain = pyo.Reals)
-        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        model.m_2 = pyo.Var(domain = pyo.NonNegativeReals)
         model.m_3 = pyo.Var(domain = pyo.Reals)
         model.m_4 = pyo.Var(domain = pyo.Reals)
         model.m_4_1 = pyo.Var(domain = pyo.Reals)
         model.m_4_2 = pyo.Var(domain = pyo.Reals)
         model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        model.m_5 = pyo.Var(domain = pyo.Reals)
+        model.m_6 = pyo.Var(domain = pyo.Reals)
+        model.m_7 = pyo.Var(domain = pyo.Reals)
+        model.m_8 = pyo.Var(domain = pyo.Reals)
         
         model.n_1 = pyo.Var(domain = pyo.Binary)
         model.n_2 = pyo.Var(domain = pyo.Binary)
         model.n_3 = pyo.Var(domain = pyo.Binary)
         model.n_4 = pyo.Var(domain = pyo.Binary)
         model.n_4_3 = pyo.Var(domain = pyo.Binary)
+        model.n_5 = pyo.Var(domain = pyo.Binary)
+        model.n_6 = pyo.Var(domain = pyo.Binary)
+        model.n_c = pyo.Var(domain = pyo.Binary)
         
         #model.n_3 = pyo.Var(boudns = (0, 1), domain = pyo.Reals)
         #model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
@@ -6384,17 +7842,17 @@ class fw_rt_last(pyo.ConcreteModel):
             return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage]
         
         def minmax_rule_3_1(model):
-            return model.m_3 >= model.u - model.Q_c - 0.12*C
+            return model.m_3 >= model.u - model.Q_c - 0.08*(C + S)
         
         def minmax_rule_3_2(model):
             return model.m_3 >= 0
         
         def minmax_rule_3_3(model):
-            return model.m_3 <= model.u - model.Q_c - 0.12*C + M_gen[self.stage]*(1 - model.n_3)
+            return model.m_3 <= model.u - model.Q_c - 0.08*(C + S) + self.M_gen[self.stage]*(1 - model.n_3)
         
         def minmax_rule_3_4(model):
-            return model.m_3 <= M_gen[self.stage]*model.n_3
-
+            return model.m_3 <= self.M_gen[self.stage]*model.n_3
+             
         def minmax_rule_4_1(model):
             return model.m_4_3 >= model.m_4_1
         
@@ -6417,13 +7875,70 @@ class fw_rt_last(pyo.ConcreteModel):
             return model.m_4 <= self.M_set_decomp[2][0]*(1 - model.n_4)
         
         def minmax_rule_4_8(model):
-            return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4  
+            return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
+        
+        
+        def minmax_rule_5_1(model):
+            return model.m_5 <= model.q_da
+        
+        def minmax_rule_5_2(model):
+            return model.m_5 <= model.q_rt
+        
+        def minmax_rule_5_3(model):
+            return model.m_5 >= model.q_da - M_gen[self.stage]*(1 - model.n_5)
+        
+        def minmax_rule_5_4(model):
+            return model.m_5 >= model.q_rt - M_gen[self.stage]*(model.n_5)
+        
+        def minmax_rule_6_1(model):
+            return model.m_6 <= model.m_5
+        
+        def minmax_rule_6_2(model):
+            return model.m_6 <= model.u
+        
+        def minmax_rule_6_3(model):
+            return model.m_6 >= model.m_5 - M_gen[self.stage]*(1 - model.n_6)
+        
+        def minmax_rule_6_4(model):
+            return model.m_6 >= model.u - M_gen[self.stage]*model.n_6
+        
+        
+        def bin_c_rule_1(model):
+            return model.q_rt - model.Q_c <= M_gen[self.stage]*model.n_c
+        
+        def bin_c_rule_2(model):
+            return model.Q_c - model.q_rt <= M_gen[self.stage]*(1 - model.n_c)
+        
+        
+        def minmax_rule_7_1(model):
+            return model.m_7 >= 0
+        
+        def minmax_rule_7_2(model):
+            return model.m_7 <= model.m_5
+        
+        def minmax_rule_7_3(model):
+            return model.m_7 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_7_4(model):
+            return model.m_7 >= model.m_5 - M_gen[self.stage]*(1 - model.n_c)
+        
+        def minmax_rule_8_1(model):
+            return model.m_8 >= 0
+        
+        def minmax_rule_8_2(model):
+            return model.m_8 <= model.m_6
+        
+        def minmax_rule_8_3(model):
+            return model.m_8 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_8_4(model):
+            return model.m_8 >= model.m_6 - M_gen[self.stage]*(1 - model.n_c)
         
         
         ### settlement_fcn
         
         def settlement_fcn_rule(model):
-            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u + P_c*(model.m_6 - model.m_7 + model.m_8)
         
         def settlement_fcn_rule_1(model):
             return model.Q_sum == model.Q_da + model.Q_rt
@@ -6508,6 +8023,29 @@ class fw_rt_last(pyo.ConcreteModel):
         model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
         model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+       
+        model.minmax_5_1 = pyo.Constraint(rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(rule=minmax_rule_8_4)       
        
         model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
@@ -7188,19 +8726,26 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         
         ## min, max reformulation Vars
         
-        model.m_1 = pyo.Var(domain = pyo.Reals)
-        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        model.m_2 = pyo.Var(domain = pyo.NonNegativeReals)
         model.m_3 = pyo.Var(domain = pyo.Reals)
         model.m_4 = pyo.Var(domain = pyo.Reals)
         model.m_4_1 = pyo.Var(domain = pyo.Reals)
         model.m_4_2 = pyo.Var(domain = pyo.Reals)
         model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        model.m_5 = pyo.Var(domain = pyo.Reals)
+        model.m_6 = pyo.Var(domain = pyo.Reals)
+        model.m_7 = pyo.Var(domain = pyo.Reals)
+        model.m_8 = pyo.Var(domain = pyo.Reals)
         
         model.n_1 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_2 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         model.n_4_3 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_5 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_6 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
+        model.n_c = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
         
         ## settlement_fcn
         
@@ -7390,17 +8935,17 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
             return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage]
         
         def minmax_rule_3_1(model):
-            return model.m_3 >= model.u - model.Q_c - 0.12*C
+            return model.m_3 >= model.u - model.Q_c - 0.08*(C + S)
         
         def minmax_rule_3_2(model):
             return model.m_3 >= 0
         
         def minmax_rule_3_3(model):
-            return model.m_3 <= model.u - model.Q_c - 0.12*C + M_gen[self.stage]*(1 - model.n_3)
+            return model.m_3 <= model.u - model.Q_c - 0.08*(C + S) + self.M_gen[self.stage]*(1 - model.n_3)
         
         def minmax_rule_3_4(model):
-            return model.m_3 <= M_gen[self.stage]*model.n_3
-
+            return model.m_3 <= self.M_gen[self.stage]*model.n_3
+             
         def minmax_rule_4_1(model):
             return model.m_4_3 >= model.m_4_1
         
@@ -7424,11 +8969,68 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         
         def minmax_rule_4_8(model):
             return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
+        
+        
+        def minmax_rule_5_1(model):
+            return model.m_5 <= model.q_da
+        
+        def minmax_rule_5_2(model):
+            return model.m_5 <= model.q_rt
+        
+        def minmax_rule_5_3(model):
+            return model.m_5 >= model.q_da - M_gen[self.stage]*(1 - model.n_5)
+        
+        def minmax_rule_5_4(model):
+            return model.m_5 >= model.q_rt - M_gen[self.stage]*(model.n_5)
+        
+        def minmax_rule_6_1(model):
+            return model.m_6 <= model.m_5
+        
+        def minmax_rule_6_2(model):
+            return model.m_6 <= model.u
+        
+        def minmax_rule_6_3(model):
+            return model.m_6 >= model.m_5 - M_gen[self.stage]*(1 - model.n_6)
+        
+        def minmax_rule_6_4(model):
+            return model.m_6 >= model.u - M_gen[self.stage]*model.n_6
+        
+        
+        def bin_c_rule_1(model):
+            return model.q_rt - model.Q_c <= M_gen[self.stage]*model.n_c
+        
+        def bin_c_rule_2(model):
+            return model.Q_c - model.q_rt <= M_gen[self.stage]*(1 - model.n_c)
+        
+        
+        def minmax_rule_7_1(model):
+            return model.m_7 >= 0
+        
+        def minmax_rule_7_2(model):
+            return model.m_7 <= model.m_5
+        
+        def minmax_rule_7_3(model):
+            return model.m_7 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_7_4(model):
+            return model.m_7 >= model.m_5 - M_gen[self.stage]*(1 - model.n_c)
+        
+        def minmax_rule_8_1(model):
+            return model.m_8 >= 0
+        
+        def minmax_rule_8_2(model):
+            return model.m_8 <= model.m_6
+        
+        def minmax_rule_8_3(model):
+            return model.m_8 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_8_4(model):
+            return model.m_8 >= model.m_6 - M_gen[self.stage]*(1 - model.n_c)
   
         ### settlement_fcn
         
         def settlement_fcn_rule(model):
-            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u     
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u + P_c*(model.m_6 - model.m_7 + model.m_8)
         
         def settlement_fcn_rule_1(model):
             return model.Q_sum == model.Q_da + model.Q_rt
@@ -7521,6 +9123,29 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
         model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+               
+        model.minmax_5_1 = pyo.Constraint(rule = minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(rule = minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(rule = minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(rule = minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(rule = minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(rule = minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(rule = minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(rule = minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(rule = bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(rule = bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(rule = minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(rule = minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(rule = minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(rule = minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(rule = minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(rule = minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(rule = minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(rule = minmax_rule_8_4)
                
         model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
@@ -8282,19 +9907,26 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         
         ## min, max reformulation Vars
         
-        model.m_1 = pyo.Var(domain = pyo.Reals)
-        model.m_2 = pyo.Var(domain = pyo.Reals)
+        model.m_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        model.m_2 = pyo.Var(domain = pyo.NonNegativeReals)
         model.m_3 = pyo.Var(domain = pyo.Reals)
         model.m_4 = pyo.Var(domain = pyo.Reals)
         model.m_4_1 = pyo.Var(domain = pyo.Reals)
         model.m_4_2 = pyo.Var(domain = pyo.Reals)
         model.m_4_3 = pyo.Var(domain = pyo.Reals)
+        model.m_5 = pyo.Var(domain = pyo.Reals)
+        model.m_6 = pyo.Var(domain = pyo.Reals)
+        model.m_7 = pyo.Var(domain = pyo.Reals)
+        model.m_8 = pyo.Var(domain = pyo.Reals)
         
         model.n_1 = pyo.Var(domain = pyo.Binary)
         model.n_2 = pyo.Var(domain = pyo.Binary)
         model.n_3 = pyo.Var(domain = pyo.Binary)
         model.n_4 = pyo.Var(domain = pyo.Binary)
         model.n_4_3 = pyo.Var(domain = pyo.Binary)
+        model.n_5 = pyo.Var(domain = pyo.Binary)
+        model.n_6 = pyo.Var(domain = pyo.Binary)
+        model.n_c = pyo.Var(domain = pyo.Binary)
         
         #model.n_3 = pyo.Var(bouns = (0, 1), domain = pyo.Reals)
         #model.n_4 = pyo.Var(bounds = (0, 1), domain = pyo.Reals)
@@ -8464,17 +10096,17 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
             return model.m_2 >= model.q_rt - model.n_2*M_gen[self.stage]
         
         def minmax_rule_3_1(model):
-            return model.m_3 >= model.u - model.Q_c - 0.12*C
+            return model.m_3 >= model.u - model.Q_c - 0.08*(C + S)
         
         def minmax_rule_3_2(model):
             return model.m_3 >= 0
         
         def minmax_rule_3_3(model):
-            return model.m_3 <= model.u - model.Q_c - 0.12*C + M_gen[self.stage]*(1 - model.n_3)
+            return model.m_3 <= model.u - model.Q_c - 0.08*(C + S) + self.M_gen[self.stage]*(1 - model.n_3)
         
         def minmax_rule_3_4(model):
-            return model.m_3 <= M_gen[self.stage]*model.n_3
-
+            return model.m_3 <= self.M_gen[self.stage]*model.n_3
+             
         def minmax_rule_4_1(model):
             return model.m_4_3 >= model.m_4_1
         
@@ -8499,10 +10131,67 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         def minmax_rule_4_8(model):
             return model.m_4 <= model.m_4_3 + self.M_set_decomp[2][1]*model.n_4
         
+        
+        def minmax_rule_5_1(model):
+            return model.m_5 <= model.q_da
+        
+        def minmax_rule_5_2(model):
+            return model.m_5 <= model.q_rt
+        
+        def minmax_rule_5_3(model):
+            return model.m_5 >= model.q_da - M_gen[self.stage]*(1 - model.n_5)
+        
+        def minmax_rule_5_4(model):
+            return model.m_5 >= model.q_rt - M_gen[self.stage]*(model.n_5)
+        
+        def minmax_rule_6_1(model):
+            return model.m_6 <= model.m_5
+        
+        def minmax_rule_6_2(model):
+            return model.m_6 <= model.u
+        
+        def minmax_rule_6_3(model):
+            return model.m_6 >= model.m_5 - M_gen[self.stage]*(1 - model.n_6)
+        
+        def minmax_rule_6_4(model):
+            return model.m_6 >= model.u - M_gen[self.stage]*model.n_6
+        
+        
+        def bin_c_rule_1(model):
+            return model.q_rt - model.Q_c <= M_gen[self.stage]*model.n_c
+        
+        def bin_c_rule_2(model):
+            return model.Q_c - model.q_rt <= M_gen[self.stage]*(1 - model.n_c)
+        
+        
+        def minmax_rule_7_1(model):
+            return model.m_7 >= 0
+        
+        def minmax_rule_7_2(model):
+            return model.m_7 <= model.m_5
+        
+        def minmax_rule_7_3(model):
+            return model.m_7 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_7_4(model):
+            return model.m_7 >= model.m_5 - M_gen[self.stage]*(1 - model.n_c)
+        
+        def minmax_rule_8_1(model):
+            return model.m_8 >= 0
+        
+        def minmax_rule_8_2(model):
+            return model.m_8 <= model.m_6
+        
+        def minmax_rule_8_3(model):
+            return model.m_8 <= M_gen[self.stage]*model.n_c
+        
+        def minmax_rule_8_4(model):
+            return model.m_8 >= model.m_6 - M_gen[self.stage]*(1 - model.n_c)
+        
         ### settlement_fcn
         
         def settlement_fcn_rule(model):
-            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u     
+            return model.f_prime == model.Q_da*self.P_da[self.stage] + (model.u - model.Q_da)*self.P_rt + self.m_4 - self.P_rt*model.m_3 - sum((2**j)*model.o[j] for j in range(self.bin_num)) + P_r*model.u + P_c*(model.m_6 - model.m_7 + model.m_8)
         
         def settlement_fcn_rule_1(model):
             return model.Q_sum == model.Q_da + model.Q_rt
@@ -8587,6 +10276,29 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         model.minmax_4_6 = pyo.Constraint(rule = minmax_rule_4_6)
         model.minmax_4_7 = pyo.Constraint(rule = minmax_rule_4_7)
         model.minmax_4_8 = pyo.Constraint(rule = minmax_rule_4_8)
+               
+        model.minmax_5_1 = pyo.Constraint(rule=minmax_rule_5_1)
+        model.minmax_5_2 = pyo.Constraint(rule=minmax_rule_5_2)
+        model.minmax_5_3 = pyo.Constraint(rule=minmax_rule_5_3)
+        model.minmax_5_4 = pyo.Constraint(rule=minmax_rule_5_4)
+
+        model.minmax_6_1 = pyo.Constraint(rule=minmax_rule_6_1)
+        model.minmax_6_2 = pyo.Constraint(rule=minmax_rule_6_2)
+        model.minmax_6_3 = pyo.Constraint(rule=minmax_rule_6_3)
+        model.minmax_6_4 = pyo.Constraint(rule=minmax_rule_6_4)
+
+        model.bin_c_1 = pyo.Constraint(rule=bin_c_rule_1)
+        model.bin_c_2 = pyo.Constraint(rule=bin_c_rule_2)
+
+        model.minmax_7_1 = pyo.Constraint(rule=minmax_rule_7_1)
+        model.minmax_7_2 = pyo.Constraint(rule=minmax_rule_7_2)
+        model.minmax_7_3 = pyo.Constraint(rule=minmax_rule_7_3)
+        model.minmax_7_4 = pyo.Constraint(rule=minmax_rule_7_4)
+
+        model.minmax_8_1 = pyo.Constraint(rule=minmax_rule_8_1)
+        model.minmax_8_2 = pyo.Constraint(rule=minmax_rule_8_2)
+        model.minmax_8_3 = pyo.Constraint(rule=minmax_rule_8_3)
+        model.minmax_8_4 = pyo.Constraint(rule=minmax_rule_8_4)
                
         model.settlement_fcn = pyo.Constraint(rule = settlement_fcn_rule)
         model.settlement_fcn_1 = pyo.Constraint(rule = settlement_fcn_rule_1)
@@ -9129,20 +10841,72 @@ class PerfectForecasting:
     def __init__(
         self, 
         E_0_daily, 
-        P_da_daily
+        P_da_daily,
+        P_rt_daily,
+        delta_E_daily
         ):
 
         self.STAGE = T
         self.E_0_daily = E_0_daily
         self.P_da_daily = P_da_daily
+        self.P_rt_daily = P_rt_daily
+        self.delta_E_daily = delta_E_daily
         
-        self.f_ESS = []
+        self.f_ESSo = []
         self.f_ESSx = []
         
-        self.P_ESS = 0
+        self.P_ESSo = 0
         self.P_ESSx = 0
         
-        self.u_ESS = []
+        self.f_ESSo_f_P = []
+        self.f_ESSo_f_V = []
+        self.f_ESSo_f_E = []
+        self.f_ESSo_f_VE = []
+        self.f_ESSo_f_Im = []
+        self.f_ESSo_f_C = []
+        self.f_ESSo_f_REC = []
+
+        self.f_ESSx_f_P = []
+        self.f_ESSx_f_V = []
+        self.f_ESSx_f_E = []
+        self.f_ESSx_f_VE = []
+        self.f_ESSx_f_Im = []
+        self.f_ESSx_f_C = []
+        self.f_ESSx_f_REC = []
+        
+        self.P_ESSo_f_P = 0
+        self.P_ESSo_f_V = 0
+        self.P_ESSo_f_E = 0
+        self.P_ESSo_f_VE = 0
+        self.P_ESSo_f_Im = 0
+        self.P_ESSo_f_C = 0
+        self.P_ESSO_f_REC = 0
+        
+        self.P_ESSx_f_P = 0
+        self.P_ESSx_f_V = 0
+        self.P_ESSx_f_E = 0        
+        self.P_ESSx_f_VE = 0
+        self.P_ESSx_f_Im = 0
+        self.P_ESSx_f_C = 0
+        self.P_ESSx_f_REC = 0
+        
+        self.b_da_ESSo = []
+        self.b_rt_ESSo = []
+        self.q_da_ESSo = []
+        self.q_rt_ESSo = []
+        self.Q_da_ESSo = []
+        self.Q_rt_ESSo = []
+        self.Q_c_ESSo = []
+        self.u_ESSo = []
+        self.S_ESSo = []
+
+        self.b_da_ESSx = []
+        self.b_rt_ESSx = []
+        self.q_da_ESSx = []
+        self.q_rt_ESSx = []
+        self.Q_da_ESSx = []
+        self.Q_rt_ESSx = []
+        self.Q_c_ESSx = []
         self.u_ESSx = []
 
     def sample_scenarios(self):
@@ -9163,26 +10927,93 @@ class PerfectForecasting:
             print(f"Perfect forecasting for scenario {k} solving...")
             
             P_da = self.P_da_daily[k]
+            P_rt = self.P_rt_daily[k]
+            delta_E = self.delta_E_daily[k]
             
             scenario = scenarios[k]
             
-            Det_ESS = Deterministic_Setting(E_0, P_da, scenario)
-            Det_ESSx = Deterministic_Setting_withoutESS(E_0, P_da, scenario)
+            Det_ESSo = Deterministic_Setting(E_0, P_da, P_rt, delta_E, scenario)
+            Det_ESSx = Deterministic_Setting_withoutESS(E_0, P_da, P_rt, delta_E, scenario)
                 
-            f_scenario_ESS = Det_ESS.get_objective_value()
+            f_scenario_ESSo = Det_ESSo.get_objective_value()
             f_scenario_ESSx = Det_ESSx.get_objective_value()
-                        
-            u_ESS = Det_ESS.get_u_value()
-            u_ESSx = Det_ESSx.get_u_value()            
-                        
-            self.f_ESS.append(f_scenario_ESS)
-            self.f_ESSx.append(f_scenario_ESSx)
             
-            self.u_ESS.append(u_ESS)
-            self.u_ESSx.append(u_ESSx)
+            (
+                f_scenario_ESSo_f_P,
+                f_scenario_ESSo_f_V,
+                f_scenario_ESSo_f_E,
+                f_scenario_ESSo_f_VE,
+                f_scenario_ESSo_f_Im,
+                f_scenario_ESSo_f_C,
+                f_scenario_ESSo_f_REC,
+            ) = Det_ESSo.get_objective_part_value()
 
-        self.P_ESS = np.mean(self.f_ESS) 
+            (
+                f_scenario_ESSx_f_P,
+                f_scenario_ESSx_f_V,
+                f_scenario_ESSx_f_E,
+                f_scenario_ESSx_f_VE,
+                f_scenario_ESSx_f_Im,
+                f_scenario_ESSx_f_C,
+                f_scenario_ESSx_f_REC,
+            ) = Det_ESSx.get_objective_part_value()
+
+            self.f_ESSo.append(f_scenario_ESSo)
+            self.f_ESSx.append(f_scenario_ESSx)
+
+            self.f_ESSo_f_P.append(f_scenario_ESSo_f_P)
+            self.f_ESSo_f_V.append(f_scenario_ESSo_f_V)
+            self.f_ESSo_f_E.append(f_scenario_ESSo_f_E)
+            self.f_ESSo_f_VE.append(f_scenario_ESSo_f_VE)
+            self.f_ESSo_f_Im.append(f_scenario_ESSo_f_Im)
+            self.f_ESSo_f_C.append(f_scenario_ESSo_f_C)
+            self.f_ESSo_f_REC.append(f_scenario_ESSo_f_REC)
+
+            self.f_ESSx_f_P.append(f_scenario_ESSx_f_P)
+            self.f_ESSx_f_V.append(f_scenario_ESSx_f_V)
+            self.f_ESSx_f_E.append(f_scenario_ESSx_f_E)
+            self.f_ESSx_f_VE.append(f_scenario_ESSx_f_VE)
+            self.f_ESSx_f_Im.append(f_scenario_ESSx_f_Im)
+            self.f_ESSx_f_C.append(f_scenario_ESSx_f_C)
+            self.f_ESSx_f_REC.append(f_scenario_ESSx_f_REC)
+            
+            self.b_da_ESSo.append(Det_ESSo.get_b_da_value())
+            self.b_rt_ESSo.append(Det_ESSo.get_b_rt_value())
+            self.q_da_ESSo.append(Det_ESSo.get_q_da_value())
+            self.q_rt_ESSo.append(Det_ESSo.get_q_rt_value())
+            self.Q_da_ESSo.append(Det_ESSo.get_Q_da_value())
+            self.Q_rt_ESSo.append(Det_ESSo.get_Q_rt_value())
+            self.Q_c_ESSo.append(Det_ESSo.get_Q_c_value())
+            self.u_ESSo.append(Det_ESSo.get_u_value())
+            self.S_ESSo.append(Det_ESSo.get_S_value())
+
+            self.b_da_ESSx.append(Det_ESSx.get_b_da_value())
+            self.b_rt_ESSx.append(Det_ESSx.get_b_rt_value())
+            self.q_da_ESSx.append(Det_ESSx.get_q_da_value())
+            self.q_rt_ESSx.append(Det_ESSx.get_q_rt_value())
+            self.Q_da_ESSx.append(Det_ESSx.get_Q_da_value())
+            self.Q_rt_ESSx.append(Det_ESSx.get_Q_rt_value())
+            self.Q_c_ESSx.append(Det_ESSx.get_Q_c_value())
+            self.u_ESSx.append(Det_ESSx.get_u_value())
+
+        self.P_ESSo = np.mean(self.f_ESSo) 
         self.P_ESSx = np.mean(self.f_ESSx)
+        
+        self.P_ESSo_f_P = np.mean(self.f_ESSo_f_P)
+        self.P_ESSo_f_V = np.mean(self.f_ESSo_f_V)
+        self.P_ESSo_f_E = np.mean(self.f_ESSo_f_E)
+        self.P_ESSo_f_VE = np.mean(self.f_ESSo_f_VE)
+        self.P_ESSo_f_Im = np.mean(self.f_ESSo_f_Im)
+        self.P_ESSo_f_C = np.mean(self.f_ESSo_f_C)
+        self.P_ESSo_f_REC = np.mean(self.f_ESSo_f_REC)
+
+        self.P_ESSx_f_P = np.mean(self.f_ESSx_f_P)
+        self.P_ESSx_f_V = np.mean(self.f_ESSx_f_V)
+        self.P_ESSx_f_E = np.mean(self.f_ESSx_f_E)
+        self.P_ESSx_f_VE = np.mean(self.f_ESSx_f_VE)
+        self.P_ESSx_f_Im = np.mean(self.f_ESSx_f_Im)
+        self.P_ESSx_f_C = np.mean(self.f_ESSx_f_C)
+        self.P_ESSx_f_REC = np.mean(self.f_ESSx_f_REC)
 
     def run_perfect_forecasting(self):
                 
@@ -9192,8 +11023,86 @@ class PerfectForecasting:
         self.perfect_forecasting(scenarios)
         
         print("\nPerfect forecasting complete.")
-        print(f"P_ESS = {self.P_ESS}")
+        print(f"P_ESSo = {self.P_ESSo}")
         print(f"P_ESSx = {self.P_ESSx}")
+        
+        print(f"P_ESSo_f_P = {self.P_ESSo_f_P}")
+        print(f"P_ESSo_f_V = {self.P_ESSo_f_V}")
+        print(f"P_ESSo_f_E = {self.P_ESSo_f_E}")
+        print(f"P_ESSo_f_VE = {self.P_ESSo_f_VE}")
+        print(f"P_ESSo_f_Im = {self.P_ESSo_f_Im}")
+        print(f"P_ESSo_f_C = {self.P_ESSo_f_C}")
+        print(f"P_ESSo_f_REC = {self.P_ESSo_f_REC}")
+
+        print(f"P_ESSx_f_P = {self.P_ESSx_f_P}")
+        print(f"P_ESSx_f_V = {self.P_ESSx_f_V}")
+        print(f"P_ESSx_f_E = {self.P_ESSx_f_E}")
+        print(f"P_ESSx_f_VE = {self.P_ESSx_f_VE}")
+        print(f"P_ESSx_f_Im = {self.P_ESSx_f_Im}")
+        print(f"P_ESSx_f_C = {self.P_ESSx_f_C}")
+        print(f"P_ESSx_f_REC = {self.P_ESSx_f_REC}")
+   
+class PerfectForecastingComp:
+    
+    def __init__(
+        self, 
+        STAGE = 24 ,
+        scenario_num = 30, 
+        ):
+
+        self.STAGE = STAGE
+        self.M = scenario_num
+        
+        self.P = 0
+
+    def sample_P_da(self):
+        
+        scenario_generator = Scenario.Setting2_scenario(E_0)
+        
+        P_da_list = scenario_generator.sample_multiple_P_da(self.M)
+        
+        return P_da_list
+    
+    def sample_scenarios(self):
+
+        scenarios = []
+        
+        for _ in range(self.M):
+            scenario_generator = Scenario.Setting2_scenario(E_0)
+            scenario = scenario_generator.scenario()
+            scenarios.append(scenario)
+            
+        return scenarios
+
+    def perfect_forecasting(self, P_da_list, scenarios):
+        
+        f = []
+        
+        for k in range(self.M):
+            
+            print(f"Perfect forecasting for scenario {k} solving...")
+            
+            scenario = scenarios[k]
+            P_da = P_da_list[k]
+            
+            Det_ESSo = Deterministic_Setting(E_0, P_da, scenario)
+                
+            f_scenario = Det_ESSo.get_objective_value()
+                        
+            f.append(f_scenario)
+
+        self.P = np.mean(f) 
+
+    def run_perfect_forecasting(self):
+                
+        scenarios = self.sample_scenarios()
+        P_da_list = self.sample_P_da()
+
+        print(f"\n=== Perfect forecasting ===")
+        self.perfect_forecasting(P_da_list, scenarios)
+        
+        print("\nPerfect forecasting complete.")
+        print(f"P = {self.P}")     
         
 # RollingHorizon
 
@@ -9210,18 +11119,26 @@ class RollingHorizon:
         
         self.R = 0
 
+    def sample_P_da(self):
+        
+        scenario_generator = Scenario.Setting2_scenario(E_0)
+        
+        P_da_list = scenario_generator.sample_multiple_P_da(self.M)
+        
+        return P_da_list
+    
     def sample_scenarios(self):
 
         scenarios = []
         
         for _ in range(self.M):
-            scenario_generator = Scenario.Setting1_scenario(E_0)
+            scenario_generator = Scenario.Setting2_scenario(E_0)
             scenario = scenario_generator.scenario()
             scenarios.append(scenario)
             
         return scenarios
 
-    def rolling_horizon(self, scenarios):
+    def rolling_horizon(self, P_da_list, scenarios):
         
         f = []
         
@@ -9230,13 +11147,18 @@ class RollingHorizon:
             print(f"Rolling for scenario {k} solving...")
             
             scenario = scenarios[k]
+            P_da = P_da_list[k]
             
             roll_da_subp = Rolling_da()
             b_da = roll_da_subp.sol_b_da
-            Q_da = roll_da_subp.sol_Q_da
-            b_rt = roll_da_subp.sol_b_rt
-            q_rt = roll_da_subp.sol_q_rt
-            S = roll_da_subp.sol_S
+            q_da = roll_da_subp.sol_q_da
+            
+            roll_rt_init_subp = Rolling_rt_init([b_da, q_da], P_da)
+            
+            Q_da = roll_rt_init_subp.sol_Q_da
+            b_rt = roll_rt_init_subp.sol_b_rt
+            q_rt = roll_rt_init_subp.sol_q_rt
+            S = roll_rt_init_subp.sol_S
             E_1 = 0
             T_q = q_rt
                         
@@ -9252,6 +11174,7 @@ class RollingHorizon:
                     S,
                     E_1,
                     T_q,
+                    P_da,
                     scenario[t]
                     )
 
@@ -9270,6 +11193,7 @@ class RollingHorizon:
                 q_rt,
                 S,
                 E_1, 
+                P_da,
                 scenario[self.STAGE-1]
                 )
                 
@@ -9284,9 +11208,10 @@ class RollingHorizon:
     def run_rolling(self):
 
         scenarios = self.sample_scenarios()
+        P_da_list = self.sample_P_da()
 
         print(f"\n=== Rolling Horizon ===")
-        self.rolling_horizon(scenarios)
+        self.rolling_horizon(P_da_list, scenarios)
         
         print("\nRolling Horizon complete.")
         print(f"R = {self.R}")
@@ -9572,70 +11497,21 @@ class SDDiPModel:
         print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {(self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]:.4f}")
         print(f"LB list = {self.LB}, UB list = {self.UB}")
 
-
 if __name__ == "__main__":
+    
+    num_iter = 25
     
     scenario_branch = 5  ## N_t
     fw_scenario_num = 10  ## M
     perfect_scenario_num = 20
     rolling_scenario_num = 20
     
-    # Solve T-Stage SDDiP
+    """ 
+    # PF vs Roll vs SDDP
     
-    num_iter = 25
-    
-    E_0_daily = E_0_daily
-    P_da_daily = P_da_daily
-    
-    perfect = PerfectForecasting(E_0_daily, P_da_daily)
-    
+    perfect = PerfectForecastingComp(scenario_num = perfect_scenario_num)
     perfect.run_perfect_forecasting()
     
-    f_ESS = perfect.f_ESS
-    f_ESSx = perfect.f_ESSx
-    perfect_obj_ESS = perfect.P_ESS
-    perfect_obj_ESSx = perfect.P_ESSx
-    
-    u_ESS_list = perfect.u_ESS
-    u_ESSx_list = perfect.u_ESSx
-    
-    daily_dates = pd.date_range(start="2024-07-12", periods=len(u_ESS_list), freq='D')
-    omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11")]
-    
-    filtered_daily_dates = daily_dates[~daily_dates.isin(omit_dates)]
-    filtered_u_ESS_list = [u_ESS_list[i] for i, dt in enumerate(daily_dates) if dt not in omit_dates]
-    filtered_u_ESSx_list = [u_ESSx_list[i] for i, dt in enumerate(daily_dates) if dt not in omit_dates]
-    
-    num_hours = len(u_ESS_list[0])
-    hourly_timestamps = []
-    
-    
-    for dt in filtered_daily_dates:
-        
-        hourly_timestamps.extend(pd.date_range(start=dt, periods=num_hours, freq='H'))
-        
-    flat_u_ESS = [val for sublist in filtered_u_ESS_list for val in sublist]
-    flat_u_ESSx = [val for sublist in filtered_u_ESSx_list for val in sublist]
-    
-    df = pd.DataFrame({"date": hourly_timestamps, "u_ESS": flat_u_ESS, "u_ESSx": flat_u_ESSx})
-    df.to_csv("hourly_u_values.csv", index=False)
-    
-    
-    for i, day in enumerate(filtered_daily_dates):
-        
-        hours = pd.date_range(start=day, periods=num_hours, freq='H')
-        plt.figure(figsize=(10, 6))
-        plt.plot(hours, filtered_u_ESS_list[i], marker='o', label='u_ESS')
-        plt.plot(hours, filtered_u_ESSx_list[i], marker='x', label='u_ESSx')
-        plt.xlabel("Time")
-        plt.ylabel("u value")
-        plt.title(f"Hourly u values for {day.strftime('%Y-%m-%d')}")
-        plt.xticks(hours, [h.strftime("%H:%M") for h in hours], rotation=45)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-    
-    """
     rolling = RollingHorizon(scenario_num = rolling_scenario_num)
     
     rolling_start_time = time.time()
@@ -9643,8 +11519,10 @@ if __name__ == "__main__":
     rolling_end_time = time.time()
     avg_time_rolling = (rolling_end_time - rolling_start_time)/rolling_scenario_num
     
+    perfect_obj = perfect.P
     rolling_obj = rolling.R
-      
+    
+         
     sddip_B = SDDiPModel(
         max_iter=num_iter,
         forward_scenario_num=fw_scenario_num,
@@ -9662,7 +11540,6 @@ if __name__ == "__main__":
     )
     
    
-    
     SDDiP_B_start_time = time.time()
     sddip_B.run_sddip()
     SDDiP_B_end_time = time.time()
@@ -9674,7 +11551,6 @@ if __name__ == "__main__":
     
     gap_SDDiP_B = (sddip_B.UB[sddip_B.iteration] - sddip_B.LB[sddip_B.iteration])/sddip_B.UB[sddip_B.iteration]
     
-    
     SDDiP_SB_start_time = time.time()
     sddip_SB.run_sddip()
     SDDiP_SB_end_time = time.time()
@@ -9684,22 +11560,9 @@ if __name__ == "__main__":
     UB_SB_list = sddip_SB.UB[:num_iter]
     
     gap_SDDiP_SB = (sddip_SB.UB[sddip_SB.iteration] - sddip_SB.LB[sddip_SB.iteration])/sddip_SB.UB[sddip_SB.iteration]
-    """
-    plt.figure(figsize=(7,5))
 
-    iterations = range(len(E_0_daily))
-    
-    plt.plot(iterations, f_ESS, label="ESSo", marker='o', color='tab:blue')
+    iterations = range(num_iter)
 
-    plt.plot(iterations, f_ESSx, label="ESSx", marker='^', color='tab:orange', linestyle='--')
-    
-    plt.xlabel('Date Index')
-    plt.ylabel('Daily Profit')
-    plt.title('ESSo vs ESSx')
-    plt.legend()
-    plt.show()
-    
-    """
     plt.plot(iterations, LB_B_list, label="LB (B)", marker='o', color='tab:blue')
     plt.plot(iterations, UB_B_list, label="UB (B)", marker='^', color='tab:blue', linestyle='--')
     plt.fill_between(iterations, LB_B_list, UB_B_list, alpha=0.1, color='tab:blue')
@@ -9708,7 +11571,6 @@ if __name__ == "__main__":
     plt.plot(iterations, UB_SB_list, label="UB (SB)", marker='^', color='tab:orange', linestyle='--')
     plt.fill_between(iterations, LB_SB_list, UB_SB_list, alpha=0.1, color='tab:orange')
     
-   
     plt.axhline(y=perfect_obj, color='brown', linestyle='--', label='PerfectForecasting_obj')
 
     plt.axhline(y=rolling_obj, color='black', linestyle='--', label='RollingHorizon_obj')
@@ -9716,14 +11578,139 @@ if __name__ == "__main__":
 
     plt.xlabel('Iteration')
     plt.ylabel('Bound')
-    plt.title('Rolling Horizon vs SDDiP')
+    plt.title('PF vs Rolling Horizon vs SDDP')
     plt.legend()
+    
+    plt.ylim(0, 50000000)
+    
     plt.show()
 
+
+
     print(f"Rolling Horizon took {avg_time_rolling:.2f} seconds on average.\n")
+    
     print(f"SDDiP (cut='B') took {time_SDDiP_B:.2f} seconds.\n")
     print(f"SDDiP (cut='SB') took {time_SDDiP_SB:.2f} seconds.\n")
     
     print(f"SDDiP optimality gap for B = {gap_SDDiP_B:.4f}")
     print(f"SDDiP optimality gap for SB = {gap_SDDiP_SB:.4f}")    
+
     """
+    
+    # ESSx vs ESSo
+    
+    E_0_daily = E_0_daily[:215]
+    P_da_daily = P_da_daily[:215]
+    P_rt_daily = P_rt_daily[:215]
+    delta_E_daily = delta_E_daily[:215]
+    
+    perfect = PerfectForecasting(E_0_daily, P_da_daily, P_rt_daily, delta_E_daily)
+    
+    perfect.run_perfect_forecasting()
+    
+    f_ESSo = perfect.f_ESSo
+    f_ESSx = perfect.f_ESSx
+    
+    perfect_obj_ESS = perfect.P_ESSo
+    perfect_obj_ESSx = perfect.P_ESSx
+    
+    b_da_ESSo_list = perfect.b_da_ESSo
+    b_rt_ESSo_list = perfect.b_rt_ESSo
+    q_da_ESSo_list = perfect.q_da_ESSo
+    q_rt_ESSo_list = perfect.q_rt_ESSo
+    Q_da_ESSo_list = perfect.Q_da_ESSo
+    Q_rt_ESSo_list = perfect.Q_rt_ESSo
+    Q_c_ESSo_list = perfect.Q_c_ESSo
+    u_ESSo_list = perfect.u_ESSo
+    S_ESSo_list = perfect.S_ESSo
+
+    b_da_ESSx_list = perfect.b_da_ESSx
+    b_rt_ESSx_list = perfect.b_rt_ESSx
+    q_da_ESSx_list = perfect.q_da_ESSx
+    q_rt_ESSx_list = perfect.q_rt_ESSx
+    Q_da_ESSx_list = perfect.Q_da_ESSx
+    Q_rt_ESSx_list = perfect.Q_rt_ESSx
+    Q_c_ESSx_list = perfect.Q_c_ESSx
+    u_ESSx_list = perfect.u_ESSx
+    
+    daily_dates = pd.date_range(start="2024-07-12", periods=len(u_ESSo_list), freq='D')
+    omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11"), pd.Timestamp("2025-02-15")]
+    filtered_daily_dates = daily_dates[~daily_dates.isin(omit_dates)]
+    
+    filtered = lambda lst: [lst[i] for i, dt in enumerate(daily_dates) if dt not in omit_dates]
+
+    filtered_b_da_ESSo_list = filtered(b_da_ESSo_list)
+    filtered_b_rt_ESSo_list = filtered(b_rt_ESSo_list)
+    filtered_q_da_ESSo_list = filtered(q_da_ESSo_list)
+    filtered_q_rt_ESSo_list = filtered(q_rt_ESSo_list)
+    filtered_Q_da_ESSo_list = filtered(Q_da_ESSo_list)
+    filtered_Q_rt_ESSo_list = filtered(Q_rt_ESSo_list)
+    filtered_Q_c_ESSo_list = filtered(Q_c_ESSo_list)
+    filtered_u_ESSo_list = filtered(u_ESSo_list)
+    filtered_S_ESSo_list = filtered(S_ESSo_list)
+
+    filtered_b_da_ESSx_list = filtered(b_da_ESSx_list)
+    filtered_b_rt_ESSx_list = filtered(b_rt_ESSx_list)
+    filtered_q_da_ESSx_list = filtered(q_da_ESSx_list)
+    filtered_q_rt_ESSx_list = filtered(q_rt_ESSx_list)
+    filtered_Q_da_ESSx_list = filtered(Q_da_ESSx_list)
+    filtered_Q_rt_ESSx_list = filtered(Q_rt_ESSx_list)
+    filtered_Q_c_ESSx_list = filtered(Q_c_ESSx_list)
+    filtered_u_ESSx_list = filtered(u_ESSx_list)
+    
+    num_hours = len(u_ESSo_list[0])
+    hourly_timestamps = []
+    
+    for dt in filtered_daily_dates:
+        
+        hourly_timestamps.extend(pd.date_range(start=dt, periods=num_hours, freq='H'))
+        
+    flat = lambda lst: [val for sublist in lst for val in sublist]    
+        
+    df_ESSo = pd.DataFrame({
+        "date": hourly_timestamps,
+        "b_da_ESSo": flat(filtered_b_da_ESSo_list),
+        "b_rt_ESSo": flat(filtered_b_rt_ESSo_list),
+        "q_da_ESSo": flat(filtered_q_da_ESSo_list),
+        "q_rt_ESSo": flat(filtered_q_rt_ESSo_list),
+        "Q_da_ESSo": flat(filtered_Q_da_ESSo_list),
+        "Q_rt_ESSo": flat(filtered_Q_rt_ESSo_list),
+        "Q_c_ESSo": flat(filtered_Q_c_ESSo_list),
+        "u_ESSo": flat(filtered_u_ESSo_list),
+        "S_ESSo": flat(filtered_S_ESSo_list),
+    })
+
+    df_ESSx = pd.DataFrame({
+        "date": hourly_timestamps,
+        "b_da_ESSx": flat(filtered_b_da_ESSx_list),
+        "b_rt_ESSx": flat(filtered_b_rt_ESSx_list),
+        "q_da_ESSx": flat(filtered_q_da_ESSx_list),
+        "q_rt_ESSx": flat(filtered_q_rt_ESSx_list),
+        "Q_da_ESSx": flat(filtered_Q_da_ESSx_list),
+        "Q_rt_ESSx": flat(filtered_Q_rt_ESSx_list),
+        "Q_c_ESSx": flat(filtered_Q_c_ESSx_list),
+        "u_ESSx": flat(filtered_u_ESSx_list),
+    })
+    
+    df_ESSo.to_csv("hourly_values_ESSo.csv", index=False)
+    df_ESSx.to_csv("hourly_values_ESSx.csv", index=False)
+    
+    
+    
+    for i, day in enumerate(filtered_daily_dates):
+        
+        hours = pd.date_range(start=day, periods=num_hours, freq='H')
+        plt.figure(figsize=(10, 6))
+        plt.plot(hours, filtered_u_ESSo_list[i], marker='x', label='u_ESS')
+        plt.plot(hours, filtered_Q_c_ESSo_list[i], marker='x', label='Q_c_ESS')
+        plt.plot(hours, filtered_Q_da_ESSo_list[i], marker='x', label='Q_da_ESS')
+        plt.xlabel("Time")
+        plt.ylabel("u value")
+        plt.title(f"Hourly u values for {day.strftime('%Y-%m-%d')}")
+        plt.xticks(hours, [h.strftime("%H:%M") for h in hours], rotation=45)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+    
+    
+    

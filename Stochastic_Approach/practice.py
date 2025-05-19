@@ -1,10 +1,18 @@
-a = [1, 2, 3, 4]
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+import warnings
+from scipy.stats import bernoulli, truncnorm
+from sklearn.cluster import KMeans
 
-for i, a in enumerate(a):
-    
-    print(i, a)
-import math
+omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11")]
 
 
-print(math.ceil(math.log2(21000)))
+date_range = pd.date_range(start='2024-07-12', periods=5808, freq='H')
+date_range = date_range[~date_range.normalize().isin(omit_dates)]
 
+daily_dates = date_range.normalize().drop_duplicates()
+
+target_date = list(daily_dates)[216]
+print(target_date)

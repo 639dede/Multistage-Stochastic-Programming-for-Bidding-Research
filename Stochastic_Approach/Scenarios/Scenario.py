@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import chardet
 import matplotlib.pyplot as plt
 import os
 import warnings
@@ -12,7 +13,15 @@ from sklearn.cluster import KMeans
 P_r = 80
 P_max = 270
 
+T = 24
+
 # CSV files & filtering
+
+def detect_encoding(file_path):
+    with open(file_path, 'rb') as f:
+        rawdata = f.read(10000)  # read first few KBs
+    result = chardet.detect(rawdata)
+    return result['encoding']
 
 ## Energy forecast file
 
@@ -20,27 +29,42 @@ file_path_Energy = './Stochastic_Approach/Scenarios/Energy_forecast.csv'
 
 df = pd.read_csv(file_path_Energy)
 
-filtered_df_Energy = df[(df['forecast_da'] > 0) & (df['forecast_rt'] > 0)]
+invalid_rows = (df['forecast_da'] <= 0) | (df['forecast_rt'] <= 0)
 
+df.loc[invalid_rows, 'forecast_da'] = 0.01
+df.loc[invalid_rows, 'forecast_rt'] = 0
+
+filtered_df_Energy = df
+
+filtered_df_Energy_for_dist = df[(df['forecast_da'] > 0) & (df['forecast_rt'] > 0)]
 
 timestamps_pre = pd.date_range(start="2024-07-12 00:00", end="2025-03-10 23:00", freq='H')
 
-omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11")]
+omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11"), pd.Timestamp("2025-02-15")]
 
 mask = ~timestamps_pre.normalize().isin(omit_dates)
 
 timestamps = timestamps_pre[mask]
 
+# E_0 processing
+
 E_0_values = df['forecast_da'].tolist()
-forecast_data = pd.DataFrame({'timestamp': timestamps, 'value': E_0_values})
-forecast_data['hour'] = forecast_data['timestamp'].dt.hour
+forecast_data_0 = pd.DataFrame({'timestamp': timestamps, 'value': E_0_values})
+forecast_data_0['hour'] = forecast_data_0['timestamp'].dt.hour
+forecast_data_0['date'] = forecast_data_0['timestamp'].dt.date
 
-forecast_data['date'] = forecast_data['timestamp'].dt.date
-E_0_daily = forecast_data.groupby('date')['value'].apply(list).tolist()
+E_0_daily = forecast_data_0.groupby('date')['value'].apply(list).tolist()
+E_0 = forecast_data_0.groupby('hour')['value'].mean().tolist()
 
-forecast_data['hour'] = forecast_data['timestamp'].dt.hour
+# E_1 processing
 
-E_0 = forecast_data.groupby('hour')['value'].mean().tolist()
+E_1_values = df['forecast_rt'].tolist()
+forecast_data_1 = pd.DataFrame({'timestamp': timestamps, 'value': E_1_values})
+forecast_data_1['hour'] = forecast_data_1['timestamp'].dt.hour
+forecast_data_1['date'] = forecast_data_1['timestamp'].dt.date
+
+E_1_daily = forecast_data_1.groupby('date')['value'].apply(list).tolist()
+E_1 = forecast_data_1.groupby('hour')['value'].mean().tolist()
 
 ## Day-Ahead price
 
@@ -50,7 +74,7 @@ files = os.listdir(directory_path_da)
 csv_files = [file for file in files if file.endswith('일간.csv')]
 
 def process_da_file(file_path):
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(file_path, encoding='utf-8')
     data = df.loc[3:27, df.columns[2]]  
     return data.tolist()
 
@@ -67,6 +91,12 @@ day_ahead_prices = [item for sublist in day_ahead_prices_daily for item in subli
 
 ## Real-Time price
 
+def detect_encoding(file_path):
+    with open(file_path, 'rb') as f:
+        rawdata = f.read(10000)  # read first few KBs
+    result = chardet.detect(rawdata)
+    return result['encoding']
+
 directory_path_rt = './Stochastic_Approach/Scenarios/모의 실시간시장 가격/실시간 임시'
 
 files_rt = os.listdir(directory_path_rt)
@@ -74,8 +104,10 @@ files_rt = os.listdir(directory_path_rt)
 csv_files_rt = [file for file in files_rt if file.endswith('.csv')]
 
 def process_rt_file(file_path):
+    
+    encoding = detect_encoding(file_path)
 
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(file_path, encoding=encoding)
     data = df.iloc[3:99, 2]  
     reshaped_data = data.values.reshape(-1, 4).mean(axis=1)
     return reshaped_data
@@ -96,7 +128,7 @@ print(len(E_0_values), len(day_ahead_prices), len(real_time_prices))
 
 date_range_pre = pd.date_range(start='2024-07-12', periods=5808, freq='H')
 
-omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11")]
+omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11"), pd.Timestamp("2025-02-15")]
 
 date_range = date_range_pre[~date_range_pre.normalize().isin(omit_dates)]
 
@@ -112,11 +144,24 @@ data = pd.DataFrame({
 
 # Delta_E distribution
 
-filtered_df_Energy['delta'] = filtered_df_Energy['forecast_rt'] / filtered_df_Energy['forecast_da']
+filtered_df_Energy['delta'] = (
+    filtered_df_Energy['forecast_rt'] 
+    / filtered_df_Energy['forecast_da']
+)
 
-delta_values = filtered_df_Energy['delta']
+delta_values = filtered_df_Energy['delta'].tolist()
 
-std_E = delta_values.std()  
+delta_E_daily = [
+    delta_values[i : i + 24]
+    for i in range(0, len(delta_values), 24)
+]
+assert all(len(day) == 24 for day in delta_E_daily), "Some daily_delta_E lists are not length 24."
+
+filtered_df_Energy_for_dist['delta'] = filtered_df_Energy_for_dist['forecast_rt'] / filtered_df_Energy_for_dist['forecast_da']
+
+delta_values_for_dist = filtered_df_Energy_for_dist['delta']
+
+std_E = delta_values_for_dist.std()  
 
 lower_E, upper_E = 0.8, 1.2
 
@@ -727,10 +772,8 @@ class Setting2_scenario():
         for t in range(self.T): 
             
             self.delta.append([self.delta_E[t], self.P_rt[t], self.Q_c[t]])
-
         
-        return self.delta
-        
+        return self.delta       
 
 # plotting distributions
 
@@ -767,3 +810,10 @@ if __name__ == '__main__':
 
     print(x1.P_da, x2.P_da)
     print(x1.scenario(),"\n", x2.scenario())
+    
+    Scenario_gen = Setting2_scenario(E_0)
+    
+    P_da_list = Scenario_gen.sample_multiple_P_da(30)
+    
+    for P_da in P_da_list:
+        print(f"multiple P_da = {P_da}")
