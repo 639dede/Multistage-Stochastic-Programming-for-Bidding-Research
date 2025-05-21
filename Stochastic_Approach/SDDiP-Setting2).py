@@ -19,7 +19,7 @@ from Scenarios import Scenario
 solver='gurobi'
    
 SOLVER=pyo.SolverFactory(solver)
-SOLVER.options['TimeLimit'] = 120
+SOLVER.options['TimeLimit'] = 20
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
@@ -116,7 +116,7 @@ class Deterministic_Setting(pyo.ConcreteModel):
     
     def _BigM_setting(self):
         
-        self.M_gen = [4*self.K[t] for t in range(T)]
+        self.M_gen = [5*self.K[t] for t in range(T)]
         
         for t in range(self.T):   
              
@@ -213,9 +213,18 @@ class Deterministic_Setting(pyo.ConcreteModel):
         
         model.m_1 = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         model.m_2 = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.m_2_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_1_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_1_2 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_2 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_2_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_2_2 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_4 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_3 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_4_1_1 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
@@ -223,10 +232,20 @@ class Deterministic_Setting(pyo.ConcreteModel):
         model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
         
+        model.n_E = pyo.Var(model.TIME, domain = pyo.Binary)
+        
         model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_1_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_1_2 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_2 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_2_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_2_2 = pyo.Var(model.TIME, domain = pyo.Binary)        
         model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_4_1_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        
         model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
@@ -334,13 +353,13 @@ class Deterministic_Setting(pyo.ConcreteModel):
             return model.w[t, j] >= 0
         
         def binarize_rule_1_2(model, t, j):
-            return model.w[t, j] <= model.u[t]
+            return model.w[t, j] <= model.m_4_1_1[t]
         
         def binarize_rule_1_3(model, t, j):
             return model.w[t, j] <= self.M_gen[t]*model.nu[t, j]
         
         def binarize_rule_1_4(model, t, j):
-            return model.w[t, j] >= model.u[t] - self.M_gen[t]*(1-model.nu[t, j])
+            return model.w[t, j] >= model.m_4_1_1[t] - self.M_gen[t]*(1-model.nu[t, j])
         
         def binarize_rule_2_1(model, t, i):
             return model.h[t, i] >= 0
@@ -385,6 +404,18 @@ class Deterministic_Setting(pyo.ConcreteModel):
     
         def dummy_rule_4_2(model, t):
             return model.m_4_2[t] == (model.m_1[t] - model.m_2[t])*self.P_rt[t] + sum((model.h[t, i] - model.k[t, i])*(2**i) for i in range(self.bin_num))
+        
+        def minmax_rule_4_1_1_1(model, t):
+            return model.m_4_1_1[t] <= model.u[t]
+        
+        def minmax_rule_4_1_1_2(model, t):
+            return model.m_4_1_1[t] <= model.Q_c[t]
+        
+        def minmax_rule_4_1_1_3(model, t):
+            return model.m_4_1_1[t] >= model.u[t] - self.M_gen[t]*(1 - model.n_4_1_1[t])
+        
+        def minmax_rule_4_1_1_4(model, t):
+            return model.m_4_1_1[t] >= model.Q_c[t] - self.M_gen[t]*model.n_4_1_1[t]
   
         def minmax_rule_1_1(model, t):
             return model.m_1[t] <= model.Q_da[t]
@@ -398,17 +429,117 @@ class Deterministic_Setting(pyo.ConcreteModel):
         def minmax_rule_1_4(model, t):
             return model.m_1[t] >= model.q_rt[t] - (model.n_1[t])*self.M_gen[t]
         
-        def minmax_rule_2_1(model, t):
-            return model.m_2[t] <= model.u[t]
         
-        def minmax_rule_2_2(model, t):
-            return model.m_2[t] <= model.q_rt[t]
+        def minmax_rule_2(model, t):
+            return model.m_2[t] == model.m_2_1[t] - model.m_2_3[t] + model.m_2_4[t]
         
-        def minmax_rule_2_3(model, t):
-            return model.m_2[t] >= model.u[t] - (1 - model.n_2[t])*self.M_gen[t]
         
-        def minmax_rule_2_4(model, t):
-            return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*self.M_gen[t]
+        def minmax_rule_2_E_1(model, t):
+            return model.Q_c[t] - model.Q_da[t] <= self.M_gen[t]*model.n_E[t]
+        
+        def minmax_rule_2_E_2(model, t):
+            return model.Q_da[t] - model.Q_c[t] <= self.M_gen[t]*(1 - model.n_E[t])
+        
+        
+        def minmax_rule_2_3_1(model, t):
+            return model.m_2_3[t] >= 0
+        
+        def minmax_rule_2_3_2(model, t):
+            return model.m_2_3[t] <= model.m_2_1[t]
+        
+        def minmax_rule_2_3_3(model, t):
+            return model.m_2_3[t] <= self.M_gen[t]*model.n_E[t]
+        
+        def minmax_rule_2_3_4(model, t):
+            return model.m_2_3[t] >= model.m_2_1[t] - self.M_gen[t]*(1 - model.n_E[t])
+        
+        
+        def minmax_rule_2_4_1(model, t):
+            return model.m_2_4[t] >= 0
+        
+        def minmax_rule_2_4_2(model, t):
+            return model.m_2_4[t] <= model.m_2_2[t]
+        
+        def minmax_rule_2_4_3(model, t):
+            return model.m_2_4[t] <= self.M_gen[t]*model.n_E[t]
+        
+        def minmax_rule_2_4_4(model, t):
+            return model.m_2_4[t] >= model.m_2_2[t] - self.M_gen[t]*(1 - model.n_E[t])
+            
+        
+        def minmax_rule_2_1_1_a(model, t):
+            return model.m_2_1_1[t] <= model.u[t]
+        
+        def minmax_rule_2_1_1_b(model, t):
+            return model.m_2_1_1[t] <= model.Q_da[t]
+        
+        def minmax_rule_2_1_1_c(model, t):
+            return model.m_2_1_1[t] >= model.u[t] - self.M_gen[t]*(1 - model.n_2_1_1[t])
+        
+        def minmax_rule_2_1_1_d(model, t):
+            return model.m_2_1_1[t] >= model.Q_da[t] - self.M_gen[t]*model.n_2_1_1[t]
+        
+        def minmax_rule_2_1_2_a(model, t):
+            return model.m_2_1_2[t] >= model.m_2_1_1[t]
+        
+        def minmax_rule_2_1_2_b(model, t):
+            return model.m_2_1_2[t] >= model.Q_c[t]
+        
+        def minmax_rule_2_1_2_c(model, t):
+            return model.m_2_1_2[t] <= model.m_2_1_1[t] + self.M_gen[t]*(1 - model.n_2_1_2[t])
+        
+        def minmax_rule_2_1_2_d(model, t):
+            return model.m_2_1_2[t] <= model.Q_c[t] + self.M_gen[t]*model.n_2_1_2[t]
+        
+        def minmax_rule_2_1_a(model, t):
+            return model.m_2_1[t] <= model.m_2_1_2[t]
+        
+        def minmax_rule_2_1_b(model, t):
+            return model.m_2_1[t] <= model.q_rt[t]
+        
+        def minmax_rule_2_1_c(model, t):
+            return model.m_2_1[t] >= model.m_2_1_2[t] - self.M_gen[t]*(1 - model.n_2_1[t])
+        
+        def minmax_rule_2_1_d(model, t):
+            return model.m_2_1[t] >= model.q_rt[t] - self.M_gen[t]*model.n_2_1[t]
+        
+        
+        def minmax_rule_2_2_1_a(model, t):
+            return model.m_2_2_1[t] >= model.u[t]
+        
+        def minmax_rule_2_2_1_b(model, t):
+            return model.m_2_2_1[t] >= model.Q_da[t]
+        
+        def minmax_rule_2_2_1_c(model, t):
+            return model.m_2_2_1[t] <= model.u[t] + self.M_gen[t]*(1 - model.n_2_2_1[t])
+        
+        def minmax_rule_2_2_1_d(model, t):
+            return model.m_2_2_1[t] <= model.Q_da[t] + self.M_gen[t]*model.n_2_2_1[t]
+        
+        def minmax_rule_2_2_2_a(model, t):
+            return model.m_2_2_2[t] <= model.m_2_2_1[t]
+        
+        def minmax_rule_2_2_2_b(model, t):
+            return model.m_2_2_2[t] <= model.Q_c[t]
+        
+        def minmax_rule_2_2_2_c(model, t):
+            return model.m_2_2_2[t] >= model.m_2_2_1[t] - self.M_gen[t]*(1 - model.n_2_2_2[t])
+        
+        def minmax_rule_2_2_2_d(model, t):
+            return model.m_2_2_2[t] >= model.Q_c[t] - self.M_gen[t]*model.n_2_2_2[t]
+        
+        def minmax_rule_2_2_a(model, t):
+            return model.m_2_2[t] <= model.m_2_2_2[t]
+        
+        def minmax_rule_2_2_b(model, t):
+            return model.m_2_2[t] <= model.q_rt[t]
+        
+        def minmax_rule_2_2_c(model, t):
+            return model.m_2_2[t] >= model.m_2_2_2[t] - self.M_gen[t]*(1 - model.n_2_2[t])
+        
+        def minmax_rule_2_2_d(model, t):
+            return model.m_2_2[t] >= model.q_rt[t] - self.M_gen[t]*model.n_2_2[t]
+        
         
         def minmax_rule_3_1(model, t):
             return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C + S)
@@ -577,14 +708,62 @@ class Deterministic_Setting(pyo.ConcreteModel):
         
         model.dummy_4_1 = pyo.Constraint(model.TIME, rule = dummy_rule_4_1)
         model.dummy_4_2 = pyo.Constraint(model.TIME, rule = dummy_rule_4_2)
+        
+        model.minmax_4_1_1_1 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_1)
+        model.minmax_4_1_1_2 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_2)
+        model.minmax_4_1_1_3 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_3)
+        model.minmax_4_1_1_4 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_4)
+        
         model.minmax_1_1 = pyo.Constraint(model.TIME, rule = minmax_rule_1_1)
         model.minmax_1_2 = pyo.Constraint(model.TIME, rule = minmax_rule_1_2)
         model.minmax_1_3 = pyo.Constraint(model.TIME, rule = minmax_rule_1_3)
         model.minmax_1_4 = pyo.Constraint(model.TIME, rule = minmax_rule_1_4)
-        model.minmax_2_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_1)
-        model.minmax_2_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_2)
-        model.minmax_2_3 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3)
-        model.minmax_2_4 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4)
+        
+        model.minmax_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2)
+        
+        model.minmax_2_E_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_E_1)
+        model.minmax_2_E_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_E_2)
+        
+        model.minmax_2_3_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_1)
+        model.minmax_2_3_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_2)
+        model.minmax_2_3_3 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_3)
+        model.minmax_2_3_4 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_4)
+        
+        model.minmax_2_4_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_1)
+        model.minmax_2_4_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_2)
+        model.minmax_2_4_3 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_3)
+        model.minmax_2_4_4 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_4)
+        
+        model.minmax_2_1_1_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_a)
+        model.minmax_2_1_1_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_b)
+        model.minmax_2_1_1_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_c)
+        model.minmax_2_1_1_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_d)
+        
+        model.minmax_2_1_2_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_a)
+        model.minmax_2_1_2_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_b)
+        model.minmax_2_1_2_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_c)
+        model.minmax_2_1_2_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_d)
+        
+        model.minmax_2_1_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_a)
+        model.minmax_2_1_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_b)
+        model.minmax_2_1_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_c)
+        model.minmax_2_1_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_d)
+        
+        model.minmax_2_2_1_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_a)
+        model.minmax_2_2_1_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_b)
+        model.minmax_2_2_1_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_c)
+        model.minmax_2_2_1_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_d)
+        
+        model.minmax_2_2_2_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_a)
+        model.minmax_2_2_2_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_b)
+        model.minmax_2_2_2_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_c)
+        model.minmax_2_2_2_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_d)
+        
+        model.minmax_2_2_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_a)
+        model.minmax_2_2_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_b)
+        model.minmax_2_2_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_c)
+        model.minmax_2_2_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_d)
+        
         model.minmax_3_1 = pyo.Constraint(model.TIME, rule = minmax_rule_3_1)
         model.minmax_3_2 = pyo.Constraint(model.TIME, rule = minmax_rule_3_2)
         model.minmax_3_3 = pyo.Constraint(model.TIME, rule = minmax_rule_3_3)
@@ -640,7 +819,7 @@ class Deterministic_Setting(pyo.ConcreteModel):
     def solve(self):
         
         self.build_model()
-        SOLVER.solve(self)
+        SOLVER.solve(self, tee = True)
         self.solved = True
         
     def get_objective_value(self):
@@ -652,6 +831,10 @@ class Deterministic_Setting(pyo.ConcreteModel):
         return pyo.value(self.objective)
 
     def get_objective_part_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
         
         part1 = sum(pyo.value(self.Q_da[t] * self.P_da[t] + (self.u[t] - self.Q_da[t]) * self.P_rt[t]) for t in range(self.T))
         part2_1 = sum(pyo.value(self.m_4_1[t]) for t in range(self.T))
@@ -869,9 +1052,18 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         
         model.m_1 = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         model.m_2 = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.m_2_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_1_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_1_2 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_2 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_2_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_2_2 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_3 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_2_4 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_3 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_1 = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.m_4_1_1 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_2 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_4_3 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_5 = pyo.Var(model.TIME, domain = pyo.Reals)
@@ -879,10 +1071,20 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         model.m_7 = pyo.Var(model.TIME, domain = pyo.Reals)
         model.m_8 = pyo.Var(model.TIME, domain = pyo.Reals)
         
+        model.n_E = pyo.Var(model.TIME, domain = pyo.Binary)
+        
         model.n_1 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_2 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_1_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_1_2 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_2 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_2_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_2_2_2 = pyo.Var(model.TIME, domain = pyo.Binary)        
         model.n_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_4 = pyo.Var(model.TIME, domain = pyo.Binary)
+        model.n_4_1_1 = pyo.Var(model.TIME, domain = pyo.Binary)
+        
         model.n_4_3 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_5 = pyo.Var(model.TIME, domain = pyo.Binary)
         model.n_6 = pyo.Var(model.TIME, domain = pyo.Binary)
@@ -987,13 +1189,13 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
             return model.w[t, j] >= 0
         
         def binarize_rule_1_2(model, t, j):
-            return model.w[t, j] <= model.u[t]
+            return model.w[t, j] <= model.m_4_1_1[t]
         
         def binarize_rule_1_3(model, t, j):
             return model.w[t, j] <= self.M_gen[t]*model.nu[t, j]
         
         def binarize_rule_1_4(model, t, j):
-            return model.w[t, j] >= model.u[t] - self.M_gen[t]*(1-model.nu[t, j])
+            return model.w[t, j] >= model.m_4_1_1[t] - self.M_gen[t]*(1-model.nu[t, j])
         
         def binarize_rule_2_1(model, t, i):
             return model.h[t, i] >= 0
@@ -1038,6 +1240,18 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
     
         def dummy_rule_4_2(model, t):
             return model.m_4_2[t] == (model.m_1[t] - model.m_2[t])*self.P_rt[t] + sum((model.h[t, i] - model.k[t, i])*(2**i) for i in range(self.bin_num))
+        
+        def minmax_rule_4_1_1_1(model, t):
+            return model.m_4_1_1[t] <= model.u[t]
+        
+        def minmax_rule_4_1_1_2(model, t):
+            return model.m_4_1_1[t] <= model.Q_c[t]
+        
+        def minmax_rule_4_1_1_3(model, t):
+            return model.m_4_1_1[t] >= model.u[t] - self.M_gen[t]*(1 - model.n_4_1_1[t])
+        
+        def minmax_rule_4_1_1_4(model, t):
+            return model.m_4_1_1[t] >= model.Q_c[t] - self.M_gen[t]*model.n_4_1_1[t]
   
         def minmax_rule_1_1(model, t):
             return model.m_1[t] <= model.Q_da[t]
@@ -1051,17 +1265,117 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         def minmax_rule_1_4(model, t):
             return model.m_1[t] >= model.q_rt[t] - (model.n_1[t])*self.M_gen[t]
         
-        def minmax_rule_2_1(model, t):
-            return model.m_2[t] <= model.u[t]
         
-        def minmax_rule_2_2(model, t):
-            return model.m_2[t] <= model.q_rt[t]
+        def minmax_rule_2(model, t):
+            return model.m_2[t] == model.m_2_1[t] - model.m_2_3[t] + model.m_2_4[t]
         
-        def minmax_rule_2_3(model, t):
-            return model.m_2[t] >= model.u[t] - (1 - model.n_2[t])*self.M_gen[t]
         
-        def minmax_rule_2_4(model, t):
-            return model.m_2[t] >= model.q_rt[t] - model.n_2[t]*self.M_gen[t]
+        def minmax_rule_2_E_1(model, t):
+            return model.Q_c[t] - model.Q_da[t] <= self.M_gen[t]*model.n_E[t]
+        
+        def minmax_rule_2_E_2(model, t):
+            return model.Q_da[t] - model.Q_c[t] <= self.M_gen[t]*(1 - model.n_E[t])
+        
+        
+        def minmax_rule_2_3_1(model, t):
+            return model.m_2_3[t] >= 0
+        
+        def minmax_rule_2_3_2(model, t):
+            return model.m_2_3[t] <= model.m_2_1[t]
+        
+        def minmax_rule_2_3_3(model, t):
+            return model.m_2_3[t] <= self.M_gen[t]*model.n_E[t]
+        
+        def minmax_rule_2_3_4(model, t):
+            return model.m_2_3[t] >= model.m_2_1[t] - self.M_gen[t]*(1 - model.n_E[t])
+        
+        
+        def minmax_rule_2_4_1(model, t):
+            return model.m_2_4[t] >= 0
+        
+        def minmax_rule_2_4_2(model, t):
+            return model.m_2_4[t] <= model.m_2_2[t]
+        
+        def minmax_rule_2_4_3(model, t):
+            return model.m_2_4[t] <= self.M_gen[t]*model.n_E[t]
+        
+        def minmax_rule_2_4_4(model, t):
+            return model.m_2_4[t] >= model.m_2_2[t] - self.M_gen[t]*(1 - model.n_E[t])
+            
+        
+        def minmax_rule_2_1_1_a(model, t):
+            return model.m_2_1_1[t] <= model.u[t]
+        
+        def minmax_rule_2_1_1_b(model, t):
+            return model.m_2_1_1[t] <= model.Q_da[t]
+        
+        def minmax_rule_2_1_1_c(model, t):
+            return model.m_2_1_1[t] >= model.u[t] - self.M_gen[t]*(1 - model.n_2_1_1[t])
+        
+        def minmax_rule_2_1_1_d(model, t):
+            return model.m_2_1_1[t] >= model.Q_da[t] - self.M_gen[t]*model.n_2_1_1[t]
+        
+        def minmax_rule_2_1_2_a(model, t):
+            return model.m_2_1_2[t] >= model.m_2_1_1[t]
+        
+        def minmax_rule_2_1_2_b(model, t):
+            return model.m_2_1_2[t] >= model.Q_c[t]
+        
+        def minmax_rule_2_1_2_c(model, t):
+            return model.m_2_1_2[t] <= model.m_2_1_1[t] + self.M_gen[t]*(1 - model.n_2_1_2[t])
+        
+        def minmax_rule_2_1_2_d(model, t):
+            return model.m_2_1_2[t] <= model.Q_c[t] + self.M_gen[t]*model.n_2_1_2[t]
+        
+        def minmax_rule_2_1_a(model, t):
+            return model.m_2_1[t] <= model.m_2_1_2[t]
+        
+        def minmax_rule_2_1_b(model, t):
+            return model.m_2_1[t] <= model.q_rt[t]
+        
+        def minmax_rule_2_1_c(model, t):
+            return model.m_2_1[t] >= model.m_2_1_2[t] - self.M_gen[t]*(1 - model.n_2_1[t])
+        
+        def minmax_rule_2_1_d(model, t):
+            return model.m_2_1[t] >= model.q_rt[t] - self.M_gen[t]*model.n_2_1[t]
+        
+        
+        def minmax_rule_2_2_1_a(model, t):
+            return model.m_2_2_1[t] >= model.u[t]
+        
+        def minmax_rule_2_2_1_b(model, t):
+            return model.m_2_2_1[t] >= model.Q_da[t]
+        
+        def minmax_rule_2_2_1_c(model, t):
+            return model.m_2_2_1[t] <= model.u[t] + self.M_gen[t]*(1 - model.n_2_2_1[t])
+        
+        def minmax_rule_2_2_1_d(model, t):
+            return model.m_2_2_1[t] <= model.Q_da[t] + self.M_gen[t]*model.n_2_2_1[t]
+        
+        def minmax_rule_2_2_2_a(model, t):
+            return model.m_2_2_2[t] <= model.m_2_2_1[t]
+        
+        def minmax_rule_2_2_2_b(model, t):
+            return model.m_2_2_2[t] <= model.Q_c[t]
+        
+        def minmax_rule_2_2_2_c(model, t):
+            return model.m_2_2_2[t] >= model.m_2_2_1[t] - self.M_gen[t]*(1 - model.n_2_2_2[t])
+        
+        def minmax_rule_2_2_2_d(model, t):
+            return model.m_2_2_2[t] >= model.Q_c[t] - self.M_gen[t]*model.n_2_2_2[t]
+        
+        def minmax_rule_2_2_a(model, t):
+            return model.m_2_2[t] <= model.m_2_2_2[t]
+        
+        def minmax_rule_2_2_b(model, t):
+            return model.m_2_2[t] <= model.q_rt[t]
+        
+        def minmax_rule_2_2_c(model, t):
+            return model.m_2_2[t] >= model.m_2_2_2[t] - self.M_gen[t]*(1 - model.n_2_2[t])
+        
+        def minmax_rule_2_2_d(model, t):
+            return model.m_2_2[t] >= model.q_rt[t] - self.M_gen[t]*model.n_2_2[t]
+        
         
         def minmax_rule_3_1(model, t):
             return model.m_3[t] >= model.u[t] - model.Q_c[t] - 0.08*(C+S)
@@ -1228,14 +1542,62 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         
         model.dummy_4_1 = pyo.Constraint(model.TIME, rule = dummy_rule_4_1)
         model.dummy_4_2 = pyo.Constraint(model.TIME, rule = dummy_rule_4_2)
+        
+        model.minmax_4_1_1_1 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_1)
+        model.minmax_4_1_1_2 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_2)
+        model.minmax_4_1_1_3 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_3)
+        model.minmax_4_1_1_4 = pyo.Constraint(model.TIME, rule = minmax_rule_4_1_1_4)
+        
         model.minmax_1_1 = pyo.Constraint(model.TIME, rule = minmax_rule_1_1)
         model.minmax_1_2 = pyo.Constraint(model.TIME, rule = minmax_rule_1_2)
         model.minmax_1_3 = pyo.Constraint(model.TIME, rule = minmax_rule_1_3)
         model.minmax_1_4 = pyo.Constraint(model.TIME, rule = minmax_rule_1_4)
-        model.minmax_2_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_1)
-        model.minmax_2_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_2)
-        model.minmax_2_3 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3)
-        model.minmax_2_4 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4)
+        
+        model.minmax_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2)
+        
+        model.minmax_2_E_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_E_1)
+        model.minmax_2_E_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_E_2)
+        
+        model.minmax_2_3_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_1)
+        model.minmax_2_3_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_2)
+        model.minmax_2_3_3 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_3)
+        model.minmax_2_3_4 = pyo.Constraint(model.TIME, rule = minmax_rule_2_3_4)
+        
+        model.minmax_2_4_1 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_1)
+        model.minmax_2_4_2 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_2)
+        model.minmax_2_4_3 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_3)
+        model.minmax_2_4_4 = pyo.Constraint(model.TIME, rule = minmax_rule_2_4_4)
+        
+        model.minmax_2_1_1_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_a)
+        model.minmax_2_1_1_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_b)
+        model.minmax_2_1_1_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_c)
+        model.minmax_2_1_1_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_1_d)
+        
+        model.minmax_2_1_2_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_a)
+        model.minmax_2_1_2_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_b)
+        model.minmax_2_1_2_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_c)
+        model.minmax_2_1_2_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_2_d)
+        
+        model.minmax_2_1_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_a)
+        model.minmax_2_1_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_b)
+        model.minmax_2_1_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_c)
+        model.minmax_2_1_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_1_d)
+        
+        model.minmax_2_2_1_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_a)
+        model.minmax_2_2_1_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_b)
+        model.minmax_2_2_1_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_c)
+        model.minmax_2_2_1_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_1_d)
+        
+        model.minmax_2_2_2_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_a)
+        model.minmax_2_2_2_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_b)
+        model.minmax_2_2_2_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_c)
+        model.minmax_2_2_2_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_2_d)
+        
+        model.minmax_2_2_a = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_a)
+        model.minmax_2_2_b = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_b)
+        model.minmax_2_2_c = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_c)
+        model.minmax_2_2_d = pyo.Constraint(model.TIME, rule = minmax_rule_2_2_d)
+        
         model.minmax_3_1 = pyo.Constraint(model.TIME, rule = minmax_rule_3_1)
         model.minmax_3_2 = pyo.Constraint(model.TIME, rule = minmax_rule_3_2)
         model.minmax_3_3 = pyo.Constraint(model.TIME, rule = minmax_rule_3_3)
@@ -1302,7 +1664,10 @@ class Deterministic_Setting_withoutESS(pyo.ConcreteModel):
         return pyo.value(self.objective)
 
     def get_objective_part_value(self):
-        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+    
         part1 = sum(pyo.value(self.Q_da[t] * self.P_da[t] + (self.u[t] - self.Q_da[t]) * self.P_rt[t]) for t in range(self.T))
         part2_1 = sum(pyo.value(self.m_4_1[t]) for t in range(self.T))
         part2_2 = sum(pyo.value(self.m_4_2[t]) for t in range(self.T))
@@ -11599,10 +11964,10 @@ if __name__ == "__main__":
     
     # ESSx vs ESSo
     
-    E_0_daily = E_0_daily[:215]
-    P_da_daily = P_da_daily[:215]
-    P_rt_daily = P_rt_daily[:215]
-    delta_E_daily = delta_E_daily[:215]
+    E_0_daily = E_0_daily[:215]  # ~215
+    P_da_daily = P_da_daily[:215]  # ~215
+    P_rt_daily = P_rt_daily[:215]  # ~215
+    delta_E_daily = delta_E_daily[:215]  # ~215
     
     perfect = PerfectForecasting(E_0_daily, P_da_daily, P_rt_daily, delta_E_daily)
     

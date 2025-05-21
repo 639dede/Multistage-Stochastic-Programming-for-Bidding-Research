@@ -27,7 +27,7 @@ from Scenarios import Scenario
 solver='gurobi'
 SOLVER=pyo.SolverFactory(solver)
 
-SOLVER.options['TimeLimit'] = 3600
+SOLVER.options['TimeLimit'] = 900
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
@@ -38,6 +38,7 @@ assert SOLVER.available(), f"Solver {solver} is available."
 C = 21022.1
 S = C*3
 B = C
+
 S_min = 0.1*S
 S_max = 0.9*S
 
@@ -49,13 +50,19 @@ v = 0.95
 gamma_over = P_max
 gamma_under = P_max
 
-T = 4
+T = 10
 
 E_0 = Scenario.E_0
 
 scenario_generator = Scenario.Setting1_scenario(E_0)
 
-E_0_partial = [E_0[t] for t in range(9, 9 + T)]
+if T <= 10:
+
+    E_0_partial = [E_0[t] for t in range(9, 9 + T)]
+    
+elif T == 24:
+    
+    E_0_partial = E_0
 
 E_0_sum = 0
 E_0_partial_max = max(E_0_partial)
@@ -65,7 +72,16 @@ for t in range(len(E_0_partial)):
 
 P_da = scenario_generator.P_da
 
-P_da_partial = [141.04237333851853, 139.02077847557203, 140.6656414585262, -60.223343222316, 141.1443379704008, 139.23105760780754, 141.57109079814273, 143.93082813230762, 138.80926230668373, 124.39462311589915]
+if T <= 10:
+    
+    P_da_partial = [141.04237333851853, 139.02077847557203, 140.6656414585262, 
+                    -60.223343222316, 141.1443379704008, 139.23105760780754, 
+                    141.57109079814273, 143.93082813230762, 138.80926230668373, 
+                    124.39462311589915]
+
+elif T == 24:
+    
+    P_da_partial = P_da
 
 K = [1.22*E_0_partial[t] + 1.01*B for t in range(T)]
 
@@ -258,6 +274,13 @@ class fw_da(pyo.ConcreteModel):
         
         return State_var 
 
+    def get_settlement_fcn_value(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        return pyo.value(self.f)    
+
     def get_objective_value(self):
         if not self.solved:
             self.solve()
@@ -303,7 +326,7 @@ class fw_rt(pyo.ConcreteModel):
 
     def _Param_setting(self):
         
-        self.P_abs = max(self.P_rt - self.P_da[self.stage])
+        self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
         
@@ -520,9 +543,9 @@ class fw_rt(pyo.ConcreteModel):
         
         model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
         model.State_Q = pyo.Constraint(model.TIME, rule = State_Q_rule)
-        model.State_q = pyo.Constraint(rule = State_o_rule)
-        model.State_b_rt = pyo.Constraint(rule = State_b_rule)
-        model.State_q_rt = pyo.Constraint(rule = State_q_rule)
+        model.State_o = pyo.Constraint(rule = State_o_rule)
+        model.State_b = pyo.Constraint(rule = State_b_rule)
+        model.State_q = pyo.Constraint(rule = State_q_rule)
         model.State_E = pyo.Constraint(rule = State_E_rule)
         
         model.overbid = pyo.Constraint(rule = overbid_rule)
@@ -629,7 +652,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
     def _Param_setting(self):
         
-        self.P_abs = max(self.P_rt - self.P_da[self.stage])
+        self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
         
@@ -768,7 +791,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         def State_Q_rule(model, t):
             return model.T_Q[t] == model.z_T_Q[t+1]
         
-        def State_q_rule(model):
+        def State_o_rule(model):
             return model.T_o == model.z_T_o + model.q_rt_next
         
         def State_b_rule(model):
@@ -783,7 +806,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         ## General Constraints
         
         def overbid_rule(model):
-            return model.T_q <= E_0_sum
+            return model.T_o <= E_0_sum
         
         def next_q_rt_rule(model):
             return model.q_rt_next <= self.delta_E_0*E_0_partial[self.stage + 1] + B
@@ -879,7 +902,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         model.State_SOC = pyo.Constraint(rule = State_SOC_rule)
         model.State_Q = pyo.Constraint(model.TIME, rule = State_Q_rule)
-        model.State_q = pyo.Constraint(rule = State_q_rule)
+        model.State_o = pyo.Constraint(rule = State_o_rule)
         model.State_b = pyo.Constraint(rule = State_b_rule)
         model.State_q = pyo.Constraint(rule = State_q_rule)
         model.State_E = pyo.Constraint(rule = State_E_rule)
@@ -990,7 +1013,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
 
     def _Param_setting(self):
         
-        self.P_abs = max(self.P_rt - self.P_da[self.stage])
+        self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
         
@@ -1129,7 +1152,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         ## General Constraints
         
         def overbid_rule(model):
-            return model.T_q <= E_0_sum
+            return model.T_o <= E_0_sum
         
         def next_q_rt_rule(model):
             return model.q_rt_next <= self.delta_E_0*E_0_partial[self.stage + 1] + B
@@ -1330,7 +1353,7 @@ class fw_rt_last(pyo.ConcreteModel):
 
     def _Param_setting(self):
         
-        self.P_abs = max(self.P_rt - self.P_da[self.stage])
+        self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
         
@@ -1368,14 +1391,6 @@ class fw_rt_last(pyo.ConcreteModel):
         model.Q_rt = pyo.Var(domain = pyo.NonNegativeReals)
         
         model.n_rt = pyo.Var(domain = pyo.Binary)
-        
-        model.lamb = pyo.Var(model.BINARIZE, domain = pyo.Binary)        
-        model.nu = pyo.Var(model.BINARIZE, domain = pyo.Binary)         
-        
-        model.w = pyo.Var(model.BINARIZE, domain = pyo.Reals)
-        model.h = pyo.Var(model.BINARIZE, domain = pyo.Reals)
-        model.k = pyo.Var(model.BINARIZE, domain = pyo.Reals)
-        model.o = pyo.Var(model.BINARIZE, domain = pyo.Reals)
         
         ## Real-Time operation 
         
@@ -1594,7 +1609,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         
     def _Param_setting(self):
         
-        self.P_abs = max(self.P_rt - self.P_da[self.stage])
+        self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
         
@@ -1855,7 +1870,8 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
                     0, 
                     0, 
                     0, 
-                    0]
+                    0
+                    ]
         
         psi = []
         psi.append(pyo.value(self.objective))
@@ -1901,7 +1917,7 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
 
     def _Param_setting(self):
         
-        self.P_abs = max(self.P_rt - self.P_da[self.stage])
+        self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
         
@@ -5756,7 +5772,6 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
         model.theta = pyo.Var(domain = pyo.Reals)
         
         model.pi_S = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
-        model.pi_T_b = pyo.Var(model.TIME, bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
         model.pi_T_Q = pyo.Var(model.TIME, bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
         model.pi_T_q = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
         model.pi_T_b_rt = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
@@ -5764,7 +5779,6 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
         model.pi_T_E = pyo.Var(bounds = (-10**8, 10**8), domain = pyo.Reals, initialize = 0.0)
         
         model.y_S = pyo.Var(domain = pyo.Reals, initialize = 0.0)
-        model.y_T_b = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
         model.y_T_Q = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
         model.y_T_q = pyo.Var(domain = pyo.Reals, initialize = 0.0)
         model.y_T_b_rt = pyo.Var(domain = pyo.Reals, initialize = 0.0)
@@ -5774,68 +5788,6 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
         model.t = pyo.Var(domain = pyo.Reals, initialize = 0.0)
         
         # Constraints
-        
-        def L_1_norm_S_1_rule(model):
-            return model.pi_S <= model.y_S
-        
-        def L_1_norm_S_2_rule(model):
-            return -model.pi_S <= model.y_S
-        
-        def L_1_norm_T_b_1_rule(model, t):
-            return model.pi_T_b[t] <= model.y_T_b[t]
-        
-        def L_1_norm_T_b_2_rule(model, t):
-            return -model.pi_T_b[t] <= model.y_T_b[t]
-        
-        def L_1_norm_T_Q_1_rule(model, t):
-            return model.pi_T_Q[t] <= model.y_T_Q[t]
-        
-        def L_1_norm_T_Q_2_rule(model, t):
-            return -model.pi_T_Q[t] <= model.y_T_Q[t]
-        
-        def L_1_norm_T_q_1_rule(model):
-            return model.pi_T_q <= model.y_T_q
-        
-        def L_1_norm_T_q_2_rule(model):
-            return -model.pi_T_q <= model.y_T_q
-        
-        def L_1_norm_T_b_rt_1_rule(model):
-            return model.pi_T_b_rt <= model.y_T_b_rt
-        
-        def L_1_norm_T_b_rt_2_rule(model):
-            return -model.pi_T_b_rt <= model.y_T_b_rt
-        
-        def L_1_norm_T_q_rt_1_rule(model):
-            return model.pi_T_q_rt <= model.y_T_q_rt
-        
-        def L_1_norm_T_q_rt_2_rule(model):
-            return -model.pi_T_q_rt <= model.y_T_q_rt
-        
-        def L_1_norm_T_E_1_rule(model):
-            return model.pi_T_E <= model.y_T_E
-        
-        def L_1_norm_T_E_2_rule(model):
-            return -model.pi_T_E <= model.y_T_E
-        
-        def L_1_norm_rule(model):
-            return model.t == model.y_S + sum(model.y_T_b[t] for t in range(self.T - self.stage)) + sum(model.y_T_Q[t] for t in range(self.T - self.stage)) + model.y_T_q + model.y_T_b_rt + model.y_T_q_rt + model.y_T_E
-        
-        model.L_1_norm_S_1 = pyo.Constraint(rule = L_1_norm_S_1_rule)
-        model.L_1_norm_S_2 = pyo.Constraint(rule = L_1_norm_S_2_rule)
-        model.L_1_norm_T_b_1 = pyo.Constraint(model.TIME, rule = L_1_norm_T_b_1_rule)
-        model.L_1_norm_T_b_2 = pyo.Constraint(model.TIME, rule = L_1_norm_T_b_2_rule)
-        model.L_1_norm_T_Q_1 = pyo.Constraint(model.TIME, rule = L_1_norm_T_Q_1_rule)
-        model.L_1_norm_T_Q_2 = pyo.Constraint(model.TIME, rule = L_1_norm_T_Q_2_rule)
-        model.L_1_norm_T_q_1 = pyo.Constraint(rule = L_1_norm_T_q_1_rule)
-        model.L_1_norm_T_q_2 = pyo.Constraint(rule = L_1_norm_T_q_2_rule)
-        model.L_1_norm_T_b_rt_1 = pyo.Constraint(rule = L_1_norm_T_b_rt_1_rule)
-        model.L_1_norm_T_b_rt_2 = pyo.Constraint(rule = L_1_norm_T_b_rt_2_rule)
-        model.L_1_norm_T_q_rt_1 = pyo.Constraint(rule = L_1_norm_T_q_rt_1_rule)
-        model.L_1_norm_T_q_rt_2 = pyo.Constraint(rule = L_1_norm_T_q_rt_2_rule)
-        model.L_1_norm_T_E_1 = pyo.Constraint(rule = L_1_norm_T_E_1_rule)
-        model.L_1_norm_T_E_2 = pyo.Constraint(rule = L_1_norm_T_E_2_rule)
-        
-        model.L_1_norm = pyo.Constraint(rule = L_1_norm_rule)
         
         def initialize_theta_rule(model):
             return model.theta >= 0
@@ -5852,7 +5804,15 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
                 # model.theta + model.t
                 
                 # L-2 norm regularization :
-                model.theta + self.reg*((model.pi_S - self.pi[0])**2 + sum((model.pi_T_b[t] - self.pi[1][t])**2 for t in range(self.T - self.stage)) + sum((model.pi_T_Q[t] - self.pi[2][t])**2 for t in range(self.T - self.stage)) + (model.pi_T_q - self.pi[3])**2 + (model.pi_T_b_rt - self.pi[4])**2 + (model.pi_T_q_rt - self.pi[5])**2 + (model.pi_T_E - self.pi[6])**2)
+                model.theta 
+                + self.reg*(
+                    (model.pi_S - self.pi[0])**2 
+                    + sum((model.pi_T_Q[t] - self.pi[1][t])**2 for t in range(self.T - self.stage)) 
+                    + (model.pi_T_q - self.pi[2])**2 
+                    + (model.pi_T_b_rt - self.pi[3])**2 
+                    + (model.pi_T_q_rt - self.pi[4])**2 
+                    + (model.pi_T_E - self.pi[5])**2
+                    )
             )
             
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.minimize)
@@ -5864,7 +5824,14 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
                 
         model = self.model()
         
-        model.dual_fcn_approx.add(model.theta >= lamb + k[0]*model.pi_S + sum(k[1][t]*model.pi_T_b[t] for t in range(self.T - self.stage)) + sum(k[2][t]*model.pi_T_Q[t] for t in range(self.T - self.stage)) + k[3]*model.pi_T_q + k[4]*model.pi_T_b_rt + k[5]*model.pi_T_q_rt + k[6]*model.pi_T_E)
+        model.dual_fcn_approx.add(model.theta >= (
+            lamb 
+            + k[0]*model.pi_S 
+            + sum(k[1][t]*model.pi_T_Q[t] for t in range(self.T - self.stage)) 
+            + k[2]*model.pi_T_q 
+            + k[3]*model.pi_T_b_rt 
+            + k[4]*model.pi_T_q_rt 
+            + k[5]*model.pi_T_E))
     
     def solve(self):
         
@@ -5878,7 +5845,6 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
 
         pi = [
             pyo.value(self.pi_S),
-            [pyo.value(self.pi_T_b[t]) for t in range(self.T - self.stage)],
             [pyo.value(self.pi_T_Q[t]) for t in range(self.T - self.stage)],
             pyo.value(self.pi_T_q),
             pyo.value(self.pi_T_b_rt),
@@ -5944,7 +5910,12 @@ class dual_approx_lev(pyo.ConcreteModel): ## Level method
         
         def objective_rule(model):
             return (
-                (model.pi_S - self.pi[0])**2 + sum((model.pi_T_b[t] - self.pi[1][t])**2 for t in range(self.T - self.stage)) + sum((model.pi_T_Q[t] - self.pi[2][t])**2 for t in range(self.T - self.stage)) + (model.pi_T_q - self.pi[3])**2 + (model.pi_T_b_rt - self.pi[4])**2 + (model.pi_T_q_rt - self.pi[5])**2 + (model.pi_T_E - self.pi[6])**2
+                (model.pi_S - self.pi[0])**2 
+                + sum((model.pi_T_Q[t] - self.pi[1][t])**2 for t in range(self.T - self.stage)) 
+                + (model.pi_T_q - self.pi[2])**2 
+                + (model.pi_T_b_rt - self.pi[3])**2 
+                + (model.pi_T_q_rt - self.pi[4])**2 
+                + (model.pi_T_E - self.pi[5])**2
             )
             
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.minimize)
@@ -5956,7 +5927,14 @@ class dual_approx_lev(pyo.ConcreteModel): ## Level method
                 
         model = self.model()
         
-        model.dual_fcn_approx.add(model.lev >= lamb + k[0]*model.pi_S + sum(k[1][t]*model.pi_T_b[t] for t in range(self.T - self.stage)) + sum(k[2][t]*model.pi_T_Q[t] for t in range(self.T - self.stage)) + k[3]*model.pi_T_q + k[4]*model.pi_T_b_rt + k[5]*model.pi_T_q_rt + k[6]*model.pi_T_E)
+        model.dual_fcn_approx.add(model.lev >= (
+            lamb 
+            + k[0]*model.pi_S 
+            + sum(k[1][t]*model.pi_T_Q[t] for t in range(self.T - self.stage)) 
+            + k[2]*model.pi_T_q 
+            + k[3]*model.pi_T_b_rt 
+            + k[4]*model.pi_T_q_rt 
+            + k[5]*model.pi_T_E))
     
     def solve(self):
         
@@ -5973,7 +5951,6 @@ class dual_approx_lev(pyo.ConcreteModel): ## Level method
 
         pi = [
             pyo.value(self.pi_S),
-            [pyo.value(self.pi_T_b[t]) for t in range(self.T - self.stage)],
             [pyo.value(self.pi_T_Q[t]) for t in range(self.T - self.stage)],
             pyo.value(self.pi_T_q),
             pyo.value(self.pi_T_b_rt),
@@ -7708,7 +7685,7 @@ class SDDiPModel:
             self._initialize_psi()
 
         elif self.cut_mode in ['B-bin', 'SB-bin', 'L-sub-bin', 'L-lev-bin']:
-            self.Round = [0 for _ in range(7)]
+            self.Round = [0 for _ in range(6)]
             self._Bin_setting()
             self._initialize_psi_bin()
 
@@ -7716,23 +7693,26 @@ class SDDiPModel:
         
         # S
         self.Round[0] = math.ceil(math.log2(S_max)) 
-        # T_b
-        self.Round[1] = math.ceil(math.log2(P_r)) 
         # T_Q
-        self.Round[2] = math.ceil(math.log2(E_0_partial_max + B)) 
+        self.Round[1] = math.ceil(math.log2(E_0_partial_max + B)) 
         # T_q
-        self.Round[3] = math.ceil(math.log2(E_0_sum))
+        self.Round[2] = math.ceil(math.log2(E_0_sum))
         # T_b_rt
-        self.Round[4] = math.ceil(math.log2(P_r))
+        self.Round[3] = math.ceil(math.log2(P_r))
         # T_q_rt
-        self.Round[5] = math.ceil(math.log2(1.2*E_0_partial_max + B))
+        self.Round[4] = math.ceil(math.log2(1.2*E_0_partial_max + B))
         # T_E
-        self.Round[6] = math.ceil(math.log2(1.2*E_0_partial_max))
+        self.Round[5] = math.ceil(math.log2(1.2*E_0_partial_max))
         
     def _initialize_psi(self):
         
         for t in range(self.STAGE): ## psi(-1), ..., psi(T - 2)
-            self.psi[t].append([3*3600000*(T - t), 0, [0 for _ in range(self.STAGE - t)], [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0])
+            self.psi[t].append([
+                3*3600000*(T - t), 
+                0, 
+                [0 for _ in range(self.STAGE - t)], 
+                0, 0, 0, 0
+                ])
 
     def _initialize_psi_bin(self):
         
@@ -7793,7 +7773,7 @@ class SDDiPModel:
             
             state = fw_da_state
             
-            f_scenario = 0
+            f_scenario = fw_da_subp.get_settlement_fcn_value()
             
             for t in range(self.STAGE - 1): ## t = 0, ..., T-2
                 
@@ -7866,7 +7846,7 @@ class SDDiPModel:
 
     def inner_product(self, t, pi, sol):
         
-        return sum(pi[i]*sol[i] for i in [0, 3, 4, 5, 6]) + sum(sum(pi[i][j]*sol[i][j] for j in range(self.STAGE - t)) for i in [1, 2])
+        return sum(pi[i]*sol[i] for i in [0, 2, 3, 4, 5]) + sum(pi[1][j]*sol[1][j] for j in range(self.STAGE - t))
 
     def backward_pass(self):
                 
@@ -7876,7 +7856,7 @@ class SDDiPModel:
         SBL = ['SB', 'L-sub', 'L-lev']
         
         v_sum = 0 
-        pi_mean = [0, [0], [0], 0, 0, 0, 0]
+        pi_mean = [0, [0], 0, 0, 0, 0]
         
         prev_solution = self.forward_solutions[self.STAGE - 1][0]
         
@@ -7890,11 +7870,10 @@ class SDDiPModel:
             
             pi_mean[0] += psi_sub[1]/self.N_t
             pi_mean[1][0] += psi_sub[2][0]/self.N_t
-            pi_mean[2][0] += psi_sub[3][0]/self.N_t
+            pi_mean[2] += psi_sub[3]/self.N_t
             pi_mean[3] += psi_sub[4]/self.N_t
             pi_mean[4] += psi_sub[5]/self.N_t
             pi_mean[5] += psi_sub[6]/self.N_t
-            pi_mean[6] += psi_sub[7]/self.N_t
             
             if self.cut_mode in BL:
                 
@@ -7902,13 +7881,12 @@ class SDDiPModel:
             
             elif self.cut_mode in SBL:
                 
-                fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 8)], delta)
+                fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 7)], delta)
 
                 v_sum += fw_rt_last_Lagrangian_subp.get_objective_value()
             
         if self.cut_mode in BL:   
                  
-            #v = v_sum/self.N_t - sum(pi_mean[i]*prev_solution[i] for i in [0, 3, 4, 5, 6]) - sum(pi_mean[j][0]*prev_solution[j][0] for j in [1, 2])
             v = v_sum/self.N_t - self.inner_product(self.STAGE - 1, pi_mean, prev_solution)
         
         elif self.cut_mode in SBL:
@@ -7919,7 +7897,7 @@ class SDDiPModel:
         
         cut_coeff.append(v)
         
-        for i in range(7):
+        for i in range(6):
             cut_coeff.append(pi_mean[i])
         
         self.psi[T-1].append(cut_coeff)
@@ -7930,7 +7908,7 @@ class SDDiPModel:
         for t in range(self.STAGE - 2, -1, -1): 
                 
             v_sum = 0 
-            pi_mean = [0, [0 for _ in range(self.STAGE - t)], [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
+            pi_mean = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
             
             prev_solution = self.forward_solutions[t][0]
             
@@ -7946,12 +7924,11 @@ class SDDiPModel:
                 
                 for i in range(self.STAGE - t):
                     pi_mean[1][i] += psi_sub[2][i]/self.N_t
-                    pi_mean[2][i] += psi_sub[3][i]/self.N_t
                     
+                pi_mean[2] += psi_sub[3]/self.N_t
                 pi_mean[3] += psi_sub[4]/self.N_t
                 pi_mean[4] += psi_sub[5]/self.N_t
                 pi_mean[5] += psi_sub[6]/self.N_t
-                pi_mean[6] += psi_sub[7]/self.N_t
                 
                 if self.cut_mode in BL:
                     
@@ -7959,13 +7936,12 @@ class SDDiPModel:
                     
                 elif self.cut_mode in SBL:
                     
-                    fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 8)], self.psi[t+1], delta)
+                    fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 7)], self.psi[t+1], delta)
 
                     v_sum += fw_rt_Lagrangian_subp.get_objective_value()
             
             if self.cut_mode in BL:
                 
-                #v = v_sum/self.N_t - sum(pi_mean[i]*prev_solution[i] for i in [0, 3, 4, 5, 6]) - sum(sum(pi_mean[i][j]*prev_solution[i][j] for j in range(self.STAGE - t)) for i in [1, 2])
                 v = v_sum/self.N_t - self.inner_product(t, pi_mean, prev_solution)
         
             if self.cut_mode in SBL:
@@ -7976,7 +7952,7 @@ class SDDiPModel:
             
             cut_coeff.append(v)
             
-            for i in range(7):
+            for i in range(6):
                 cut_coeff.append(pi_mean[i])
         
             self.psi[t].append(cut_coeff)
@@ -7995,7 +7971,7 @@ class SDDiPModel:
         ## t = {T-1 -> T-2}
         
         v_sum = 0 
-        pi_mean = [0, [0], [0], 0, 0, 0, 0]
+        pi_mean = [0, [0], 0, 0, 0, 0]
         
         prev_solution = self.forward_solutions[self.STAGE - 1][0]
         
@@ -8016,7 +7992,7 @@ class SDDiPModel:
             lev = 0.9
             gap = 1       
             lamb = 0
-            k = [0, [0], [0], 0, 0, 0, 0]
+            k = [0, [0], 0, 0, 0, 0]
             l = 10000000
                         
             dual_subp_sub_last = dual_approx_sub(self.STAGE - 1, reg, pi_LP)
@@ -8035,11 +8011,11 @@ class SDDiPModel:
                 
                 lamb = L + self.inner_product(self.STAGE - 1, pi, z)
                 
-                for l in [0, 3, 4, 5, 6]:
+                for l in [0, 2, 3, 4, 5]:
                     
                     k[l] = prev_solution[l] - z[l]
                 
-                for l in [1, 2]:
+                for l in [1]:
                     
                     k[l][0] = prev_solution[l][0] - z[l][0]
                 
@@ -8091,11 +8067,10 @@ class SDDiPModel:
                         
             pi_mean[0] += pi[0]/self.N_t
             pi_mean[1][0] += pi[1][0]/self.N_t
-            pi_mean[2][0] += pi[2][0]/self.N_t
+            pi_mean[2] += pi[2]/self.N_t
             pi_mean[3] += pi[3]/self.N_t
             pi_mean[4] += pi[4]/self.N_t
             pi_mean[5] += pi[5]/self.N_t
-            pi_mean[6] += pi[6]/self.N_t
             
             v_sum += L
                 
@@ -8105,7 +8080,7 @@ class SDDiPModel:
         
         cut_coeff.append(v)
         
-        for i in range(7):
+        for i in range(6):
             cut_coeff.append(pi_mean[i])
         
         self.psi[self.STAGE - 1].append(cut_coeff)
@@ -8117,7 +8092,7 @@ class SDDiPModel:
         for t in range(self.STAGE - 2, -1, -1): 
             
             v_sum = 0 
-            pi_mean = [0, [0 for _ in range(self.STAGE - t)], [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
+            pi_mean = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
             
             prev_solution = self.forward_solutions[t][0]
             
@@ -8138,7 +8113,7 @@ class SDDiPModel:
                 lev = 0.9
                 gap = 1
                 lamb = 0
-                k = [0, [0 for _ in range(self.STAGE - t)], [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
+                k = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
                 l = 10000000*(self.STAGE - t)
                       
                 dual_subp_sub = dual_approx_sub(t, reg, pi_LP)
@@ -8157,11 +8132,11 @@ class SDDiPModel:
                     
                     lamb = L + self.inner_product(t, pi, z)
                     
-                    for l in [0, 3, 4, 5, 6]:
+                    for l in [0, 2, 3, 4, 5]:
                         
                         k[l] = prev_solution[l] - z[l]
                         
-                    for l in [1, 2]:
+                    for l in [1]:
                         
                         for i in range(self.STAGE - t):
                             
@@ -8216,12 +8191,11 @@ class SDDiPModel:
                 
                 for i in range(self.STAGE - t):
                     pi_mean[1][i] += pi[1][i]/self.N_t
-                    pi_mean[2][i] += pi[2][i]/self.N_t
                     
+                pi_mean[2] += pi[2]/self.N_t
                 pi_mean[3] += pi[3]/self.N_t
                 pi_mean[4] += pi[4]/self.N_t
                 pi_mean[5] += pi[5]/self.N_t
-                pi_mean[6] += pi[6]/self.N_t
                                 
                 v_sum += L
                             
@@ -8231,7 +8205,7 @@ class SDDiPModel:
             
             cut_coeff.append(v)
             
-            for i in range(7):
+            for i in range(6):
                 cut_coeff.append(pi_mean[i])
         
             self.psi[t].append(cut_coeff)
@@ -8249,10 +8223,10 @@ class SDDiPModel:
         
         return (
             sum(
-                sum(pi[i][k]*sol[i][k] for k in range(self.Round[i]+1)) for i in [0, 3, 4, 5, 6]
+                sum(pi[i][k]*sol[i][k] for k in range(self.Round[i]+1)) for i in [0, 2, 3, 4, 5]
                 ) 
             + sum(
-                sum(sum(pi[i][j][k]*sol[i][j][k] for k in range(self.Round[i]+1)) for j in range(self.STAGE - t)) for i in [1, 2]
+                sum(sum(pi[i][j][k]*sol[i][j][k] for k in range(self.Round[i]+1)) for j in range(self.STAGE - t)) for i in [1]
                 )
             )
 
@@ -8745,7 +8719,7 @@ class SDDiPModel:
         
         self.gap = (self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]
         
-        if self.iteration >= self.max_iter and self.gap <= 0.01:
+        if self.iteration >= self.max_iter:
             return True
                 
         return False
@@ -8777,7 +8751,7 @@ class SDDiPModel:
             
             elif self.cut_mode == 'L-sub' or self.cut_mode == 'L-lev':
                 
-                if self.gap > 0.5 or self.iteration <= 2:
+                if self.gap > 1 or self.iteration <= 2:
                     self.backward_pass()
                 
                 else:
@@ -8804,7 +8778,12 @@ class SDDiPModel:
 
 if __name__ == "__main__":
     
-    num_iter = 30
+    if T <= 4:
+        num_iter = 30
+        
+    elif T >= 5:
+        num_iter = 60
+    
     scenario_branch = 4  ## N_t
     fw_scenario_num = 20  ## M
     
@@ -8815,24 +8794,63 @@ if __name__ == "__main__":
     
     stage_params = []
     
-    for t in range(9, 9 + T):
+    if T <= 10:
         
-        stage_param = scenario_generator.sample_multiple_delta(t, scenario_branch)
+        for t in range(9, 9 + T):
+            
+            stage_param = scenario_generator.sample_multiple_delta(t, scenario_branch)
+            
+            stage_params.append(stage_param)  
+               
+            stage_params = [
+            [[1.0568037492471882, 99.2150319380103, 0], [0.8541591674818009, 103.45161675891347, 0], [0.9212841857860108, -12.6821832148197, 0], [0.8436906609947701, 108.65916144510042, 0]], 
+            [[0.944393934353801, 106.16613527143109, 0], [0.9980446516218301, 132.19415678199823, 0], [0.8226665907126034, 95.40992777649764, 0], [0.9761652480607177, 109.37295079949263, 0]], 
+            [[0.9639480113042348, 100.46593285560922, 0], [1.0031398798406639, 103.78275063792817, 0], [0.8093512104476058, 102.33300251027543, 0], [1.0991221913686902, 118.59169266739974, 0]], 
+            [[1.087466326285433, 100.32338793425832, 0], [1.159245374394473, 103.67644682218588, -0.19179979971204353], [1.12102933753565, 110.01092585228216, 0], [0.8617548399782096, 152.37489352218722, 0]], 
+            [[1.0834976219212336, 104.07271226957103, 0], [0.8634498605081226, 118.03221736803673, 0], [1.1243335742671112, 103.20854856981401, 0], [0.9114198128210322, 101.19156069226295, 0]], 
+            [[0.8572519085283472, 101.31222172327678, 0], [0.928104724382114, 122.24819178552463, 0], [0.8545139078847096, 108.5435698896676, 0], [0.8626342190157117, 105.17070251683006, 0]], 
+            [[0.9387870765915632, -40, 0], [1.1314970540447034, 105.46379701442571, 0], [1.0724074653195903, 129.26308660133995, 0], [1.1740660716616722, 126.37538413434159, 0]], 
+            [[0.811680967361771, 165.77340414277157, 0], [0.9903501561327369, 107.24395081093166, 0], [0.9303225486946357, 101.52293987784844, 0], [1.073680500657586, 105.91863994492752, 0]], 
+            [[1.0096636550616571, 106.49119243927669, 0], [1.1769362403042851, 113.00487937251063, 0], [0.8426279475355245, 103.2266055200999, 0], [0.8716942875836529, 124.43592953940643, 0]], 
+            [[0.8833331326752389, 84.25117087896008, 0], [1.0492024939789395, 105.95747450552334, 0], [0.8059872474874955, 164.91212360360043, 0], [1.075847955832046, 102.54032593542846, 0]]
+            ]
+            
+    elif T == 24:
         
-        stage_params.append(stage_param)     
-    
-    stage_params = [
-        [[1.0568037492471882, 99.2150319380103, 0], [0.8541591674818009, 103.45161675891347, 0], [0.9212841857860108, -12.6821832148197, 0], [0.8436906609947701, 108.65916144510042, 0]], 
-        [[0.944393934353801, 106.16613527143109, 0], [0.9980446516218301, 132.19415678199823, 0], [0.8226665907126034, 95.40992777649764, 0], [0.9761652480607177, 109.37295079949263, 0]], 
-        [[0.9639480113042348, 100.46593285560922, 0], [1.0031398798406639, 103.78275063792817, 0], [0.8093512104476058, 102.33300251027543, 0], [1.0991221913686902, 118.59169266739974, 0]], 
-        [[1.087466326285433, 100.32338793425832, 0], [1.159245374394473, 103.67644682218588, -0.19179979971204353], [1.12102933753565, 110.01092585228216, 0], [0.8617548399782096, 152.37489352218722, 0]], 
-        [[1.0834976219212336, 104.07271226957103, 0], [0.8634498605081226, 118.03221736803673, 0], [1.1243335742671112, 103.20854856981401, 0], [0.9114198128210322, 101.19156069226295, 0]], 
-        [[0.8572519085283472, 101.31222172327678, 0], [0.928104724382114, 122.24819178552463, 0], [0.8545139078847096, 108.5435698896676, 0], [0.8626342190157117, 105.17070251683006, 0]], 
-        [[0.9387870765915632, -40, 0], [1.1314970540447034, 105.46379701442571, 0], [1.0724074653195903, 129.26308660133995, 0], [1.1740660716616722, 126.37538413434159, 0]], 
-        [[0.811680967361771, 165.77340414277157, 0], [0.9903501561327369, 107.24395081093166, 0], [0.9303225486946357, 101.52293987784844, 0], [1.073680500657586, 105.91863994492752, 0]], 
-        [[1.0096636550616571, 106.49119243927669, 0], [1.1769362403042851, 113.00487937251063, 0], [0.8426279475355245, 103.2266055200999, 0], [0.8716942875836529, 124.43592953940643, 0]], 
-        [[0.8833331326752389, 84.25117087896008, 0], [1.0492024939789395, 105.95747450552334, 0], [0.8059872474874955, 164.91212360360043, 0], [1.075847955832046, 102.54032593542846, 0]]
-        ]
+        for t in range(T):
+            
+            stage_param = scenario_generator.sample_multiple_delta(t, scenario_branch)
+            
+            stage_params.append(stage_param) 
+            
+            stage_params = [
+                [[1.0215916878707407, 127.78063274505286, 0], [0.913198717630274, 207.15368016517033, 0], [0.8834311252191159, 112.47748126297796, 0], [0.9093990290952852, 104.16773575789867, 0]],
+                [[1.1488431388110705, 130.9160409043475, 0], [1.065076595008393, 107.24674977480271, 0], [0.8196148184043662, 154.03597880917974, 0], [1.056322550250875, 130.5887198443035, 0]],
+                [[0.8382805679787786, 161.66092232270626, 0], [0.9072248713716513, 144.28413611903053, 0], [1.008446512641973, 122.0270351143196, 0], [1.0762045957212751, 150.74339164683713, 0]],
+                [[1.1914322160053217, 119.40454637923602, 0], [1.193322380728992, 130.3142120174733, 0], [1.1234266258049317, 111.230438943751, 0], [0.913473226771982, 151.25455717947463, 0]],
+                [[0.9806408592150446, 117.68811785393548, 0], [1.1579324579530106, 145.43799591219667, 0], [1.0753349724707235, 132.98835900203508, 0], [0.9302061644925295, 107.2725599508661, 0]],
+                [[1.0328008590207247, 104.2448741445248, 0], [0.8897749313427393, 150.9105776976912, 0.5620083635886923], [0.884279376272486, 144.33114812030516, 0], [1.1427580174945196, 153.27114703688127, 0]],
+                [[1.0419324778937955, 89.49134638951436, 0], [0.8399441852929602, 143.1041652905437, 0], [1.1088398149147847, 158.1343491710808, 0], [1.1124797099474808, 100.17352907311863, 0]],
+                [[1.0404812228728273, 187.43198044293445, 0], [0.9606678628866206, 153.54564830510174, 0], [1.1024340464905058, 148.57787436913443, 0], [1.1226162597769818, 83.24495101198171, 0]],
+                [[0.9347148687381786, 108.46472427885557, 0], [0.9920412478402375, 141.5702662836685, 0], [1.020324603203949, 154.87733374658288, 0], [0.8438221282456536, 136.71228452714038, 0]],
+                [[1.19164263223995, 141.85190820423819, 0], [0.8248244059889797, 140.2505909394309, 0], [0.9098962152318385, 153.33715894430296, 0], [0.9340122362746441, 118.19139405788043, 0.12240362302166444]],
+                [[1.1821557322096625, 124.15893383969049, 0], [1.1035953416269042, 162.94491703408116, 0], [1.039434444581245, 135.3373986267369, -0.3718429526822882], [0.8996312360574763, 155.48471886063214, 0]],
+                [[0.8464797880021295, -40.83018294386079, 0], [1.1919607033884003, 125.00152614176613, 0], [0.9860733556794887, -42.61271770412862, 0], [0.8133068329067613, 159.6656920917638, 0]],
+                [[1.0021363463719195, 119.87546641833352, 0], [1.1777970592002465, 128.6422485692858, 0], [0.814082811047605, 139.32314602782463, 0], [1.1460402827779228, 152.52770259929176, 0]],
+                [[0.8206351825907535, -42.93625642779996, 0], [1.0363732899855291, 133.7275935505178, 0], [0.8240914258609248, 135.68421048930225, 0], [0.9403565021945437, 122.54326915837518, 0]],
+                [[0.918712259653239, 131.85794253397466, 0], [1.188237378119679, 156.8532769134401, 0], [1.1616356067497748, 138.89768755162373, 0], [1.1797580281083941, 140.59570014596747, 0]],
+                [[0.9733791108916049, 147.19917007286438, 0], [0.9880022815913414, 144.98208445831798, 0], [1.1834931792106, 180.6078697006711, 0], [1.0425587972099644, 129.15288294852678, 0]],
+                [[0.8343515073585218, 141.30319115794194, 0], [1.0999285823780465, 147.26211796024688, 0], [0.9223317131098161, 148.83421599302298, 0], [1.1913610430318116, 139.14098675605615, 0]],
+                [[1.1321858667927096, 89.65675763916045, 0], [1.0879435940828859, 141.206567233732, 0], [0.8850163096182874, 146.12531608973316, 0], [0.8498997084837714, 140.58573887134324, 0]],
+                [[1.0857077759999743, 141.683763069225, 0], [1.1863095342242285, 132.0067508244964, 0], [1.0691546869491797, 141.25004016178457, 0], [0.9054617522388662, 140.17527106547365, 0]],
+                [[1.1840944219266767, 113.65705462932182, 0], [1.0680634482160214, 121.02956495657905, 0], [0.9009198607461647, 129.5521662600149, 0], [1.0654860271095627, 130.06505208633504, 0]],
+                [[0.8723540804845644, 170.3702932938346, 0], [1.051904252827458, 151.50240042834247, 0], [0.8214806038830954, 90.76440746230455, 0], [1.1139277934008909, 102.96393647635523, 0]],
+                [[1.1296385651730396, 134.60261763268483, 0], [0.8249847922150656, 106.84217246452607, 0], [1.0769263303296945, 121.90347693000534, 0], [0.857235079695519, 152.3212855748905, 0]],
+                [[0.8261830968053797, 158.75750983854374, 0], [1.1541271626992855, 147.49360537847625, 0], [0.8075457115100096, 109.91956945322873, -0.40742964944915894], [0.9742769980442817, 150.92485054893862, 0]],
+                [[0, 216.86335042940675, 0], [0, 131.74841739827423, 0], [0, 153.5741300362661, 0], [0, 142.61852676386806, 0]],
+            ]
+
+    print(stage_params)
     
     ScenarioTree1 = RecombiningScenarioTree(T, scenario_branch, stage_params)
     
@@ -8849,12 +8867,13 @@ if __name__ == "__main__":
         DEF_end_time = time.time()
         time_DEF = DEF_end_time - DEF_start_time
         """
+        
         sddip_1 = SDDiPModel(
             max_iter=num_iter,
             scenario_tree=ScenarioTree1,
             forward_scenario_num=fw_scenario_num,
             backward_branch=scenario_branch,
-            cut_mode='L-sub-bin',
+            cut_mode='B',
             BigM_mode=BigM_mode,
         )
 

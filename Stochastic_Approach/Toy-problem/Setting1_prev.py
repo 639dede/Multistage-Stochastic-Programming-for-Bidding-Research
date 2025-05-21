@@ -35,6 +35,10 @@ assert SOLVER.available(), f"Solver {solver} is available."
 
 # SDDiP Model
 
+
+P_r = 80
+P_max = 270
+
 C = 21022.1
 S = C*3
 B = C
@@ -252,11 +256,13 @@ class fw_da(pyo.ConcreteModel):
 
 class fw_rt(pyo.ConcreteModel):
 
-    def __init__(self, stage, T_prev, psi, delta):
+    def __init__(self, stage, T_prev, psi, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = stage
         
@@ -283,7 +289,24 @@ class fw_rt(pyo.ConcreteModel):
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1])                      
 
     def _BigM_setting(self):
         
@@ -807,11 +830,13 @@ class fw_rt(pyo.ConcreteModel):
 
 class fw_rt_Alt(pyo.ConcreteModel): 
 
-    def __init__(self, stage, T_prev, psi, delta):
+    def __init__(self, stage, T_prev, psi, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = stage
         
@@ -838,8 +863,25 @@ class fw_rt_Alt(pyo.ConcreteModel):
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
-
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+ 
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
+        
     def _BigM_setting(self):
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
@@ -1390,11 +1432,13 @@ class fw_rt_Alt(pyo.ConcreteModel):
     
 class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
-    def __init__(self, stage, T_prev, psi, delta):
+    def __init__(self, stage, T_prev, psi, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = stage
         
@@ -1421,7 +1465,24 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -1984,13 +2045,15 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
 class fw_rt_LP_relax_Alt(pyo.ConcreteModel): 
 
-    def __init__(self, stage, T_prev, psi, delta):
+    def __init__(self, stage, T_prev, psi, delta, exp):
         
         super().__init__()
 
         self.solved = False
         
         self.stage = stage
+        
+        self.exp = exp
         
         self.S_prev = T_prev[0]
         self.T_b_prev = T_prev[1]
@@ -2015,7 +2078,24 @@ class fw_rt_LP_relax_Alt(pyo.ConcreteModel):
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -2639,11 +2719,13 @@ class fw_rt_LP_relax_Alt(pyo.ConcreteModel):
 
 class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward - Strengthened Benders' Cut)
 
-    def __init__(self, stage, pi, psi, delta):
+    def __init__(self, stage, pi, psi, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = stage
         self.pi = pi
@@ -2662,7 +2744,24 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -3192,11 +3291,13 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
 
 class fw_rt_Lagrangian_Alt(pyo.ConcreteModel): 
 
-    def __init__(self, stage, pi, psi, delta):
+    def __init__(self, stage, pi, psi, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = stage
         self.pi = pi
@@ -3216,6 +3317,19 @@ class fw_rt_Lagrangian_Alt(pyo.ConcreteModel):
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
         self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -3758,11 +3872,13 @@ class fw_rt_Lagrangian_Alt(pyo.ConcreteModel):
 
 class fw_rt_last(pyo.ConcreteModel): 
     
-    def __init__(self, T_prev, delta):
+    def __init__(self, T_prev, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = T - 1
         
@@ -3786,7 +3902,24 @@ class fw_rt_last(pyo.ConcreteModel):
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -4240,11 +4373,13 @@ class fw_rt_last(pyo.ConcreteModel):
   
 class fw_rt_last_Alt(pyo.ConcreteModel): 
     
-    def __init__(self, T_prev, delta):
+    def __init__(self, T_prev, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = T - 1
         
@@ -4268,7 +4403,24 @@ class fw_rt_last_Alt(pyo.ConcreteModel):
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -4754,11 +4906,13 @@ class fw_rt_last_Alt(pyo.ConcreteModel):
     
 class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
            
-    def __init__(self, T_prev, delta):
+    def __init__(self, T_prev, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = T - 1
         
@@ -4782,7 +4936,24 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -5294,11 +5465,13 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
       
 class fw_rt_last_LP_relax_Alt(pyo.ConcreteModel): 
            
-    def __init__(self, T_prev, delta):
+    def __init__(self, T_prev, delta, exp):
         
         super().__init__()
 
         self.solved = False
+        
+        self.exp = exp
         
         self.stage = T - 1
         
@@ -5322,7 +5495,24 @@ class fw_rt_last_LP_relax_Alt(pyo.ConcreteModel):
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -5871,11 +6061,13 @@ class fw_rt_last_LP_relax_Alt(pyo.ConcreteModel):
              
 class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengthened Benders' Cut)
            
-    def __init__(self, pi, delta):
+    def __init__(self, pi, delta, exp):
         
         super().__init__()
 
         self.solved = False
+
+        self.exp = exp
 
         self.pi = pi
         
@@ -5893,7 +6085,24 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -6376,13 +6585,15 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
 
 class fw_rt_last_Lagrangian_Alt(pyo.ConcreteModel): 
            
-    def __init__(self, pi, delta):
+    def __init__(self, pi, delta, exp):
         
         super().__init__()
 
         self.solved = False
 
         self.pi = pi
+        
+        self.exp = exp
         
         self.stage = T - 1
 
@@ -6398,7 +6609,24 @@ class fw_rt_last_Lagrangian_Alt(pyo.ConcreteModel):
         
         self.M_set_decomp = [[0, 0] for i in range(3)]
         
-        self._BigM_setting()
+        if self.exp:
+            self._BigM_setting_IP()
+            
+        else:
+            self._BigM_setting()
+
+    def _BigM_setting_IP(self):
+        
+        self.M_price[0] = 1
+        self.M_price[1] = self.P_rt + 81
+        self.M_set[0] = (5*P_max)*K[self.stage]
+        self.M_set[1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][0] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[0][1] = (4*P_max)*K[self.stage]
+        self.M_set_decomp[1][0] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[1][1] = (2*P_max)*K[self.stage]
+        self.M_set_decomp[2][0] = max(self.M_set_decomp[0][0], self.M_set_decomp[1][0])
+        self.M_set_decomp[2][1] = min(self.M_set_decomp[0][1], self.M_set_decomp[1][1]) 
 
     def _BigM_setting(self):
         
@@ -10509,73 +10737,11 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
         model.t = pyo.Var(domain = pyo.Reals, initialize = 0.0)
         
         # Constraints
-        
-        def L_1_norm_S_1_rule(model):
-            return model.pi_S <= model.y_S
-        
-        def L_1_norm_S_2_rule(model):
-            return -model.pi_S <= model.y_S
-        
-        def L_1_norm_T_b_1_rule(model, t):
-            return model.pi_T_b[t] <= model.y_T_b[t]
-        
-        def L_1_norm_T_b_2_rule(model, t):
-            return -model.pi_T_b[t] <= model.y_T_b[t]
-        
-        def L_1_norm_T_Q_1_rule(model, t):
-            return model.pi_T_Q[t] <= model.y_T_Q[t]
-        
-        def L_1_norm_T_Q_2_rule(model, t):
-            return -model.pi_T_Q[t] <= model.y_T_Q[t]
-        
-        def L_1_norm_T_q_1_rule(model):
-            return model.pi_T_q <= model.y_T_q
-        
-        def L_1_norm_T_q_2_rule(model):
-            return -model.pi_T_q <= model.y_T_q
-        
-        def L_1_norm_T_b_rt_1_rule(model):
-            return model.pi_T_b_rt <= model.y_T_b_rt
-        
-        def L_1_norm_T_b_rt_2_rule(model):
-            return -model.pi_T_b_rt <= model.y_T_b_rt
-        
-        def L_1_norm_T_q_rt_1_rule(model):
-            return model.pi_T_q_rt <= model.y_T_q_rt
-        
-        def L_1_norm_T_q_rt_2_rule(model):
-            return -model.pi_T_q_rt <= model.y_T_q_rt
-        
-        def L_1_norm_T_E_1_rule(model):
-            return model.pi_T_E <= model.y_T_E
-        
-        def L_1_norm_T_E_2_rule(model):
-            return -model.pi_T_E <= model.y_T_E
-        
-        def L_1_norm_rule(model):
-            return model.t == model.y_S + sum(model.y_T_b[t] for t in range(self.T - self.stage)) + sum(model.y_T_Q[t] for t in range(self.T - self.stage)) + model.y_T_q + model.y_T_b_rt + model.y_T_q_rt + model.y_T_E
-        
-        model.L_1_norm_S_1 = pyo.Constraint(rule = L_1_norm_S_1_rule)
-        model.L_1_norm_S_2 = pyo.Constraint(rule = L_1_norm_S_2_rule)
-        model.L_1_norm_T_b_1 = pyo.Constraint(model.TIME, rule = L_1_norm_T_b_1_rule)
-        model.L_1_norm_T_b_2 = pyo.Constraint(model.TIME, rule = L_1_norm_T_b_2_rule)
-        model.L_1_norm_T_Q_1 = pyo.Constraint(model.TIME, rule = L_1_norm_T_Q_1_rule)
-        model.L_1_norm_T_Q_2 = pyo.Constraint(model.TIME, rule = L_1_norm_T_Q_2_rule)
-        model.L_1_norm_T_q_1 = pyo.Constraint(rule = L_1_norm_T_q_1_rule)
-        model.L_1_norm_T_q_2 = pyo.Constraint(rule = L_1_norm_T_q_2_rule)
-        model.L_1_norm_T_b_rt_1 = pyo.Constraint(rule = L_1_norm_T_b_rt_1_rule)
-        model.L_1_norm_T_b_rt_2 = pyo.Constraint(rule = L_1_norm_T_b_rt_2_rule)
-        model.L_1_norm_T_q_rt_1 = pyo.Constraint(rule = L_1_norm_T_q_rt_1_rule)
-        model.L_1_norm_T_q_rt_2 = pyo.Constraint(rule = L_1_norm_T_q_rt_2_rule)
-        model.L_1_norm_T_E_1 = pyo.Constraint(rule = L_1_norm_T_E_1_rule)
-        model.L_1_norm_T_E_2 = pyo.Constraint(rule = L_1_norm_T_E_2_rule)
-        
-        model.L_1_norm = pyo.Constraint(rule = L_1_norm_rule)
-        
+    
         def initialize_theta_rule(model):
             return model.theta >= 0
         
-        model.initialize_theta = pyo.Constraint(rule = initialize_theta_rule)
+        #model.initialize_theta = pyo.Constraint(rule = initialize_theta_rule)
         
         model.dual_fcn_approx = pyo.ConstraintList() 
         
@@ -12423,6 +12589,7 @@ class SDDiPModel:
         self.alpha = alpha
         self.cut_mode = cut_mode
         self.BigM_mode = BigM_mode
+        self.exp_mode = exp_mode
         
         self.iteration = 0
         
@@ -12467,7 +12634,13 @@ class SDDiPModel:
     def _initialize_psi(self):
         
         for t in range(self.STAGE): ## psi(-1), ..., psi(T - 2)
-            self.psi[t].append([3*3600000*(T - t), 0, [0 for _ in range(self.STAGE - t)], [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0])
+            self.psi[t].append([
+                3*3600000*(T - t), 
+                0, 
+                [0 for _ in range(self.STAGE - t)], 
+                [0 for _ in range(self.STAGE - t)], 
+                0, 0, 0, 0
+                ])
 
     def _initialize_psi_bin(self):
         
@@ -12533,10 +12706,10 @@ class SDDiPModel:
             for t in range(self.STAGE - 1): ## t = 0, ..., T-2
                 
                 if self.BigM_mode == 'BigM':
-                    fw_rt_subp = fw_rt(t, state, self.psi[t+1], scenario[t])
+                    fw_rt_subp = fw_rt(t, state, self.psi[t+1], scenario[t], self.exp_mode)
                    
                 elif self.BigM_mode == 'Alt': 
-                    fw_rt_subp = fw_rt_Alt(t, state, self.psi[t+1], scenario[t])
+                    fw_rt_subp = fw_rt_Alt(t, state, self.psi[t+1], scenario[t], self.exp_mode)
                 
                 state = fw_rt_subp.get_state_solutions()
                 self.forward_solutions[t+1].append(state)
@@ -12545,10 +12718,10 @@ class SDDiPModel:
             ## t = T-1
             
             if self.BigM_mode == 'BigM':
-                fw_rt_last_subp = fw_rt_last(state, scenario[self.STAGE-1])
+                fw_rt_last_subp = fw_rt_last(state, scenario[self.STAGE-1], self.exp_mode)
              
             elif self.BigM_mode == 'Alt':
-                fw_rt_last_subp = fw_rt_last_Alt(state, scenario[self.STAGE-1])
+                fw_rt_last_subp = fw_rt_last_Alt(state, scenario[self.STAGE-1], self.exp_mode)
             f_scenario += fw_rt_last_subp.get_settlement_fcn_value()
             
             f.append(f_scenario)
@@ -12627,10 +12800,10 @@ class SDDiPModel:
             delta = stage_params[T - 1][j]      
             
             if self.BigM_mode == 'BigM':
-                fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax(prev_solution, delta)
+                fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax(prev_solution, delta, self.exp_mode)
           
             elif self.BigM_mode == 'Alt':
-                fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax_Alt(prev_solution, delta)
+                fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax_Alt(prev_solution, delta, self.exp_mode)
 
             
             psi_sub = fw_rt_last_LP_relax_subp.get_cut_coefficients()
@@ -12650,10 +12823,10 @@ class SDDiPModel:
             elif self.cut_mode in SBL:
                 
                 if self.BigM_mode == 'BigM':
-                    fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 8)], delta)
+                    fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 8)], delta, self.exp_mode)
                   
                 elif self.BigM_mode == 'Alt':
-                    fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian_Alt([psi_sub[i] for i in range(1, 8)], delta)   
+                    fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian_Alt([psi_sub[i] for i in range(1, 8)], delta, self.exp_mode)   
                     
                 v_sum += fw_rt_last_Lagrangian_subp.get_objective_value()
             
@@ -12690,10 +12863,10 @@ class SDDiPModel:
                 delta = stage_params[t][j]
                 
                 if self.BigM_mode == 'BigM':
-                    fw_rt_LP_relax_subp = fw_rt_LP_relax(t, prev_solution, self.psi[t+1], delta)
+                    fw_rt_LP_relax_subp = fw_rt_LP_relax(t, prev_solution, self.psi[t+1], delta, self.exp_mode)
                
                 elif self.BigM_mode == 'Alt':
-                    fw_rt_LP_relax_subp = fw_rt_LP_relax_Alt(t, prev_solution, self.psi[t+1], delta)         
+                    fw_rt_LP_relax_subp = fw_rt_LP_relax_Alt(t, prev_solution, self.psi[t+1], delta, self.exp_mode)         
                                         
                 psi_sub = fw_rt_LP_relax_subp.get_cut_coefficients()
                 
@@ -12715,10 +12888,10 @@ class SDDiPModel:
                 elif self.cut_mode in SBL:
                     
                     if self.BigM_mode == 'BigM':
-                        fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 8)], self.psi[t+1], delta)
+                        fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 8)], self.psi[t+1], delta, self.exp_mode)
                  
                     elif self.BigM_mode == 'Alt':
-                        fw_rt_Lagrangian_subp = fw_rt_Lagrangian_Alt(t, [psi_sub[i] for i in range(1, 8)], self.psi[t+1], delta)
+                        fw_rt_Lagrangian_subp = fw_rt_Lagrangian_Alt(t, [psi_sub[i] for i in range(1, 8)], self.psi[t+1], delta, self.exp_mode)
 
                     v_sum += fw_rt_Lagrangian_subp.get_objective_value()
             
@@ -13504,7 +13677,7 @@ class SDDiPModel:
         
         self.gap = (self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]
         
-        if self.iteration >= self.max_iter and self.gap <= 0.01:
+        if self.iteration >= self.max_iter:
             return True
                 
         return False
@@ -13613,8 +13786,9 @@ if __name__ == "__main__":
             scenario_tree=ScenarioTree1,
             forward_scenario_num=fw_scenario_num,
             backward_branch=scenario_branch,
-            cut_mode='L-sub-bin',
-            BigM_mode=BigM_mode,
+            cut_mode='SB',
+            BigM_mode='BigM',
+            exp_mode=False
         )
 
         SDDiP_1_start_time = time.time()
@@ -13633,8 +13807,9 @@ if __name__ == "__main__":
             scenario_tree=ScenarioTree1,
             forward_scenario_num=fw_scenario_num,
             backward_branch=scenario_branch,
-            cut_mode='SB',
-            BigM_mode=BigM_mode,
+            cut_mode='L-sub',
+            BigM_mode='BigM',
+            exp_mode=False
         )
         
         SDDiP_2_start_time = time.time()
@@ -13672,12 +13847,12 @@ if __name__ == "__main__":
         
         iterations = range(num_iter)
         
-        plt.plot(iterations, LB_1_list, label="LB (B)", marker='o', color='tab:blue')
-        plt.plot(iterations, UB_1_list, label="UB (B)", marker='^', color='tab:blue', linestyle='--')
+        plt.plot(iterations, LB_1_list, label="LB (SB-BigM)", marker='o', color='tab:blue')
+        plt.plot(iterations, UB_1_list, label="UB (SB-BigM)", marker='^', color='tab:blue', linestyle='--')
         plt.fill_between(iterations, LB_1_list, UB_1_list, alpha=0.1, color='tab:blue')
         
-        plt.plot(iterations, LB_2_list, label="LB (SB)", marker='o', color='tab:orange')
-        plt.plot(iterations, UB_2_list, label="UB (SB)", marker='^', color='tab:orange', linestyle='--')
+        plt.plot(iterations, LB_2_list, label="LB (SB-Alt)", marker='o', color='tab:orange')
+        plt.plot(iterations, UB_2_list, label="UB (SB-Alt)", marker='^', color='tab:orange', linestyle='--')
         plt.fill_between(iterations, LB_2_list, UB_2_list, alpha=0.1, color='tab:orange')
         """
         plt.plot(iterations, LB_3_list, label="LB (SB)", marker='o', color='tab:green')
