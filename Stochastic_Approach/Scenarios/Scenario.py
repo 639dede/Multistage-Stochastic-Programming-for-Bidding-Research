@@ -38,7 +38,7 @@ filtered_df_Energy = df
 
 filtered_df_Energy_for_dist = df[(df['forecast_da'] > 0) & (df['forecast_rt'] > 0)]
 
-timestamps_pre = pd.date_range(start="2024-07-12 00:00", end="2025-03-10 23:00", freq='H')
+timestamps_pre = pd.date_range(start="2024-03-01 00:00", end="2025-03-10 23:00", freq='H')
 
 omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11"), pd.Timestamp("2025-02-15")]
 
@@ -126,7 +126,7 @@ print(len(E_0_values), len(day_ahead_prices), len(real_time_prices))
 
 ## Dataframe for TGMM
 
-date_range_pre = pd.date_range(start='2024-07-12', periods=5808, freq='H')
+date_range_pre = pd.date_range(start='2024-03-01', periods=9000, freq='H')
 
 omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11"), pd.Timestamp("2025-02-15")]
 

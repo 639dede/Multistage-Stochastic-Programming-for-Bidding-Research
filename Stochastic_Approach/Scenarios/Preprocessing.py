@@ -9,7 +9,7 @@ from sklearn.cluster import KMeans
 
 import pandas as pd
 
-file_path_Energy = '.\Stochastic_Approach\Scenarios\Energy.csv'
+file_path_Energy = './Stochastic_Approach/Scenarios/Energy.csv'
 
 df = pd.read_csv(file_path_Energy)
 
