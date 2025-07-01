@@ -1,2 +1,1 @@
-Multistage Stochastic Programming(MSP) model for JeJu Island Electricity Market considering complex 
-Day-Ahead Intra-Day Real-Time operation structure.
+The codes in this repository is for our research <Day-Ahead and Real-Time bidding and ESS operation problem for VPP in Negative Price market using Stochastic Dual Dynamic Integer Programming> 
