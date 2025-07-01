@@ -27,13 +27,16 @@ from Scenarios import Scenario
 solver='gurobi'
 SOLVER=pyo.SolverFactory(solver)
 
-SOLVER.options['TimeLimit'] = 10
+SOLVER.options['TimeLimit'] = 1000
+#SOLVER.options['MIPGap'] = 1e-4
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
 # Generate Scenario
 
 # SDDiP Model
+
+Total_time = 18000
 
 C = 21022.1
 S = C*3
@@ -50,13 +53,17 @@ v = 0.95
 gamma_over = P_max
 gamma_under = P_max
 
-T = 4
-P_da_minus_mode =False
-P_rt_minus_mode =False
+T = 24
+
+dual_tolerance = 1e-7
+tol = 1e-5
+Node_num = 100
+Lag_iter_UB = 500
+
+P_da_minus_mode = False
+P_rt_minus_mode = False
 
 E_0 = Scenario.E_0
-
-scenario_generator = Scenario.Setting1_scenario(E_0)
 
 if T <= 10:
 
@@ -72,7 +79,6 @@ E_0_partial_max = max(E_0_partial)
 for t in range(len(E_0_partial)):
     E_0_sum += E_0_partial[t]
 
-P_da = scenario_generator.P_da
 
 if T <= 10:
     
@@ -81,7 +87,7 @@ if T <= 10:
             -40.04237333851853, # T = 9
             -70.02077847557203, # T = 10
             180.6656414585262,  # T = 11
-            -60.223343222316,   # T = 12
+            -30.223343222316,   # T = 12
             01.1443379704008,   # T = 13
             69.23105760780754,  # T = 14
             -61.57109079814273, # T = 15
@@ -166,7 +172,7 @@ elif T == 24:
     
 K = [1.23*E_0_partial[t] + 1.02*B for t in range(T)]
 
-M_gen = [[K[t], 2*K[t]] for t in range(T)]
+M_gen = [[1.02*K[t], 2*K[t]] for t in range(T)]
 
 
 # Subproblems for SDDiP
@@ -192,17 +198,10 @@ class fw_da(pyo.ConcreteModel):
     def _BigM_setting(self):
         
         for t in range(self.T):
-    
-            if self.P_da[t] >= 0:
 
-                self.M_price[t][0] = 400
-                self.M_price[t][1] = 400
-                
-            else:
+            self.M_price[t][0] = 400
+            self.M_price[t][1] = 400
 
-                self.M_price[t][0] = 400
-                self.M_price[t][1] = 400
-    
     def build_model(self):
         
         model = self.model()
@@ -419,6 +418,10 @@ class fw_rt(pyo.ConcreteModel):
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
+        """
+        self.M_price[0] = 400
+        self.M_price[1] = 400
+        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -438,7 +441,7 @@ class fw_rt(pyo.ConcreteModel):
         else:
             
             self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81    
+            self.M_price[1] = self.P_rt + 81           
         
     def build_model(self):
         
@@ -759,6 +762,10 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
+        """
+        self.M_price[0] = 400
+        self.M_price[1] = 400
+        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -779,7 +786,8 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             
             self.M_price[0] = -self.P_rt + 1
             self.M_price[1] = self.P_rt + 81    
-      
+        
+  
     def build_model(self):
         
         model = self.model()
@@ -1136,6 +1144,10 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
+        """
+        self.M_price[0] = 400
+        self.M_price[1] = 400
+        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -1475,6 +1487,10 @@ class fw_rt_last(pyo.ConcreteModel):
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
+        """
+        self.M_price[0] = 400
+        self.M_price[1] = 400
+        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -1494,7 +1510,7 @@ class fw_rt_last(pyo.ConcreteModel):
         else:
             
             self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81                                  
+            self.M_price[1] = self.P_rt + 81                          
  
     def build_model(self):
         
@@ -1743,6 +1759,10 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
+        """
+        self.M_price[0] = 400
+        self.M_price[1] = 400
+        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -2073,6 +2093,10 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
+        """
+        self.M_price[0] = 400
+        self.M_price[1] = 400
+        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -2395,7 +2419,8 @@ class dual_approx_sub(pyo.ConcreteModel): ## Subgradient method
             + k[2]*model.pi_o 
             + k[3]*model.pi_b 
             + k[4]*model.pi_q 
-            + k[5]*model.pi_E))
+            + k[5]*model.pi_E)
+            )
     
     def solve(self):
         
@@ -2886,7 +2911,7 @@ class T_stage_DEF(pyo.ConcreteModel):
         
         def settlement_fcn_rule(model, k, t):
             return model.f[k, t] == (
-                model.Q_da[k, t]*P_da[t] 
+                model.Q_da[k, t]*P_da_partial[t] 
                 + (model.u[k, t] - model.Q_da[k, t])*self.P_rt[k][t] 
                 + self.m_2[k, t] 
                 - gamma_over*model.phi_over[k, t]
@@ -3002,6 +3027,9 @@ class SDDiPModel:
         max_iter = 20, 
         alpha = 0.95, 
         cut_mode = 'B',
+        plot = True,
+        tol = 0.001,
+        K = 1
         ):
 
         ## STAGE = -1, 0, ..., STAGE - 1
@@ -3014,8 +3042,17 @@ class SDDiPModel:
         self.N_t = backward_branch
         self.alpha = alpha
         self.cut_mode = cut_mode
+        self.plot = plot
+        self.tol = tol
+        self.K = K
         
         self.iteration = 0
+        
+        self.start_time = time.time()
+        self.running_time = 0
+        
+        self.Lag_elapsed_time_list = []
+        self.Total_Lag_iter_list = []
         
         self.gap = 1
         
@@ -3108,7 +3145,7 @@ class SDDiPModel:
             
             f.append(f_scenario)
         
-        if self.iteration == self.max_iter:
+        if self.iteration == self.max_iter + 1:
 
             self.b_da_final = np.array(local_b_da)
             self.Q_da_final = np.array(local_Q_da)
@@ -3144,7 +3181,7 @@ class SDDiPModel:
         ## t = {T-1 -> T-2}
         
         BL = ['B']
-        SBL = ['SB', 'L-sub', 'L-lev']
+        SBL = ['SB', 'L-sub', 'L-lev', 'hyb']
         
         v_sum = 0 
         pi_mean = [0, [0], 0, 0, 0, 0]
@@ -3264,6 +3301,9 @@ class SDDiPModel:
         v_sum = 0 
         pi_mean = [0, [0], 0, 0, 0, 0]
         
+        Lag_elapsed_time = 0
+        Total_Lag_iter = 0
+        
         prev_solution = self.forward_solutions[self.STAGE - 1][0]
                 
         for j in range(self.N_t): 
@@ -3278,7 +3318,7 @@ class SDDiPModel:
             pi_min = pi_LP
             
             reg = 0.00001
-            G = 100000000
+            G = 10000000
             lev = 0.9
             gap = 1       
             lamb = 0
@@ -3297,7 +3337,7 @@ class SDDiPModel:
                         
             pi_minobj = 10000000
             
-            while gap >= 0.000001:            
+            while gap >= dual_tolerance:            
                 
                 if Lag_iter >= 3:
                     
@@ -3340,8 +3380,12 @@ class SDDiPModel:
                 
                 fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, delta)
                 
+                start_time = time.time()
+                
                 L = fw_rt_last_Lag_subp.get_objective_value()
                 z = fw_rt_last_Lag_subp.get_auxiliary_value()
+                                
+                Lag_elapsed_time += time.time() - start_time
                                 
                 pi_obj = L + self.inner_product(self.STAGE - 1, pi, prev_solution)
                                 
@@ -3350,15 +3394,22 @@ class SDDiPModel:
                     pi_minobj = pi_obj
                     pi_min = pi
                 
-                if pi_obj == 0:
-                    continue    
+                if pi_obj == -G:
+                    Lag_iter += 1
+                    continue
                 
                 gap = (pi_obj - obj)/(pi_obj+G)
                                         
                 #print(f"k = {k}, \npi = {pi} \n, \ngap = {gap}, \npi_obj = {pi_obj}, \nobj = {obj}")
                                               
                 Lag_iter += 1
-                        
+                
+                if Lag_iter == Lag_iter_UB:
+                    
+                    break
+            
+            Total_Lag_iter += Lag_iter
+            
             pi_mean[0] += pi[0]/self.N_t
             pi_mean[1][0] += pi[1][0]/self.N_t
             pi_mean[2] += pi[2]/self.N_t
@@ -3419,7 +3470,7 @@ class SDDiPModel:
                                 
                 pi_minobj = 10000000*(self.STAGE - t)
                 
-                while gap >= 0.000001:
+                while gap >= dual_tolerance:
                     
                     if Lag_iter >= 3:
                         
@@ -3463,8 +3514,12 @@ class SDDiPModel:
                                         
                     fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, self.psi[t+1], delta)
                     
+                    start_time = time.time()
+                    
                     L = fw_rt_Lag_subp.get_objective_value()
                     z = fw_rt_Lag_subp.get_auxiliary_value()
+                    
+                    Lag_elapsed_time += time.time() - start_time
                     
                     pi_obj = L + self.inner_product(t, pi, prev_solution)
                     
@@ -3472,13 +3527,20 @@ class SDDiPModel:
                     
                         pi_minobj = pi_obj
                         pi_min = pi
-
-                    if pi_obj == 0:
+                    
+                    if pi_obj == -G:
+                        Lag_iter += 1
                         continue
                     
                     gap = (pi_obj - obj)/(pi_obj+G)
                                                                             
                     Lag_iter += 1    
+                    
+                    if Lag_iter == Lag_iter_UB:
+                    
+                        break
+                
+                Total_Lag_iter += Lag_iter
                                                         
                 pi_mean[0] += pi[0]/self.N_t
                 
@@ -3510,6 +3572,9 @@ class SDDiPModel:
         
         fw_da_for_UB = fw_da(self.psi[0])
         
+        self.Lag_elapsed_time_list.append(Lag_elapsed_time)
+        self.Total_Lag_iter_list.append(Total_Lag_iter)
+        
         self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))   
 
     def backward_pass_hybrid(self):
@@ -3519,10 +3584,10 @@ class SDDiPModel:
         v_sum = 0 
         pi_mean = [0, [0], 0, 0, 0, 0]
         
+        Lag_elapsed_time = 0
+        
         prev_solution = self.forward_solutions[self.STAGE - 1][0]
-        
-        print(f"-----Solving Dual stage = {self.STAGE - 1}-----")
-        
+                
         for j in range(self.N_t): 
             
             delta = stage_params[T - 1][j]      
@@ -3554,8 +3619,8 @@ class SDDiPModel:
                 pi = pi_LP
                 pi_min = pi_LP
                 
-                reg = 0.0000001
-                G = 1000
+                reg = 0.00001
+                G = 10000000
                 lev = 0.9
                 gap = 1       
                 lamb = 0
@@ -3574,7 +3639,11 @@ class SDDiPModel:
                             
                 pi_minobj = 10000000
                 
-                while gap >= 0.0001:            
+                while gap >= dual_tolerance:            
+                    
+                    if Lag_iter >= 3:
+                    
+                        dual_subp_sub_last.reg = 0
                     
                     lamb = L + self.inner_product(self.STAGE - 1, pi, z)
                     
@@ -3588,7 +3657,7 @@ class SDDiPModel:
                     
                     dual_coeff = [lamb, k]
                                     
-                    if self.cut_mode == 'L-sub':
+                    if self.cut_mode == 'hyb':
                         
                         dual_subp_sub_last.add_plane(dual_coeff)
                         pi = dual_subp_sub_last.get_solution_value()
@@ -3613,8 +3682,12 @@ class SDDiPModel:
                     
                     fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, delta)
                     
+                    start_time = time.time()
+                    
                     L = fw_rt_last_Lag_subp.get_objective_value()
                     z = fw_rt_last_Lag_subp.get_auxiliary_value()
+                              
+                    Lag_elapsed_time += time.time() - start_time
                                     
                     pi_obj = L + self.inner_product(self.STAGE - 1, pi, prev_solution)
                                     
@@ -3623,14 +3696,19 @@ class SDDiPModel:
                         pi_minobj = pi_obj
                         pi_min = pi
                     
-                    if pi_obj == 0:
-                        continue    
+                    if pi_obj == -G:
+                        Lag_iter += 1
+                        continue
                     
                     gap = (pi_obj - obj)/(pi_obj+G)
                                             
                     #print(f"k = {k}, \npi = {pi} \n, \ngap = {gap}, \npi_obj = {pi_obj}, \nobj = {obj}")
                                                 
                     Lag_iter += 1
+                            
+                    if Lag_iter == Lag_iter_UB:
+                    
+                        break        
                             
                 pi_mean[0] += pi[0]/self.N_t
                 pi_mean[1][0] += pi[1][0]/self.N_t
@@ -3662,9 +3740,7 @@ class SDDiPModel:
             pi_mean = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
             
             prev_solution = self.forward_solutions[t][0]
-            
-            print(f"-----Solving Dual stage = {t}-----")
-            
+                        
             for j in range(self.N_t):
                                 
                 delta = stage_params[t][j]
@@ -3699,8 +3775,9 @@ class SDDiPModel:
                     pi = pi_LP
                     pi_min = pi_LP
                                     
-                    reg = 0.000001
                     lev = 0.9
+                    G = 10000000
+                    reg = 0.00001
                     gap = 1
                     lamb = 0
                     k = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
@@ -3718,7 +3795,11 @@ class SDDiPModel:
                                     
                     pi_minobj = 10000000*(self.STAGE - t)
                     
-                    while gap >= 0.0001:
+                    while gap >= dual_tolerance:
+                        
+                        if Lag_iter >= 3:
+                            
+                            dual_subp_sub.reg = 0
                         
                         lamb = L + self.inner_product(t, pi, z)
                         
@@ -3734,7 +3815,7 @@ class SDDiPModel:
                                             
                         dual_coeff = [lamb, k]
                                             
-                        if self.cut_mode == 'L-sub':
+                        if self.cut_mode == 'hyb':
                             dual_subp_sub.add_plane(dual_coeff)
                             pi = dual_subp_sub.get_solution_value()
                             obj = dual_subp_sub.get_objective_value()
@@ -3758,8 +3839,12 @@ class SDDiPModel:
                                             
                         fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, self.psi[t+1], delta)
                         
+                        start_time = time.time()
+                        
                         L = fw_rt_Lag_subp.get_objective_value()
                         z = fw_rt_Lag_subp.get_auxiliary_value()
+                        
+                        Lag_elapsed_time += time.time() - start_time
                         
                         pi_obj = L + self.inner_product(t, pi, prev_solution)
                         
@@ -3767,15 +3852,18 @@ class SDDiPModel:
                         
                             pi_minobj = pi_obj
                             pi_min = pi
-
-                        if pi_obj == 0:
+                        
+                        if pi_obj == -G:
+                            Lag_iter += 1
                             continue
                         
-                        gap = (pi_obj - obj)/pi_obj
+                        gap = (pi_obj - obj)/(pi_obj+G)
                                                                                 
-                        Lag_iter += 1    
+                        Lag_iter += 1      
+                        #print(Lag_iter)                  
+                        if Lag_iter == Lag_iter_UB:
                         
-                        #print(f"piobj = {pi_obj}, obj = {obj}")            
+                            break
                                         
                     pi_mean[0] += pi[0]/self.N_t
                     
@@ -3807,33 +3895,63 @@ class SDDiPModel:
         
         fw_da_for_UB = fw_da(self.psi[0])
         
+        self.Lag_elapsed_time_list.append(Lag_elapsed_time)
+        
         self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))   
 
-    def stopping_criterion(self, tol = 0.01):
+    def stopping_criterion(self, tol = 1e-3):
         
         self.gap = (self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]
         
-        if self.iteration >= self.max_iter:
-            return True
+        self.running_time = time.time() - self.start_time
+        
+        print(f"run_time = {self.running_time}, criteria = {Total_time/self.K}")
+        
+        if self.plot == True:    
+            if self.iteration >= self.max_iter:
+                return True
+        
+        else:
+            if self.iteration <= 3:
+                baseline = 1e9
                 
+            elif self.iteration >= 4:
+                baseline = self.UB[self.iteration-3]
+            
+            if (
+                (baseline - self.UB[self.iteration])/self.UB[self.iteration] < self.tol 
+                or self.running_time > Total_time/self.K
+            ):
+                return True
+
         return False
 
     def run_sddip(self):
         
-        while not self.stopping_criterion():
+        final_pass = False
+
+        self.start_time = time.time()
+        
+        while True:
+            
+            if not final_pass and self.stopping_criterion():
+                final_pass = True
+                
+                print("\n>>> Stopping criterion met. Performing final pass with M scenarios...")
+            
+            elif final_pass:
+                break
+
             self.iteration += 1
             print(f"\n=== Iteration {self.iteration} ===")
-            
-            if self.iteration <= self.max_iter-2:
-            
-                scenarios = self.sample_scenarios(2)
-                
-            elif self.iteration == self.max_iter:
-                
-                scenarios = self.sample_scenarios(self.M)
 
-            if self.cut_mode in ['B', 'SB', 'L-sub', 'L-lev']:
-                            
+            if final_pass:
+                scenarios = self.sample_scenarios(self.M)
+                
+            else:
+                scenarios = self.sample_scenarios(2)
+
+            if self.cut_mode in ['B', 'SB', 'L-sub', 'L-lev', 'hyb']:
                 self.forward_pass(scenarios)
                 
             else:
@@ -3841,52 +3959,44 @@ class SDDiPModel:
                 break
 
             print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
-            
-            if self.cut_mode == 'B' or self.cut_mode == 'SB':
-                
+
+            if self.cut_mode in ['B', 'SB']:
                 self.backward_pass()
-            
-            elif self.cut_mode == 'L-sub' or self.cut_mode == 'L-lev':
                 
-                if self.gap > 0.8 or self.iteration <= 2:
+            elif self.cut_mode in ['L-sub', 'L-lev']:
                 
+                if self.iteration <= 4:
                     self.backward_pass()
-                
+                    
                 else:
                     self.backward_pass_Lagrangian()
-            
-            elif self.cut_mode == 'hybrid':
+                    
+            elif self.cut_mode == 'hyb':
                 
-                if self.gap > 0.8 or self.iteration <= 2:
-                
+                if self.iteration <= 4:
                     self.backward_pass()
-                
+                    
                 else:
                     self.backward_pass_hybrid()
-        
             else:
                 print("Not a proposed cut")
                 break
-            
+
             print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
-            
+
         print("\nSDDiP complete.")
         print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {(self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]:.4f}")
 
 
+
 if __name__ == "__main__":
     
-    if T <= 4:
-        num_iter = 20
-        
-    elif T >= 4 and T <= 10:
-        num_iter = 50
-        
-    elif T == 24:
-        num_iter = 100
+    num_iter = 100
     
     scenario_branch = 4  ## N_t
     fw_scenario_num = 200  ## M
+    
+    plot_mode = False
     
     stage_params = []
     
@@ -3903,15 +4013,15 @@ if __name__ == "__main__":
             if P_rt_minus_mode == True:
             
                 stage_params = [
-                [[1.0568037492471882, 99.2150319380103, 0], [0.8541591674818009, 103.45161675891347, 0], [0.9212841857860108, -12.6821832148197, 0], [0.8436906609947701, 108.65916144510042, 0]], 
+                [[1.0568037492471882, -75.2150319380103, 0], [0.8541591674818009, 103.45161675891347, 0], [0.9212841857860108, -12.6821832148197, 0], [0.8436906609947701, 108.65916144510042, 0]], 
                 [[0.944393934353801, 106.16613527143109, 0], [0.9980446516218301, 132.19415678199823, 0], [0.8226665907126034, 95.40992777649764, 0], [0.9761652480607177, 109.37295079949263, 0]], 
                 [[0.9639480113042348, -70.46593285560922, 0], [1.0031398798406639, -63.78275063792817, 0], [0.8093512104476058, -2.33300251027543, 0], [1.0991221913686902, 118.59169266739974, 0]], 
                 [[1.087466326285433, -60.32338793425832, 0], [1.159245374394473, -3.67644682218588, -0.19179979971204353], [1.12102933753565, -40.01092585228216, 0], [0.8617548399782096, 152.37489352218722, 0]], 
                 [[1.0834976219212336, 104.07271226957103, 0], [0.8634498605081226, -18.03221736803673, 0], [1.1243335742671112, -53.20854856981401, 0], [0.9114198128210322, 101.19156069226295, 0]], 
                 [[0.8572519085283472, 101.31222172327678, 0], [0.928104724382114, -22.24819178552463, 0], [0.8545139078847096, -70.5435698896676, 0], [0.8626342190157117, 105.17070251683006, 0]], 
                 [[0.9387870765915632, -40, 0], [1.1314970540447034, 105.46379701442571, 0], [1.0724074653195903, 129.26308660133995, 0], [1.1740660716616722, 126.37538413434159, 0]], 
-                [[0.811680967361771, 165.77340414277157, 0], [0.9903501561327369, 107.24395081093166, 0], [0.9303225486946357, 101.52293987784844, 0], [1.073680500657586, 105.91863994492752, 0]], 
-                [[1.0096636550616571, 106.49119243927669, 0], [1.1769362403042851, 113.00487937251063, 0], [0.8426279475355245, 103.2266055200999, 0], [0.8716942875836529, 124.43592953940643, 0]], 
+                [[0.811680967361771, -65.77340414277157, 0], [0.9903501561327369, 107.24395081093166, 0], [0.9303225486946357, -71.52293987784844, 0], [1.073680500657586, 105.91863994492752, 0]], 
+                [[1.0096636550616571, 106.49119243927669, 0], [1.1769362403042851, 113.00487937251063, 0], [0.8426279475355245, -73.2266055200999, 0], [0.8716942875836529, -24.43592953940643, 0]], 
                 [[0.8833331326752389, 84.25117087896008, 0], [1.0492024939789395, 105.95747450552334, 0], [0.8059872474874955, 164.91212360360043, 0], [1.075847955832046, 102.54032593542846, 0]]
                 ]
             
@@ -3935,10 +4045,6 @@ if __name__ == "__main__":
     elif T == 24:
         
         for t in range(T):
-            
-            stage_param = scenario_generator.sample_multiple_delta(t, scenario_branch)
-            
-            stage_params.append(stage_param) 
             
             if P_rt_minus_mode == True:    
                 
@@ -4001,117 +4107,143 @@ if __name__ == "__main__":
                         
     P_rt_per_hour = [ [branch[1] for branch in stage] for stage in stage_params ]     
     
-    ## Plot Day Ahead and Real Time Price values
-    
-    if T <= 10:
-        hours = np.arange(10)
         
-    elif T == 24:
-        hours = np.arange(24)
-    
-    plt.figure(figsize=(12, 6))
-    
-    P_rt_curves = list(zip(*P_rt_per_hour))  
-
-    for curve in P_rt_curves:
-        plt.plot(hours, curve, color='royalblue', alpha=0.4, linewidth=1)
-
-    plt.plot(hours, P_da_partial, color='black', linewidth=2.5, label='P_da')
-
-    plt.title("Day-Ahead vs Real-Time Prices")
-    plt.xlabel("Hour (t)")
-    plt.ylabel("Price")
-    plt.grid(True, axis='y', linestyle='--', alpha=0.5)  
-    plt.legend()
-    
-    plt.ylim(-P_r - 20, P_max + 40)
-    
-    plt.tight_layout()
-    plt.show()
+    def convergence_Comparison(plot = True):
         
-    def Comparison():
-        
-        """
-        DEF_1 = T_stage_DEF(ScenarioTree1)
-        
-        DEF_start_time = time.time()
-        DEF_obj = DEF_1.get_objective_value()
-        DEF_end_time = time.time()
-        time_DEF = DEF_end_time - DEF_start_time
-        """
-        
+        #DEF_1 = T_stage_DEF(ScenarioTree1)
+    
         sddip_1 = SDDiPModel(
-            max_iter=num_iter,
-            stage_params=stage_params,
-            forward_scenario_num=fw_scenario_num,
-            backward_branch=scenario_branch,
-            cut_mode='SB',
-        )
+                max_iter=num_iter,
+                stage_params=stage_params,
+                forward_scenario_num=fw_scenario_num,
+                backward_branch=scenario_branch,
+                cut_mode='SB',
+                plot=plot,
+                tol=tol,
+                K=Node_num
+            )
+        
+        sddip_2 = SDDiPModel(
+                max_iter=num_iter,
+                stage_params=stage_params,
+                forward_scenario_num=fw_scenario_num,
+                backward_branch=scenario_branch,
+                cut_mode='L-sub',
+                plot=plot,
+                tol=tol,
+                K=Node_num
+            )
+        
+        sddip_3 = SDDiPModel(
+                max_iter=num_iter,
+                stage_params=stage_params,
+                forward_scenario_num=fw_scenario_num,
+                backward_branch=scenario_branch,
+                cut_mode='hyb',
+                plot=plot,
+                tol=tol,
+                K=Node_num
+            )
+
 
         SDDiP_1_start_time = time.time()
         sddip_1.run_sddip()
         SDDiP_1_end_time = time.time()
         time_SDDiP_1 = SDDiP_1_end_time - SDDiP_1_start_time
-
+        
         LB_1_list = sddip_1.LB 
         UB_1_list = sddip_1.UB
         
         gap_SDDiP_1 = (sddip_1.UB[sddip_1.iteration] - sddip_1.LB[sddip_1.iteration])/sddip_1.UB[sddip_1.iteration]
         
-        sddip_2 = SDDiPModel(
-            max_iter=num_iter,
-            stage_params=stage_params,
-            forward_scenario_num=fw_scenario_num,
-            backward_branch=scenario_branch,
-            cut_mode='L-sub',
-        )
         
         SDDiP_2_start_time = time.time()
         sddip_2.run_sddip()
         SDDiP_2_end_time = time.time()
         time_SDDiP_2 = SDDiP_2_end_time - SDDiP_2_start_time
-
+        
         LB_2_list = sddip_2.LB
         UB_2_list = sddip_2.UB
         
         gap_SDDiP_2 = (sddip_2.UB[sddip_2.iteration] - sddip_2.LB[sddip_2.iteration])/sddip_2.UB[sddip_2.iteration]
         
         
+        SDDiP_3_start_time = time.time()
+        sddip_3.run_sddip()
+        SDDiP_3_end_time = time.time()
+        time_SDDiP_3 = SDDiP_3_end_time - SDDiP_3_start_time
+
+        LB_3_list = sddip_3.LB
+        UB_3_list = sddip_3.UB
+        
+        gap_SDDiP_3 = (sddip_3.UB[sddip_3.iteration] - sddip_3.LB[sddip_3.iteration])/sddip_3.UB[sddip_3.iteration]        
+        
         ## Plot SDDiP results
         
-        plt.figure(figsize=(7,5))
+        if plot:    
+            plt.figure(figsize=(7,5))
+            
+            iterations = range(num_iter+2)
+            
+            plt.plot(iterations, LB_1_list, label=f"LB ({sddip_1.cut_mode})", marker='o', color='tab:blue')
+            plt.plot(iterations, UB_1_list, label=f"UB ({sddip_1.cut_mode})", marker='^', color='tab:blue', linestyle='--')
+            plt.fill_between(iterations, LB_1_list, UB_1_list, alpha=0.1, color='tab:blue')
+            
+            plt.plot(iterations, LB_2_list, label=f"LB ({sddip_2.cut_mode})", marker='o', color='tab:orange')
+            plt.plot(iterations, UB_2_list, label=f"UB ({sddip_2.cut_mode})", marker='^', color='tab:orange', linestyle='--')
+            plt.fill_between(iterations, LB_2_list, UB_2_list, alpha=0.1, color='tab:orange')
         
-        iterations = range(num_iter+1)
+            plt.plot(iterations, LB_3_list, label=f"LB ({sddip_3.cut_mode})", marker='o', color='tab:green')
+            plt.plot(iterations, UB_3_list, label=f"UB ({sddip_3.cut_mode})", marker='^', color='tab:green', linestyle='--')
+            plt.fill_between(iterations, LB_3_list, UB_3_list, alpha=0.1, color='tab:green')
+                        
+            plt.xlabel('Iteration')
+            plt.ylabel('Bound')
+            plt.legend()
+            
+            plt.ylim(0, 7000000*T)
+            
+            plt.show()
         
-        plt.plot(iterations, LB_1_list, label="LB (B)", marker='o', color='tab:blue')
-        plt.plot(iterations, UB_1_list, label="UB (B)", marker='^', color='tab:blue', linestyle='--')
-        plt.fill_between(iterations, LB_1_list, UB_1_list, alpha=0.1, color='tab:blue')
-        
-        plt.plot(iterations, LB_2_list, label="LB (SB)", marker='o', color='tab:orange')
-        plt.plot(iterations, UB_2_list, label="UB (SB)", marker='^', color='tab:orange', linestyle='--')
-        plt.fill_between(iterations, LB_2_list, UB_2_list, alpha=0.1, color='tab:orange')
-        
-        #plt.axhline(y=DEF_obj, color='black', linestyle='--', label='DEF_obj')
-        
-        plt.xlabel('Iteration')
-        plt.ylabel('Bound')
-        plt.legend()
-        
-        plt.ylim(0, 10800000*T)
-        
-        plt.show()
+        else:    
+            
+            plt.figure(figsize=(7,5))
+            
+            iterations = range(num_iter+2)
+            
+            List_ya = [0 for i in iterations]
+            
+            plt.plot(iterations, List_ya, label=f"LB ({sddip_1.cut_mode})", marker='o', color='tab:blue')
+            plt.plot(iterations, List_ya, label=f"UB ({sddip_1.cut_mode})", marker='^', color='tab:blue', linestyle='--')
+            plt.fill_between(iterations, List_ya, List_ya, alpha=0.1, color='tab:blue')
 
-        #print(f"Solving T-stage DEF took {time_DEF:.2f} seconds.\n")
+            plt.plot(iterations, List_ya, label=f"LB ({sddip_2.cut_mode})", marker='o', color='tab:orange')
+            plt.plot(iterations, List_ya, label=f"UB ({sddip_2.cut_mode})", marker='^', color='tab:orange', linestyle='--')
+            plt.fill_between(iterations, List_ya, List_ya, alpha=0.1, color='tab:orange')
+
+            plt.plot(iterations, List_ya, label=f"LB ({sddip_3.cut_mode})", marker='o', color='tab:green')
+            plt.plot(iterations, List_ya, label=f"UB ({sddip_3.cut_mode})", marker='^', color='tab:green', linestyle='--')
+            plt.fill_between(iterations, List_ya, List_ya, alpha=0.1, color='tab:green')
+            
+            plt.xlabel('Iteration')
+            plt.ylabel('Bound')
+            plt.legend()
+            
+            plt.ylim(0, 7000000*T)
+            
+            plt.show()
+        
         print(f"SDDiP1 took {time_SDDiP_1:.2f} seconds.\n")
         print(f"SDDiP2 took {time_SDDiP_2:.2f} seconds.\n")
+        print(f"SDDiP3 took {time_SDDiP_3:.2f} seconds.\n")
              
         print(f"SDDiP1 optimality gap = {gap_SDDiP_1:.4f}")
-        print(f"SDDiP2 optimality gap = {gap_SDDiP_2:.4f}")    
+        print(f"SDDiP2 optimality gap = {gap_SDDiP_2:.4f}")
+        print(f"SDDiP3 optimality gap = {gap_SDDiP_3:.4f}")      
         
-        #print(f"DEF obj = {DEF_obj}")
         print(f"SDDiP1 final LB = {LB_1_list[-1]}, UB = {UB_1_list[-1]}")
         print(f"SDDiP2 final LB = {LB_2_list[-1]}, UB = {UB_2_list[-1]}")
-        
+        print(f"SDDiP3 final LB = {LB_3_list[-1]}, UB = {UB_3_list[-1]}")
         
         ### Plot solutions
         
@@ -4124,6 +4256,11 @@ if __name__ == "__main__":
         Q_da_final_2 = sddip_2.Q_da_final
         b_rt_final_2 = sddip_2.b_rt_final
         Q_rt_final_2 = sddip_2.Q_rt_final
+        
+        b_da_final_3 = sddip_3.b_da_final           
+        Q_da_final_3 = sddip_3.Q_da_final
+        b_rt_final_3 = sddip_3.b_rt_final
+        Q_rt_final_3 = sddip_3.Q_rt_final
         
         hours = np.arange(T)
                 
@@ -4168,21 +4305,30 @@ if __name__ == "__main__":
             plt.tight_layout()
             plt.show()
         
-        
-        solution_plot(
-            b_da_final_1, 
-            Q_da_final_1, 
-            b_rt_final_1, 
-            Q_rt_final_1, 
-            title="SDDiP 1 solution plot"
-            )
-        
-        solution_plot(
-            b_da_final_2, 
-            Q_da_final_2, 
-            b_rt_final_2, 
-            Q_rt_final_2, 
-            title="SDDiP 2 solution plot"
-            )        
-        
-    Comparison()
+        if plot:
+                
+            solution_plot(
+                b_da_final_1, 
+                Q_da_final_1, 
+                b_rt_final_1, 
+                Q_rt_final_1, 
+                title="SDDiP 1 solution plot"
+                )
+            
+            solution_plot(
+                b_da_final_2, 
+                Q_da_final_2, 
+                b_rt_final_2, 
+                Q_rt_final_2, 
+                title="SDDiP 2 solution plot"
+                )        
+            
+            solution_plot(
+                b_da_final_3, 
+                Q_da_final_3, 
+                b_rt_final_3, 
+                Q_rt_final_3, 
+                title="SDDiP 2 solution plot"
+                )       
+            
+    convergence_Comparison(plot_mode)
