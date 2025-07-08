@@ -57,11 +57,11 @@ T = 24
 
 dual_tolerance = 1e-7
 tol = 1e-5
-Node_num = 60
-Lag_iter_UB = 500
+Node_num = 1
+Lag_iter_UB = 600
 
-P_da_minus_mode = True
-P_rt_minus_mode = True
+P_da_minus_mode = False
+P_rt_minus_mode = False 
 
 E_0 = Scenario.E_0
 

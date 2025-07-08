@@ -22,8 +22,6 @@ logging.getLogger("pyomo.core").setLevel(logging.ERROR)
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_path)
 
-from Scenarios import Scenario
-
 solver='gurobi'
 SOLVER=pyo.SolverFactory(solver)
 
@@ -32,11 +30,104 @@ SOLVER.options['TimeLimit'] = 1000
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
-# Generate Scenario
 
-# SDDiP Model
+# Load Energy Forecast list
 
-Total_time = 18000
+E_0_path = './Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv'
+np.set_printoptions(suppress=True, precision=4)
+E_0 = np.loadtxt(E_0_path, delimiter=',')
+
+print(E_0)
+
+
+# Load Price and Scenario csv files
+
+def load_clustered_P_da(directory_path):
+    Reduced_P_da = []
+    files = sorted(os.listdir(directory_path), key=lambda x: int(x.split('K')[-1].split('.csv')[0]))
+
+    for file in files:
+        if file.endswith('.csv'):
+            file_path = os.path.join(directory_path, file)
+            data = np.loadtxt(file_path, delimiter=',')
+            if data.ndim == 1:
+                data = data.reshape(1, -1)  # Fix for K = 1
+            Reduced_P_da.append(data.tolist())  # Convert to list
+
+    return Reduced_P_da
+
+cluster_dir = './Stochastic_Approach/Scenarios/Clustered_P_da'
+Reduced_P_da = load_clustered_P_da(cluster_dir)
+
+K_list = [1, 5, 10, 25, 60, 100]
+    
+T = 24
+hours = np.arange(T)
+
+for i, P_da_list in enumerate(Reduced_P_da):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for profile in P_da_list:
+        ax.plot(hours, profile, color='blue', alpha=0.6)
+    ax.set_title(f"K = {K_list[i]}: Clustered Day-Ahead Price Profiles")
+    ax.set_xlabel("Hour")
+    ax.set_ylabel("Price")
+    ax.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+def load_scenario_trees(base_dir):
+    Reduced_scenario_trees = []
+    k_folders = sorted(os.listdir(base_dir), key=lambda x: int(x[1:]))  # Assumes folders named K1, K5, ...
+
+    for k_folder in k_folders:
+        k_path = os.path.join(base_dir, k_folder)
+        scenario_files = sorted(os.listdir(k_path), key=lambda x: int(x.split('_')[1].split('.')[0]))
+
+        scenario_trees = []
+        for file in scenario_files:
+            file_path = os.path.join(k_path, file)
+            data = np.loadtxt(file_path, delimiter=',')
+
+            tree = [[] for _ in range(24)]
+            for row in data:
+                t = int(row[0])
+                branch = row[2:].tolist()  # Skip t and b
+                tree[t].append(branch)
+            scenario_trees.append(tree)
+
+        Reduced_scenario_trees.append(scenario_trees)
+
+    return Reduced_scenario_trees
+
+clustered_tree_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees'
+Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
+
+fig, axes = plt.subplots(len(K_list), 1, figsize=(12, 2.5 * len(K_list)), sharex=True, constrained_layout=True)
+hours = np.arange(24)
+
+for i, (k, (scenario_trees, P_da_list)) in enumerate(zip(K_list, zip(Reduced_scenario_trees, Reduced_P_da))):
+    ax = axes[i] if len(K_list) > 1 else axes
+
+    for P_da, scenario in zip(P_da_list, scenario_trees):
+        ax.plot(hours, P_da, color='blue', linewidth=2.0, alpha=0.8)  # Day-ahead
+
+        N_t = len(scenario[0])
+        for b in range(N_t):
+            P_rt_values = [scenario[t][b][1] for t in range(24)]
+            ax.plot(hours, P_rt_values, color='black', linewidth=0.6, alpha=0.3)  # Real-time branches
+
+    ax.set_title(f"K = {k}: P_da (blue) & P_rt branches (black)", fontsize=10)
+    ax.set_ylabel("Price")
+    ax.set_ylim(-120, 200)
+    ax.grid(True)
+
+axes[-1].set_xlabel("Hour")
+
+plt.show()
+
+# SDDiP Model Parameters
+
+T = 24
 
 C = 21022.1
 S = C*3
@@ -53,17 +144,19 @@ v = 0.95
 gamma_over = P_max
 gamma_under = P_max
 
-T = 24
+if T == 24:
+    Total_time = 18000
+    
+elif T == 7 or T == 10:
+    Total_time = 1500
+
+elif T == 2 or T == 4:
+    Total_time = 500
 
 dual_tolerance = 1e-7
 tol = 1e-5
-Node_num = 100
+Node_num = 1
 Lag_iter_UB = 500
-
-P_da_minus_mode = False
-P_rt_minus_mode = False
-
-E_0 = Scenario.E_0
 
 if T <= 10:
 
@@ -78,97 +171,6 @@ E_0_partial_max = max(E_0_partial)
 
 for t in range(len(E_0_partial)):
     E_0_sum += E_0_partial[t]
-
-
-if T <= 10:
-    
-    if P_da_minus_mode == True:    
-        P_da_partial = [
-            -40.04237333851853, # T = 9
-            -70.02077847557203, # T = 10
-            180.6656414585262,  # T = 11
-            -30.223343222316,   # T = 12
-            01.1443379704008,   # T = 13
-            69.23105760780754,  # T = 14
-            -61.57109079814273, # T = 15
-            -43.93082813230762, # T = 16
-            -38.80926230668373, # T = 17
-            124.39462311589915  # T = 18
-            ]
-        
-    else:
-        P_da_partial = [
-            140.04237333851853, # T = 9
-            170.02077847557203, # T = 10
-            180.6656414585262,  # T = 11
-            160.223343222316,   # T = 12
-            101.1443379704008,  # T = 13
-            89.23105760780754,  # T = 14
-            161.57109079814273, # T = 15
-            143.93082813230762, # T = 16
-            138.80926230668373, # T = 17
-            124.39462311589915  # T = 18
-            ]
-    
-
-elif T == 24:
-    
-    if P_da_minus_mode == True:
-        P_da_partial = [
-            52.83429128347213,        # t = 0
-            66.22347892347328,        # t = 1
-            80.98439238472342,        # t = 2
-            112.78293487312834,       # t = 3
-            125.32984719238412,       # t = 4
-            -38.98473284912348,       # t = 5
-            -49.12834712389432,       # t = 6
-            -21.48723847293847,       # t = 7 
-            -10.32948327481234,       # t = 8 
-            0.0000000000000000,       # t = 9
-            -40.04237333851853,       # t = 10
-            90.02077847557203,       # t = 11
-            -70.6656414585262,        # t = 12
-            -60.223343222316,         # t = 13
-            141.1443379704008,        # t = 14
-            -39.23105760780754,       # t = 15
-            -25.57109079814273,       # t = 16
-            143.93082813230762,       # t = 17
-            -38.80926230668373,       # t = 18
-            124.39462311589915,       # t = 19
-            108.92834719847234,       # t = 20
-            88.49238471239842,        # t = 21
-            69.18234718234713,        # t = 22
-            54.32847239482347         # t = 23
-            ]
-    
-    else:
-        P_da_partial = [
-            152.83429128347213,        # t = 0
-            166.22347892347328,        # t = 1
-            180.98439238472342,        # t = 2
-            172.78293487312834,       # t = 3
-            155.32984719238412,       # t = 4
-            168.98473284912348,       # t = 5
-            169.12834712389432,       # t = 6
-            171.48723847293847,       # t = 7 
-            180.32948327481234,       # t = 8 
-            153.48329481234872,       # t = 9
-            150.04237333851853,       # t = 10
-            170.02077847557203,       # t = 11
-            180.6656414585262,        # t = 12
-            160.223343222316,         # t = 13
-            141.1443379704008,        # t = 14
-            139.23105760780754,       # t = 15
-            125.57109079814273,       # t = 16
-            143.93082813230762,       # t = 17
-            178.80926230668373,       # t = 18
-            154.39462311589915,       # t = 19
-            158.92834719847234,       # t = 20
-            168.49238471239842,        # t = 21
-            169.18234718234713,        # t = 22
-            154.32847239482347         # t = 23
-            ]
-        
     
 K = [1.23*E_0_partial[t] + 1.02*B for t in range(T)]
 
@@ -177,7 +179,7 @@ M_gen = [[1.02*K[t], 2*K[t]] for t in range(T)]
 
 # Subproblems for SDDiP
 
-## stage = -1
+## stage = DA
 
 class fw_da(pyo.ConcreteModel): 
     
@@ -188,8 +190,90 @@ class fw_da(pyo.ConcreteModel):
         self.solved = False
         self.psi = psi
         self.T = T
+
+    def build_model(self):
         
-        self.P_da = P_da_partial
+        model = self.model()
+        
+        model.TIME = pyo.RangeSet(0, T-1)
+        
+        model.PSIRANGE = pyo.RangeSet(0, len(self.psi)-1)
+        
+        # Vars
+        
+        model.theta = pyo.Var(domain = pyo.Reals)
+        
+        model.b = pyo.Var(model.TIME, bounds = (-P_r, 0), domain = pyo.Reals)
+        model.q = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        # Constraints
+        
+        def da_bidding_amount_rule(model, t):
+            return model.q_da[t] <= E_0_partial[t] + B
+        
+        def da_overbid_rule(model):
+            return sum(model.q_da[t] for t in range(self.T)) <= E_0_sum
+        
+        def value_fcn_approx_rule(model, l):
+            return model.theta <= (
+                sum(self.psi[l][0][t]*model.b[t] for t in range(T)) 
+                +sum(self.psi[l][1][t]*model.q[t] for t in range(T)) 
+                )
+
+        model.da_bidding_amount = pyo.Constraint(model.TIME, rule=da_bidding_amount_rule)
+        model.da_overbid = pyo.Constraint(rule=da_overbid_rule)
+        model.value_fcn_approx = pyo.Constraint(model.PSIRANGE, rule = value_fcn_approx_rule)
+
+        # Obj Fcn
+        
+        def objective_rule(model):
+            return (
+                model.theta
+            )
+        
+        model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
+
+    def solve(self):
+        
+        self.build_model()
+        SOLVER.solve(self)
+        self.solved = True
+
+    def get_state_solutions(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True
+        State_var = []
+        
+        State_var.append([pyo.value(self.b[t]) for t in range(self.T)])
+        State_var.append([pyo.value(self.q[t]) for t in range(self.T)])
+        
+        return State_var 
+
+    def get_objective_value(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        return pyo.value(self.objective)        
+
+
+## stage = -1
+
+class fw_rt_init(pyo.ConcreteModel): 
+    
+    def __init__(self, da_prev, psi, P_da):
+        
+        super().__init__()
+
+        self.solved = False
+        
+        self.b_prev = da_prev[0]
+        self.q_prev = da_prev[1]
+        
+        self.psi = psi
+        self.T = T
+        self.P_da = P_da
         
         self.M_price = [[0, 0] for t in range(self.T)]
         
@@ -198,10 +282,15 @@ class fw_da(pyo.ConcreteModel):
     def _BigM_setting(self):
         
         for t in range(self.T):
+            
+            if self.P_da[t] >= 0:
+                self.M_price[t][0] = 1
+                self.M_price[t][1] = self.P_da[t] + 1
 
-            self.M_price[t][0] = 400
-            self.M_price[t][1] = 400
-
+            else:
+                self.M_price[t][0] = -self.P_da[t] + 1
+                self.M_price[t][1] = self.P_da[t] + 81 
+            
     def build_model(self):
         
         model = self.model()
@@ -234,13 +323,15 @@ class fw_da(pyo.ConcreteModel):
         
         # Constraints
         
+        ## Connected to DA stage
+        
+        def da_b_rule(model, t):
+            return model.b_da[t] == self.b_prev[t]
+        
+        def da_q_rule(model, t):
+            return model.q_da[t] == self.q_prev[t]
+        
         ## Day-Ahead Market Rules
-        
-        def da_bidding_amount_rule(model, t):
-            return model.q_da[t] <= E_0_partial[t] + B
-        
-        def da_overbid_rule(model):
-            return sum(model.q_da[t] for t in range(self.T)) <= E_0_sum
         
         def market_clearing_1_rule(model, t):
             return model.b_da[t] - self.P_da[t] <= self.M_price[t][0]*(1 - model.n_da[t])
@@ -293,15 +384,16 @@ class fw_da(pyo.ConcreteModel):
                 + self.psi[l][3]*model.T_o 
                 + self.psi[l][4]*model.T_b 
                 + self.psi[l][5]*model.T_q 
-                + self.psi[l][6]*model.T_E)
+                + self.psi[l][6]*model.T_E
+                )
         
         def settlement_fcn_rule(model):
             return model.f == sum(
                 self.P_da[t]*model.Q_da[t] for t in range(self.T)
             )
             
-        model.da_bidding_amount = pyo.Constraint(model.TIME, rule = da_bidding_amount_rule)
-        model.da_overbid = pyo.Constraint(rule = da_overbid_rule)
+        model.da_b_amount = pyo.Constraint(model.TIME, rule = da_b_rule)
+        model.da_q_amount = pyo.Constraint(model.TIME, rule = da_q_rule)
         model.market_clearing_1 = pyo.Constraint(model.TIME, rule = market_clearing_1_rule)
         model.market_clearing_2 = pyo.Constraint(model.TIME, rule = market_clearing_2_rule)
         model.market_clearing_3 = pyo.Constraint(model.TIME, rule = market_clearing_3_rule)
@@ -382,7 +474,7 @@ class fw_da(pyo.ConcreteModel):
 
 class fw_rt(pyo.ConcreteModel):
 
-    def __init__(self, stage, T_prev, psi, delta):
+    def __init__(self, stage, T_prev, psi, P_da, delta):
         
         super().__init__()
 
@@ -399,7 +491,7 @@ class fw_rt(pyo.ConcreteModel):
         
         self.psi = psi
         
-        self.P_da = P_da_partial
+        self.P_da = P_da
         self.delta_E_0 = delta[0]
         self.P_rt = delta[1]
         self.delta_c = delta[2]
@@ -418,11 +510,7 @@ class fw_rt(pyo.ConcreteModel):
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
-        """
-        self.M_price[0] = 400
-        self.M_price[1] = 400
-        """
-        
+
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
             self.M_price[0] = 1
@@ -509,7 +597,7 @@ class fw_rt(pyo.ConcreteModel):
                    
         # Constraints
         
-        ## Connected to t-1 state 
+        ## Connected to t-1 stage 
         
         def da_Q_rule(model):
             return model.Q_da == self.T_Q_prev[0]
@@ -724,7 +812,7 @@ class fw_rt(pyo.ConcreteModel):
 
 class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
-    def __init__(self, stage, T_prev, psi, delta, exp):
+    def __init__(self, stage, T_prev, psi, P_da, delta, exp):
         
         super().__init__()
 
@@ -743,7 +831,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         self.psi = psi
         
-        self.P_da = P_da_partial
+        self.P_da = P_da
         self.delta_E_0 = delta[0]
         self.P_rt = delta[1]
         self.delta_c = delta[2]
@@ -787,7 +875,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             self.M_price[0] = -self.P_rt + 1
             self.M_price[1] = self.P_rt + 81    
         
-  
     def build_model(self):
         
         model = self.model()
@@ -1115,7 +1202,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
 class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward - Strengthened Benders' Cut)
 
-    def __init__(self, stage, pi, psi, delta):
+    def __init__(self, stage, pi, psi, P_da, delta):
         
         super().__init__()
 
@@ -1125,7 +1212,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         self.pi = pi
         self.psi = psi
         
-        self.P_da = P_da_partial
+        self.P_da = P_da
         self.delta_E_0 = delta[0]
         self.P_rt = delta[1]
         self.delta_c = delta[2]
@@ -1144,10 +1231,6 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
-        """
-        self.M_price[0] = 400
-        self.M_price[1] = 400
-        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -1454,7 +1537,7 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
 
 class fw_rt_last(pyo.ConcreteModel): 
     
-    def __init__(self, T_prev, delta):
+    def __init__(self, T_prev, P_da, delta):
         
         super().__init__()
 
@@ -1469,7 +1552,7 @@ class fw_rt_last(pyo.ConcreteModel):
         self.T_q_prev = T_prev[4]
         self.T_E_prev = T_prev[5]
 
-        self.P_da = P_da_partial
+        self.P_da = P_da
         self.P_rt = delta[1]
         self.delta_c = delta[2]
         
@@ -1487,10 +1570,6 @@ class fw_rt_last(pyo.ConcreteModel):
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
-        """
-        self.M_price[0] = 400
-        self.M_price[1] = 400
-        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -1724,7 +1803,7 @@ class fw_rt_last(pyo.ConcreteModel):
 
 class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
            
-    def __init__(self, T_prev, delta, exp):
+    def __init__(self, T_prev, P_da, delta, exp):
         
         super().__init__()
 
@@ -1741,7 +1820,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         self.T_q_prev = T_prev[4]
         self.T_E_prev = T_prev[5]
 
-        self.P_da = P_da_partial
+        self.P_da = P_da
         self.P_rt = delta[1]
         self.delta_c = delta[2]
         
@@ -1759,10 +1838,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
-        """
-        self.M_price[0] = 400
-        self.M_price[1] = 400
-        """
+
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -2064,7 +2140,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
      
 class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengthened Benders' Cut)
            
-    def __init__(self, pi, delta):
+    def __init__(self, pi, P_da, delta):
         
         super().__init__()
 
@@ -2074,7 +2150,7 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         
         self.stage = T - 1
 
-        self.P_da = P_da_partial
+        self.P_da = P_da
         self.P_rt = delta[1]
         self.delta_c = delta[2]
         
@@ -2093,10 +2169,6 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
 
     def _BigM_setting(self):
-        """
-        self.M_price[0] = 400
-        self.M_price[1] = 400
-        """
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
@@ -2556,467 +2628,10 @@ class dual_approx_lev(pyo.ConcreteModel): ## Level method
 
         return pyo.value(self.objective) 
 
-    
-# Scenario Tree generation
-
-class ScenarioNode:
-    
-    def __init__(self, name, stage, param, prob=1.0):
-        
-        self.name = name
-        self.stage = stage
-        self.param = param
-        self.prob = prob
-        self.children = []  
-
-    def add_child(self, child_node):
-        
-        self.children.append(child_node)
-
-class RecombiningScenarioTree:
-    
-    def __init__(self, stage_num ,branch, params):
-        
-        self.stage_num = stage_num
-        self.branch = branch
-        self.params = params
-        
-        self.root = ScenarioNode(name = "root", param = None, stage = -1, prob = 1.0)
-        self.nodes = [[] for t in range(self.stage_num)]
-        
-        self._build_recombining_tree()
-        
-    def _build_recombining_tree(self):
-        
-        for i in range(self.branch):
-            
-            param = self.params[0][i]
-            child_node = ScenarioNode(
-                name = f"Stage0_Node{i}",
-                stage = 0,
-                param = param,
-                prob = 1/self.branch
-            )
-            self.root.add_child(child_node)
-            self.nodes[0].append(child_node)
-         
-        for t in range(self.stage_num - 1):  
-              
-            stage_nodes = self.nodes[t]
-            
-            for i in range(len(stage_nodes)):
-                                
-                for j in range(self.branch):
-                    
-                    param = self.params[t + 1][j]
-                    child_node = ScenarioNode(
-                        name = f"Stage{t+1}_Node{j}",
-                        stage = t + 1,
-                        param = param,
-                        prob = 1/(self.branch)**(t + 1)
-                    )
-                    stage_nodes[i].add_child(child_node)
-                    self.nodes[t+1].append(child_node)
-                    
-    def print_tree(self):
-
-        def _print_node(node, indent = 0):
-            
-            print("  " * indent + f"{node.name} (stage={node.stage}, prob={node.prob})" + f"param = {node.param}")
-            for child in node.children:
-                _print_node(child, indent + 1)
-
-        _print_node(self.root)
-                                        
-    def scenarios(self):
-        scenarios = []
-        
-        def _dfs(node, path):
-            path.append(node)
-            
-            if node.stage == self.stage_num - 1:
-                scenarios.append(path.copy())
-            else:
-                for child in node.children:
-                    _dfs(child, path)
-            
-            path.pop()
-
-        for child in self.root.children:
-            _dfs(child, [])
-        
-        return scenarios
-                    
-    def node_scenarios(self):
-        
-        node_scenarios = {}
-            
-        for t in range(self.stage_num):
-            for node_id, node_obj in enumerate(self.nodes[t]):
-                node_scenarios[t, node_id] = set()
-
-        for s_idx, path in enumerate(self.scenarios()):
-            for t in range(self.stage_num):
-                node_obj = path[t]
-
-                node_id = self.nodes[t].index(node_obj)
-                node_scenarios[t, node_id].add(s_idx)
-                
-        return node_scenarios
-
-        
-# T Stage Deterministic Equivalent Problem.
-
-class T_stage_DEF(pyo.ConcreteModel):
-    
-    def __init__(self, scenario_tree):
-        
-        super().__init__()
-
-        self.solved = False
-        self.result = None
-        
-        self.scenario_tree = scenario_tree
-        self.scenarios = self.scenario_tree.scenarios()
-        self.num_scenarios = len(self.scenarios)
-        self.node_scenarios = self.scenario_tree.node_scenarios()
-        
-        self.E_0 = E_0_partial
-        self.P_da = P_da_partial
-        
-        self.delta_E = [
-            [self.scenarios[k][t].param[0] for t in range(T)] 
-            for k in range(self.num_scenarios)
-            ]
-        self.P_rt = [
-            [self.scenarios[k][t].param[1] for t in range(T)] 
-            for k in range(self.num_scenarios)
-            ]
-        self.delta_c = [
-            [self.scenarios[k][t].param[2] for t in range(T)] 
-            for k in range(self.num_scenarios)
-            ]
-                
-        self.P_abs = [
-            [max(self.P_rt[k][t] - self.P_da[t], 0) for t in range(T)]
-            for k in range(self.num_scenarios)
-        ]        
-                
-        self.T = T
-        
-        self.M_price = [
-            [[[0, 0], [0, 0]] for t in range(self.T)] for k in range(self.num_scenarios)
-        ]
-        
-        self._BigM_setting()
- 
-    def _BigM_setting(self):
-        
-        for k in range(self.num_scenarios):
-            
-            for t in range(T):
-                
-                if self.P_da[t] >=0 and self.P_rt[k][t] >= 0:
-                    
-                    self.M_price[k][t][0][0] = 0
-                    self.M_price[k][t][0][1] = self.P_da[t] + 80
-                    self.M_price[k][t][1][0] = 0
-                    self.M_price[k][t][1][1] = self.P_rt[k][t] + 80
-  
-                elif self.P_da[t] >=0 and self.P_rt[k][t] < 0:            
-                    
-                    self.M_price[k][t][0][0] = 0
-                    self.M_price[k][t][0][1] = self.P_da[t] + 80
-                    self.M_price[k][t][1][0] = -self.P_rt[k][t]
-                    self.M_price[k][t][1][1] = self.P_rt[k][t] + 80
-
-                elif self.P_da[t] < 0 and self.P_rt[k][t] >= 0:
-                    
-                    self.M_price[k][t][0][0] = -self.P_da[t]
-                    self.M_price[k][t][0][1] = self.P_da[t] + 80
-                    self.M_price[k][t][1][0] = 0
-                    self.M_price[k][t][1][1] = self.P_rt[k][t] + 80
- 
-                else:
-                    
-                    self.M_price[k][t][0][0] = -self.P_da[t]
-                    self.M_price[k][t][0][1] = self.P_da[t] + 80
-                    self.M_price[k][t][1][0] = -self.P_rt[k][t]
-                    self.M_price[k][t][1][1] = self.P_rt[k][t] + 80
-
-    def build_model(self):
-        
-        model = self.model()
-        
-        model.TIME = pyo.RangeSet(0, T - 1)
-
-        model.S_TIME = pyo.RangeSet(-1, T - 1)
-        
-        model.SCENARIO = pyo.RangeSet(0, self.num_scenarios - 1)
-        
-        # Vars
-        
-        ## day ahead
-        
-        model.b_da = pyo.Var(model.SCENARIO, model.TIME, bounds = (-P_r, 0), domain = pyo.Reals)
-        model.q_da = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        model.Q_da = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        
-        model.n_da = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.Binary)
-                
-        ## real time
-        
-        ### Bidding & Market clearing
-        
-        model.b_rt = pyo.Var(model.SCENARIO, model.TIME, bounds = (-P_r, 0), domain = pyo.Reals)
-        model.q_rt = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        model.Q_rt = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        
-        model.n_rt = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.Binary)
-        
-        ### Real-Time operation 
-        
-        model.g = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        model.c = pyo.Var(model.SCENARIO, model.TIME, bounds = (0, B), domain = pyo.Reals)
-        model.d = pyo.Var(model.SCENARIO, model.TIME, bounds = (0, B), domain = pyo.Reals)
-        model.u = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        model.Q_c = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-                
-        model.S = pyo.Var(model.SCENARIO, model.S_TIME, bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
-
-        ### min, max reformulation Vars
-        
-        model.m_1 = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        model.m_2 = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        
-        model.n_1 = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.Binary)
-        
-        ## Imbalance Penerty Vars
-        
-        model.phi_over = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        model.phi_under = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.NonNegativeReals)
-        
-        ### settlement_fcn_Vars
-        
-        model.f = pyo.Var(model.SCENARIO, model.TIME, domain = pyo.Reals)
-        
-        # Constraints
-        
-        ## Day-Ahead Market Rules
-        
-        def da_bidding_amount_rule(model, k, t):
-            return model.q_da[k, t] <= self.E_0[t] + B
-        
-        def da_overbid_rule(model, k):
-            return sum(model.q_da[k, t] for t in range(self.T)) <= E_0_sum
-        
-        def da_market_clearing_1_rule(model, k, t):
-            return model.b_da[k, t] - self.P_da[t] <= self.M_price[k][t][0][0]*(1 - model.n_da[k, t])
-        
-        def da_market_clearing_2_rule(model, k, t):
-            return self.P_da[t] - model.b_da[k, t] <= self.M_price[k][t][0][1]*model.n_da[k, t]
-        
-        def da_market_clearing_3_rule(model, k, t):
-            return model.Q_da[k, t] <= model.q_da[k, t]
-        
-        def da_market_clearing_4_rule(model, k, t):
-            return model.Q_da[k, t] <= M_gen[t][0]*model.n_da[k, t]
-        
-        def da_market_clearing_5_rule(model, k, t):
-            return model.Q_da[k, t] >= model.q_da[k, t] - M_gen[t][0]*(1 - model.n_da[k, t])        
-        
-        ## Real-Time Market rules(especially for t = 0)
-        
-        def rt_bidding_amount_rule_0(model, k):
-            return model.q_rt[k, 0] <= B
-        
-        model.rt_bidding_amount = pyo.ConstraintList()
-        
-        for k in range(self.num_scenarios):
-            
-            for t in range(1, T):
-                
-                model.rt_bidding_amount.add(model.q_rt[k, t] <= B + self.E_0[t]*self.delta_E[k][t-1])
-        
-        def rt_overbid_rule(model, k):
-            return sum(model.q_rt[k, t] for t in range(self.T)) <= E_0_sum
-        
-        def SOC_initial_rule(model, k):
-            return model.S[k, -1] == 0.5*S
-        
-        def SOC_rule(model, k, t):
-            return model.S[k, t] == model.S[k, t - 1] + v*model.c[k, t] - (1/v)*model.d[k, t]
-        
-        def generation_rule_0(model, k):
-            return model.g[k, 0] <= 0
-
-        model.generation = pyo.ConstraintList()
-        
-        for k in range(self.num_scenarios):
-                
-            for t in range(1, T):
-                
-                model.generation.add(model.g[k, t] <= self.E_0[t]*self.delta_E[k][t-1])
-        
-        def charge_rule(model, k, t):
-            return model.c[k, t] <= model.g[k, t]
-        
-        def electricity_supply_rule(model, k, t):
-            return model.u[k, t] == model.g[k, t] + model.d[k, t] - model.c[k, t]
-        
-        def rt_market_clearing_rule_1(model, k, t):
-            return model.b_rt[k, t] - self.P_rt[k][t] <= self.M_price[k][t][1][0]*(1 - model.n_rt[k, t])
-        
-        def rt_market_clearing_rule_2(model, k, t):
-            return self.P_rt[k][t] - model.b_rt[k, t] <= self.M_price[k][t][1][1]*model.n_rt[k, t] 
-        
-        def rt_market_clearing_rule_3(model, k, t):
-            return model.Q_rt[k, t] <= model.q_rt[k, t]
-        
-        def rt_market_clearing_rule_4(model, k, t):
-            return model.Q_rt[k, t] <= M_gen[t][0]*model.n_rt[k, t]
-        
-        def rt_market_clearing_rule_5(model, k, t):
-            return model.Q_rt[k, t] >= model.q_rt[k, t] - M_gen[t][0]*(1 - model.n_rt[k, t])
-        
-        def dispatch_rule(model, k, t):
-            return model.Q_c[k, t] == (1 + self.delta_c[k][t])*model.Q_rt[k, t]
-        
-        ## f(t) MIP reformulation
-        
-        def minmax_rule_1_1(model, k, t):
-            return model.m_1[k, t] >= model.Q_da[k, t] - model.u[k, t]
-        
-        def minmax_rule_1_2(model, k, t):
-            return model.m_1[k, t] >= 0
-        
-        def minmax_rule_1_3(model, k, t):
-            return model.m_1[k, t] <= model.Q_da[k, t] - model.u[k, t] + M_gen[t][0]*(1 - model.n_1[k, t])
-        
-        def minmax_rule_1_4(model, k, t):
-            return model.m_1[k, t] <= M_gen[t][0]*model.n_1[k, t]
-        
-        def minmax_rule_2_1(model, k, t):
-            return model.m_2[k, t] == model.m_1[k, t]*self.P_abs[k][t]
-        
-        ### Imbalance Penalty
-        
-        def imbalance_over_rule(model, k, t):
-            return model.u[k, t] - model.Q_c[k, t] <= model.phi_over[k, t]
-        
-        def imbalance_under_rule(model, k, t):
-            return model.Q_c[k, t] - model.u[k, t] <= model.phi_under[k, t]
-        
-        ## Settlement fcn
-        
-        def settlement_fcn_rule(model, k, t):
-            return model.f[k, t] == (
-                model.Q_da[k, t]*P_da_partial[t] 
-                + (model.u[k, t] - model.Q_da[k, t])*self.P_rt[k][t] 
-                + self.m_2[k, t] 
-                - gamma_over*model.phi_over[k, t]
-                - gamma_under*model.phi_under[k, t]
-                )
-            
-        model.da_bidding_amount = pyo.Constraint(model.SCENARIO, model.TIME, rule = da_bidding_amount_rule)
-        model.da_overbid = pyo.Constraint(model.SCENARIO, rule = da_overbid_rule)
-        model.da_market_clearing_1 = pyo.Constraint(model.SCENARIO, model.TIME, rule = da_market_clearing_1_rule)
-        model.da_market_clearing_2 = pyo.Constraint(model.SCENARIO, model.TIME, rule = da_market_clearing_2_rule)
-        model.da_market_clearing_3 = pyo.Constraint(model.SCENARIO, model.TIME, rule = da_market_clearing_3_rule)
-        model.da_market_clearing_4 = pyo.Constraint(model.SCENARIO, model.TIME, rule = da_market_clearing_4_rule)
-        model.da_market_clearing_5 = pyo.Constraint(model.SCENARIO, model.TIME, rule = da_market_clearing_5_rule)
-
-        model.rt_bidding_amount_0 = pyo.Constraint(model.SCENARIO, rule = rt_bidding_amount_rule_0)
-
-        model.rt_overbid = pyo.Constraint(model.SCENARIO, rule = rt_overbid_rule)
-        model.SOC_initial = pyo.Constraint(model.SCENARIO, rule = SOC_initial_rule)
-        model.SOC = pyo.Constraint(model.SCENARIO, model.TIME, rule = SOC_rule)
-        model.generation_0 = pyo.Constraint(model.SCENARIO, rule = generation_rule_0)
-        
-        model.charge = pyo.Constraint(model.SCENARIO, model.TIME, rule = charge_rule)
-        model.electricity_supply = pyo.Constraint(model.SCENARIO, model.TIME, rule = electricity_supply_rule)
-        model.rt_market_clearing_1 = pyo.Constraint(model.SCENARIO, model.TIME, rule = rt_market_clearing_rule_1)
-        model.rt_market_clearing_2 = pyo.Constraint(model.SCENARIO, model.TIME, rule = rt_market_clearing_rule_2)
-        model.rt_market_clearing_3 = pyo.Constraint(model.SCENARIO, model.TIME, rule = rt_market_clearing_rule_3)
-        model.rt_market_clearing_4 = pyo.Constraint(model.SCENARIO, model.TIME, rule = rt_market_clearing_rule_4)
-        model.rt_market_clearing_5 = pyo.Constraint(model.SCENARIO, model.TIME, rule = rt_market_clearing_rule_5)
-
-        model.dispatch = pyo.Constraint(model.SCENARIO, model.TIME, rule = dispatch_rule)
-        
-        model.minmax_1_1 = pyo.Constraint(model.SCENARIO, model.TIME, rule = minmax_rule_1_1)
-        model.minmax_1_2 = pyo.Constraint(model.SCENARIO, model.TIME, rule = minmax_rule_1_2)
-        model.minmax_1_3 = pyo.Constraint(model.SCENARIO, model.TIME, rule = minmax_rule_1_3)
-        model.minmax_1_4 = pyo.Constraint(model.SCENARIO, model.TIME, rule = minmax_rule_1_4)
-        model.minmax_2_1 = pyo.Constraint(model.SCENARIO, model.TIME, rule = minmax_rule_2_1)
-
-        model.imbalance_over = pyo.Constraint(model.SCENARIO, model.TIME, rule = imbalance_over_rule)
-        model.imbalance_under = pyo.Constraint(model.SCENARIO, model.TIME, rule = imbalance_under_rule)
-
-        model.settlement_fcn = pyo.Constraint(model.SCENARIO, model.TIME, rule = settlement_fcn_rule)
-
-        ## Non-anticipativ
-        
-        model.NonAnticipativity = pyo.ConstraintList()
-              
-        for k in range(1, self.num_scenarios):
-            
-            for t in range(self.T):
-                
-                model.NonAnticipativity.add(model.b_da[k, t] == model.b_da[0, t])
-                model.NonAnticipativity.add(model.q_da[k, t] == model.q_da[0, t])
-                #model.NonAnticipativity.add(model.Q_da[k, t] == model.Q_da[0, t])
-                #model.NonAnticipativity.add(model.n_da[k, t] == model.n_da[0, t])
-                
-            model.NonAnticipativity.add(model.b_rt[k, 0] == model.b_rt[0, 0])
-            model.NonAnticipativity.add(model.q_rt[k, 0] == model.q_rt[0, 0])
-           
-        for (t, node_id), kset in self.node_scenarios.items():
-            
-            if len(kset) > 1:
-                
-                klist = list(kset)
-                base = klist[0]
-                
-                for k in klist[1:]:
-                    
-                    model.NonAnticipativity.add(model.b_rt[k, t+1] == model.b_rt[base, t+1])
-                    model.NonAnticipativity.add(model.q_rt[k, t+1] == model.q_rt[base, t+1])
-                    model.NonAnticipativity.add(model.Q_rt[k, t] == model.Q_rt[base, t])
-                    model.NonAnticipativity.add(model.n_rt[k, t] == model.n_rt[base, t])
-                        
-                    model.NonAnticipativity.add(model.g[k, t] == model.g[base, t])
-                    model.NonAnticipativity.add(model.c[k, t] == model.c[base, t])
-                    model.NonAnticipativity.add(model.d[k, t] == model.d[base, t])
-                    model.NonAnticipativity.add(model.u[k, t] == model.u[base, t])
-        
-        
-        def objective_rule(model):
-            return (
-                (1/self.num_scenarios)*sum(sum(model.f[k, t] for t in range(T)) for k in range(self.num_scenarios))
-            )
-        
-        model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
-    
-    
-    def solve(self):
-        
-        self.build_model()
-        self.result = SOLVER.solve(self, tee = True)
-        print(f"{self.T} stage DEF solved")
-        self.solved = True
-    
-    
-    def get_objective_value(self):
-        
-        if not self.solved:
-            self.solve()
-            self.solved = True
-    
-        return pyo.value(self.objective)
 
 # SDDiP Algorithm
                                  
-class SDDiPModel:
+class PSDDiPModel:
         
     def __init__(
         self, 
@@ -3987,8 +3602,6 @@ class SDDiPModel:
         print("\nSDDiP complete.")
         print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {(self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]:.4f}")
 
-
-
 if __name__ == "__main__":
     
     num_iter = 100
@@ -4046,64 +3659,32 @@ if __name__ == "__main__":
         
         for t in range(T):
             
-            if P_rt_minus_mode == True:    
-                
-                stage_params = [
-                    [[1.0215916878707407, 80.78063274505286, 0], [0.913198717630274, 207.15368016517033, 0], [0.8834311252191159, 112.47748126297796, 0], [0.9093990290952852, 104.16773575789867, 0]],
-                    [[1.1488431388110705, 130.9160409043475, 0], [1.065076595008393, 107.24674977480271, 0], [0.8196148184043662, 154.03597880917974, 0], [1.056322550250875, 130.5887198443035, 0]],
-                    [[0.8382805679787786, 161.66092232270626, 0], [0.9072248713716513, 144.28413611903053, 0], [1.008446512641973, 122.0270351143196, 0], [1.0762045957212751, 150.74339164683713, 0]],
-                    [[1.1914322160053217, 119.40454637923602, 0], [1.193322380728992, 130.3142120174733, 0], [1.1234266258049317, 111.230438943751, 0], [0.913473226771982, 151.25455717947463, 0]],
-                    [[0.9806408592150446, 117.68811785393548, 0], [1.1579324579530106, 145.43799591219667, 0], [1.0753349724707235, 132.98835900203508, 0], [0.9302061644925295, 107.2725599508661, 0]],
-                    [[1.0328008590207247, 104.2448741445248, 0], [0.8897749313427393, 150.9105776976912, 0.5620083635886923], [0.884279376272486, 144.33114812030516, 0], [1.1427580174945196, 153.27114703688127, 0]],
-                    [[1.0419324778937955, 89.49134638951436, 0], [0.8399441852929602, 143.1041652905437, 0], [1.1088398149147847, -58.1343491710808, 0], [1.1124797099474808, -70.17352907311863, 0]],
-                    [[1.0404812228728273, 187.43198044293445, 0], [0.9606678628866206, 153.54564830510174, 0], [1.1024340464905058, 148.57787436913443, 0], [1.1226162597769818, -83.24495101198171, 0]],
-                    [[0.9347148687381786, 108.46472427885557, 0], [0.9920412478402375, 141.5702662836685, 0], [1.020324603203949, -54.87733374658288, 0], [0.8438221282456536, 136.71228452714038, 0]],
-                    [[1.19164263223995, 141.85190820423819, 0], [0.8248244059889797, -40.2505909394309, 0], [0.9098962152318385, 153.33715894430296, 0], [0.9340122362746441, 118.19139405788043, 0.12240362302166444]],
-                    [[1.1821557322096625, 124.15893383969049, 0], [1.1035953416269042, -62.94491703408116, 0], [1.039434444581245, 135.3373986267369, -0.3718429526822882], [0.8996312360574763, 155.48471886063214, 0]],
-                    [[0.8464797880021295, -40.83018294386079, 0], [1.1919607033884003, 125.00152614176613, 0], [0.9860733556794887, -42.61271770412862, 0], [0.8133068329067613, 159.6656920917638, 0]],
-                    [[1.0021363463719195, 119.87546641833352, 0], [1.1777970592002465, 128.6422485692858, 0], [0.814082811047605, 139.32314602782463, 0], [1.1460402827779228, -52.52770259929176, 0]],
-                    [[0.8206351825907535, -42.93625642779996, 0], [1.0363732899855291, 133.7275935505178, 0], [0.8240914258609248, 135.68421048930225, 0], [0.9403565021945437, 122.54326915837518, 0]],
-                    [[0.918712259653239, 131.85794253397466, 0], [1.188237378119679, -56.8532769134401, 0], [1.1616356067497748, 138.89768755162373, 0], [1.1797580281083941, 140.59570014596747, 0]],
-                    [[0.9733791108916049, 147.19917007286438, 0], [0.9880022815913414, 144.98208445831798, 0], [1.1834931792106, -70.6078697006711, 0], [1.0425587972099644, -29.15288294852678, 0]],
-                    [[0.8343515073585218, 141.30319115794194, 0], [1.0999285823780465, 147.26211796024688, 0], [0.9223317131098161, 148.83421599302298, 0], [1.1913610430318116, 139.14098675605615, 0]],
-                    [[1.1321858667927096, 89.65675763916045, 0], [1.0879435940828859, 141.206567233732, 0], [0.8850163096182874, 146.12531608973316, 0], [0.8498997084837714, 140.58573887134324, 0]],
-                    [[1.0857077759999743, 141.683763069225, 0], [1.1863095342242285, -32.0067508244964, 0], [1.0691546869491797, 141.25004016178457, 0], [0.9054617522388662, 140.17527106547365, 0]],
-                    [[1.1840944219266767, 113.65705462932182, 0], [1.0680634482160214, 121.02956495657905, 0], [0.9009198607461647, 129.5521662600149, 0], [1.0654860271095627, 130.06505208633504, 0]],
-                    [[0.8723540804845644, 170.3702932938346, 0], [1.051904252827458, 151.50240042834247, 0], [0.8214806038830954, 90.76440746230455, 0], [1.1139277934008909, 102.96393647635523, 0]],
-                    [[1.1296385651730396, 134.60261763268483, 0], [0.8249847922150656, 106.84217246452607, 0], [1.0769263303296945, 121.90347693000534, 0], [0.857235079695519, 152.3212855748905, 0]],
-                    [[0.8261830968053797, 158.75750983854374, 0], [1.1541271626992855, 147.49360537847625, 0], [0.8075457115100096, 109.91956945322873, -0.40742964944915894], [0.9742769980442817, 150.92485054893862, 0]],
-                    [[0, 216.86335042940675, 0], [0, 131.74841739827423, 0], [0, 153.5741300362661, 0], [0, 142.61852676386806, 0]],
-                ]
-            
-            else:
-                
-                stage_params = [
-                    [[1.0215916878707407, 80.78063274505286, 0], [0.913198717630274, 207.15368016517033, 0], [0.8834311252191159, 112.47748126297796, 0], [0.9093990290952852, 104.16773575789867, 0]],
-                    [[1.1488431388110705, 130.9160409043475, 0], [1.065076595008393, 107.24674977480271, 0], [0.8196148184043662, 154.03597880917974, 0], [1.056322550250875, 130.5887198443035, 0]],
-                    [[0.8382805679787786, 161.66092232270626, 0], [0.9072248713716513, 144.28413611903053, 0], [1.008446512641973, 122.0270351143196, 0], [1.0762045957212751, 150.74339164683713, 0]],
-                    [[1.1914322160053217, 119.40454637923602, 0], [1.193322380728992, 130.3142120174733, 0], [1.1234266258049317, 111.230438943751, 0], [0.913473226771982, 151.25455717947463, 0]],
-                    [[0.9806408592150446, 117.68811785393548, 0], [1.1579324579530106, 145.43799591219667, 0], [1.0753349724707235, 132.98835900203508, 0], [0.9302061644925295, 107.2725599508661, 0]],
-                    [[1.0328008590207247, 104.2448741445248, 0], [0.8897749313427393, 150.9105776976912, 0.5620083635886923], [0.884279376272486, 144.33114812030516, 0], [1.1427580174945196, 153.27114703688127, 0]],
-                    [[1.0419324778937955, 89.49134638951436, 0], [0.8399441852929602, 143.1041652905437, 0], [1.1088398149147847, 158.1343491710808, 0], [1.1124797099474808, 170.17352907311863, 0]],
-                    [[1.0404812228728273, 187.43198044293445, 0], [0.9606678628866206, 153.54564830510174, 0], [1.1024340464905058, 148.57787436913443, 0], [1.1226162597769818, 183.2449510119817, 0]],
-                    [[0.9347148687381786, 108.46472427885557, 0], [0.9920412478402375, 141.5702662836685, 0], [1.020324603203949, 154.87733374658288, 0], [0.8438221282456536, 136.71228452714038, 0]],
-                    [[1.19164263223995, 141.85190820423819, 0], [0.8248244059889797, 140.2505909394309, 0], [0.9098962152318385, 153.33715894430296, 0], [0.9340122362746441, 118.19139405788043, 0.12240362302166444]],
-                    [[1.1821557322096625, 124.15893383969049, 0], [1.1035953416269042, 162.94491703408116, 0], [1.039434444581245, 135.3373986267369, -0.3718429526822882], [0.8996312360574763, 155.48471886063214, 0]],
-                    [[0.8464797880021295, 140.8301829438608, 0], [1.1919607033884003, 125.00152614176613, 0], [0.9860733556794887, 142.61271770412862, 0], [0.8133068329067613, 159.6656920917638, 0]],
-                    [[1.0021363463719195, 119.87546641833352, 0], [1.1777970592002465, 128.6422485692858, 0], [0.814082811047605, 139.32314602782463, 0], [1.1460402827779228, 152.52770259929176, 0]],
-                    [[0.8206351825907535, 142.93625642779996, 0], [1.0363732899855291, 133.7275935505178, 0], [0.8240914258609248, 135.68421048930225, 0], [0.9403565021945437, 122.54326915837518, 0]],
-                    [[0.918712259653239, 131.85794253397466, 0], [1.188237378119679, 156.8532769134401, 0], [1.1616356067497748, 138.89768755162373, 0], [1.1797580281083941, 140.59570014596747, 0]],
-                    [[0.9733791108916049, 147.19917007286438, 0], [0.9880022815913414, 144.98208445831798, 0], [1.1834931792106, 170.6078697006711, 0], [1.0425587972099644, 129.15288294852678, 0]],
-                    [[0.8343515073585218, 141.30319115794194, 0], [1.0999285823780465, 147.26211796024688, 0], [0.9223317131098161, 148.83421599302298, 0], [1.1913610430318116, 139.14098675605615, 0]],
-                    [[1.1321858667927096, 89.65675763916045, 0], [1.0879435940828859, 141.206567233732, 0], [0.8850163096182874, 146.12531608973316, 0], [0.8498997084837714, 140.58573887134324, 0]],
-                    [[1.0857077759999743, 141.683763069225, 0], [1.1863095342242285, 132.0067508244964, 0], [1.0691546869491797, 141.25004016178457, 0], [0.9054617522388662, 140.17527106547365, 0]],
-                    [[1.1840944219266767, 113.65705462932182, 0], [1.0680634482160214, 121.02956495657905, 0], [0.9009198607461647, 129.5521662600149, 0], [1.0654860271095627, 130.06505208633504, 0]],
-                    [[0.8723540804845644, 170.3702932938346, 0], [1.051904252827458, 151.50240042834247, 0], [0.8214806038830954, 90.76440746230455, 0], [1.1139277934008909, 102.96393647635523, 0]],
-                    [[1.1296385651730396, 134.60261763268483, 0], [0.8249847922150656, 106.84217246452607, 0], [1.0769263303296945, 121.90347693000534, 0], [0.857235079695519, 152.3212855748905, 0]],
-                    [[0.8261830968053797, 158.75750983854374, 0], [1.1541271626992855, 147.49360537847625, 0], [0.8075457115100096, 109.91956945322873, -0.40742964944915894], [0.9742769980442817, 150.92485054893862, 0]],
-                    [[0, 216.86335042940675, 0], [0, 131.74841739827423, 0], [0, 153.5741300362661, 0], [0, 142.61852676386806, 0]],
-                ]
-                 
+            stage_params = [
+                [[1.0215916878707407, 80.78063274505286, 0], [0.913198717630274, 207.15368016517033, 0], [0.8834311252191159, 112.47748126297796, 0], [0.9093990290952852, 104.16773575789867, 0]],
+                [[1.1488431388110705, 130.9160409043475, 0], [1.065076595008393, 107.24674977480271, 0], [0.8196148184043662, 154.03597880917974, 0], [1.056322550250875, 130.5887198443035, 0]],
+                [[0.8382805679787786, 161.66092232270626, 0], [0.9072248713716513, 144.28413611903053, 0], [1.008446512641973, 122.0270351143196, 0], [1.0762045957212751, 150.74339164683713, 0]],
+                [[1.1914322160053217, 119.40454637923602, 0], [1.193322380728992, 130.3142120174733, 0], [1.1234266258049317, 111.230438943751, 0], [0.913473226771982, 151.25455717947463, 0]],
+                [[0.9806408592150446, 117.68811785393548, 0], [1.1579324579530106, 145.43799591219667, 0], [1.0753349724707235, 132.98835900203508, 0], [0.9302061644925295, 107.2725599508661, 0]],
+                [[1.0328008590207247, 104.2448741445248, 0], [0.8897749313427393, 150.9105776976912, 0.5620083635886923], [0.884279376272486, 144.33114812030516, 0], [1.1427580174945196, 153.27114703688127, 0]],
+                [[1.0419324778937955, 89.49134638951436, 0], [0.8399441852929602, 143.1041652905437, 0], [1.1088398149147847, -58.1343491710808, 0], [1.1124797099474808, -70.17352907311863, 0]],
+                [[1.0404812228728273, 187.43198044293445, 0], [0.9606678628866206, 153.54564830510174, 0], [1.1024340464905058, 148.57787436913443, 0], [1.1226162597769818, -83.24495101198171, 0]],
+                [[0.9347148687381786, 108.46472427885557, 0], [0.9920412478402375, 141.5702662836685, 0], [1.020324603203949, -54.87733374658288, 0], [0.8438221282456536, 136.71228452714038, 0]],
+                [[1.19164263223995, 141.85190820423819, 0], [0.8248244059889797, -40.2505909394309, 0], [0.9098962152318385, 153.33715894430296, 0], [0.9340122362746441, 118.19139405788043, 0.12240362302166444]],
+                [[1.1821557322096625, 124.15893383969049, 0], [1.1035953416269042, -62.94491703408116, 0], [1.039434444581245, 135.3373986267369, -0.3718429526822882], [0.8996312360574763, 155.48471886063214, 0]],
+                [[0.8464797880021295, -40.83018294386079, 0], [1.1919607033884003, 125.00152614176613, 0], [0.9860733556794887, -42.61271770412862, 0], [0.8133068329067613, 159.6656920917638, 0]],
+                [[1.0021363463719195, 119.87546641833352, 0], [1.1777970592002465, 128.6422485692858, 0], [0.814082811047605, 139.32314602782463, 0], [1.1460402827779228, -52.52770259929176, 0]],
+                [[0.8206351825907535, -42.93625642779996, 0], [1.0363732899855291, 133.7275935505178, 0], [0.8240914258609248, 135.68421048930225, 0], [0.9403565021945437, 122.54326915837518, 0]],
+                [[0.918712259653239, 131.85794253397466, 0], [1.188237378119679, -56.8532769134401, 0], [1.1616356067497748, 138.89768755162373, 0], [1.1797580281083941, 140.59570014596747, 0]],
+                [[0.9733791108916049, 147.19917007286438, 0], [0.9880022815913414, 144.98208445831798, 0], [1.1834931792106, -70.6078697006711, 0], [1.0425587972099644, -29.15288294852678, 0]],
+                [[0.8343515073585218, 141.30319115794194, 0], [1.0999285823780465, 147.26211796024688, 0], [0.9223317131098161, 148.83421599302298, 0], [1.1913610430318116, 139.14098675605615, 0]],
+                [[1.1321858667927096, 89.65675763916045, 0], [1.0879435940828859, 141.206567233732, 0], [0.8850163096182874, 146.12531608973316, 0], [0.8498997084837714, 140.58573887134324, 0]],
+                [[1.0857077759999743, 141.683763069225, 0], [1.1863095342242285, -32.0067508244964, 0], [1.0691546869491797, 141.25004016178457, 0], [0.9054617522388662, 140.17527106547365, 0]],
+                [[1.1840944219266767, 113.65705462932182, 0], [1.0680634482160214, 121.02956495657905, 0], [0.9009198607461647, 129.5521662600149, 0], [1.0654860271095627, 130.06505208633504, 0]],
+                [[0.8723540804845644, 170.3702932938346, 0], [1.051904252827458, 151.50240042834247, 0], [0.8214806038830954, 90.76440746230455, 0], [1.1139277934008909, 102.96393647635523, 0]],
+                [[1.1296385651730396, 134.60261763268483, 0], [0.8249847922150656, 106.84217246452607, 0], [1.0769263303296945, 121.90347693000534, 0], [0.857235079695519, 152.3212855748905, 0]],
+                [[0.8261830968053797, 158.75750983854374, 0], [1.1541271626992855, 147.49360537847625, 0], [0.8075457115100096, 109.91956945322873, -0.40742964944915894], [0.9742769980442817, 150.92485054893862, 0]],
+                [[0, 216.86335042940675, 0], [0, 131.74841739827423, 0], [0, 153.5741300362661, 0], [0, 142.61852676386806, 0]],
+            ]
                         
     P_rt_per_hour = [ [branch[1] for branch in stage] for stage in stage_params ]     
     
@@ -4112,7 +3693,7 @@ if __name__ == "__main__":
         
         #DEF_1 = T_stage_DEF(ScenarioTree1)
     
-        sddip_1 = SDDiPModel(
+        sddip_1 = PSDDiPModel(
                 max_iter=num_iter,
                 stage_params=stage_params,
                 forward_scenario_num=fw_scenario_num,
@@ -4123,7 +3704,7 @@ if __name__ == "__main__":
                 K=Node_num
             )
         
-        sddip_2 = SDDiPModel(
+        sddip_2 = PSDDiPModel(
                 max_iter=num_iter,
                 stage_params=stage_params,
                 forward_scenario_num=fw_scenario_num,
@@ -4134,7 +3715,7 @@ if __name__ == "__main__":
                 K=Node_num
             )
         
-        sddip_3 = SDDiPModel(
+        sddip_3 = PSDDiPModel(
                 max_iter=num_iter,
                 stage_params=stage_params,
                 forward_scenario_num=fw_scenario_num,
