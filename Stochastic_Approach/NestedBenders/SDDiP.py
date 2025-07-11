@@ -170,9 +170,9 @@ elif T == 24:
             ]
         
     
-K = [1.23*E_0_partial[t] + 1.02*B for t in range(T)]
+K = [1.28*E_0_partial[t] + 1.04*B for t in range(T)]
 
-M_gen = [[1.02*K[t], 2*K[t]] for t in range(T)]
+M_gen = [[1.04*K[t], 2*K[t]] for t in range(T)]
 
 
 # Subproblems for SDDiP
@@ -425,23 +425,23 @@ class fw_rt(pyo.ConcreteModel):
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] >=0 and self.P_rt < 0:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         else:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81           
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90          
         
     def build_model(self):
         
@@ -760,7 +760,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
     def _Param_setting(self):
         
         self.P_abs = max(self.P_rt - self.P_da[self.stage], 0)
-
+   
     def _BigM_setting(self):
         """
         self.M_price[0] = 400
@@ -769,24 +769,23 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] >=0 and self.P_rt < 0:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         else:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81    
-        
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90    
   
     def build_model(self):
         
@@ -1151,24 +1150,24 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## stage = 0, 1, ..., T-1 (Backward -
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] >=0 and self.P_rt < 0:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         else:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81    
-        
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90  
+            
     def build_model(self):
         
         model = self.model()
@@ -1494,24 +1493,24 @@ class fw_rt_last(pyo.ConcreteModel):
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] >=0 and self.P_rt < 0:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         else:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81                          
- 
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90  
+   
     def build_model(self):
         
         model = self.model()
@@ -1766,24 +1765,24 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## stage = T (Backward)
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] >=0 and self.P_rt < 0:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         else:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81    
-
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90  
+   
     def build_model(self):
         
         model = self.model()
@@ -2100,24 +2099,24 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## stage = T (Backward - Strengt
         
         if self.P_da[self.stage] >=0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] >=0 and self.P_rt < 0:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90
 
         elif self.P_da[self.stage] < 0 and self.P_rt >= 0:
             
-            self.M_price[0] = 1
-            self.M_price[1] = self.P_rt + 81
+            self.M_price[0] = 10
+            self.M_price[1] = self.P_rt + 90
 
         else:
             
-            self.M_price[0] = -self.P_rt + 1
-            self.M_price[1] = self.P_rt + 81    
-        
+            self.M_price[0] = -self.P_rt + 10
+            self.M_price[1] = self.P_rt + 90  
+    
     def build_model(self):
         
         model = self.model()

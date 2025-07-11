@@ -651,16 +651,18 @@ if __name__ == '__main__':
     
     sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(1000))
     
-    K_list = [1, 5, 10, 25, 60, 100]
+    K_list = [1, 5, 10, 25, 60, 100, 1000]
     
     Reduced_P_da = []
     Reduced_scenario_trees = []
     
-    for k in K_list:
+    for k in K_list[:-1]:
         kmeans = KMeans(n_clusters=k, random_state=0, n_init='auto')
         kmeans.fit(sampled_P_da)
         cluster_centers = kmeans.cluster_centers_  # shape: (k, 24)
         Reduced_P_da.append(cluster_centers)
+    
+    Reduced_P_da.append(sampled_P_da)
     
     for P_da_list in Reduced_P_da:
         scenario_trees = []
@@ -669,7 +671,6 @@ if __name__ == '__main__':
             scenario_trees.append(scenario_tree)
         Reduced_scenario_trees.append(scenario_trees)
     
-    print(type(Reduced_P_da))
     
     base_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees'
     os.makedirs(base_dir, exist_ok=True)
@@ -687,7 +688,7 @@ if __name__ == '__main__':
             csv_path = os.path.join(k_dir, f'scenario_{j}.csv')
             np.savetxt(csv_path, rows, delimiter=',')
     
-    """    
+    
     fig, axes = plt.subplots(len(K_list), 1, figsize=(10, 4 * len(K_list)), sharex=True)
     hours = np.arange(24)
 
@@ -723,7 +724,7 @@ if __name__ == '__main__':
         ax.grid(True)
         plt.tight_layout()
         plt.show()
-    """
+    
     
     save_dir = './Stochastic_Approach/Scenarios/Clustered_P_da'
     os.makedirs(save_dir, exist_ok=True)
@@ -755,7 +756,7 @@ if __name__ == '__main__':
     axes[-1].set_xlabel("Hour")
     
     plt.savefig('./Stochastic_Approach/Scenarios/combined_scenario_density.png', dpi=300)
-    #plt.show()
+    plt.show()
         
     """
     num_days = sampled_P_da.shape[0]
