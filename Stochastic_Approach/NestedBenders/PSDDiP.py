@@ -1,5 +1,5 @@
 import os
-import sys
+import signal, sys
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -12,6 +12,8 @@ import math
 import re
 import warnings
 import logging
+import multiprocessing as mp
+from joblib import Parallel, delayed
 
 from pyomo.util.infeasible import log_infeasible_constraints
 from pyomo.opt import TerminationCondition, SolverStatus
@@ -57,7 +59,7 @@ def load_clustered_P_da(directory_path):
 cluster_dir = './Stochastic_Approach/Scenarios/Clustered_P_da'
 Reduced_P_da = load_clustered_P_da(cluster_dir)
 
-K_list = [1, 5, 10, 25, 60, 100, 1000]
+K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 1000]
     
 T = 24
 hours = np.arange(T)
@@ -130,7 +132,9 @@ plt.show()
 
 # SDDiP Model Parameters
 
-T = 4
+T = 24
+
+E_0 = E_0
 
 C = 21022.1
 S = C*3
@@ -148,7 +152,7 @@ gamma_over = P_max
 gamma_under = P_max
 
 if T == 24:
-    Total_time = 18000
+    Total_time = 10800
     
     E_0_partial = E_0
     
@@ -156,7 +160,7 @@ if T == 24:
     Reduced_scenario_trees = Reduced_scenario_trees
     
 elif T in [7, 10]:
-    Total_time = 1500
+    Total_time = 500
     start = 9
     E_0_partial = E_0[start:start+T]
     Reduced_P_da = [np.array(cluster)[:, start:start+T] for cluster in Reduced_P_da]
@@ -166,7 +170,7 @@ elif T in [7, 10]:
     ]
 
 elif T in [2, 4]:
-    Total_time = 30
+    Total_time = 200
     start = 9
     E_0_partial = E_0[start:start+T]
     Reduced_P_da = [np.array(cluster)[:, start:start+T] for cluster in Reduced_P_da]
@@ -204,7 +208,7 @@ plt.show()
 
 """
 
-dual_tolerance = 1e-7
+dual_tolerance = 1e-5
 tol = 1e-5
 Node_num = 1
 Lag_iter_UB = 500
@@ -3038,8 +3042,559 @@ class dual_approx_sub_da(pyo.ConcreteModel): ## Subgradient method
         return pyo.value(self.theta) 
 
 
+
+class dual_approx_lev(pyo.ConcreteModel): ## Level method
+    
+    def __init__(self, stage, reg, pi):
+        
+        super().__init__()
+        
+        self.solved = False
+        
+        self.stage = stage
+        
+        self.reg = reg
+        self.pi = pi
+        
+        self.T = T
+    
+        self._build_model()
+    
+    def _build_model(self):
+        
+        model = self.model()
+        
+        model.TIME = pyo.RangeSet(0, self.T - self.stage - 1)
+        
+        # Vars
+        
+        model.theta = pyo.Var(domain = pyo.Reals)
+        
+        model.pi_S = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_Q = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
+        model.pi_o = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_b = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_q = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.pi_E = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+                
+        # Constraints
+        
+        def initialize_theta_rule(model):
+            return model.theta >= -10000000
+        
+        model.initialize_theta = pyo.Constraint(rule = initialize_theta_rule)
+        
+        model.dual_fcn_approx = pyo.ConstraintList() 
+        
+        # Obj Fcn
+        
+        def objective_rule(model):
+            return (
+                model.theta
+                + self.reg*(
+                    + (model.pi_S)**2
+                    + sum((model.pi_Q[t])**2 for t in range(self.T - self.stage))
+                    + (model.pi_o)**2 
+                    + (model.pi_b)**2 
+                    + (model.pi_q)**2 
+                    + (model.pi_E)**2 
+                )
+            )
+            
+        model.objective = pyo.Objective(rule = objective_rule, sense = pyo.minimize)
+
+    def add_plane(self, coeff):
+        
+        lamb = coeff[0]
+        k = coeff[1]
+                
+        model = self.model()
+        
+        model.dual_fcn_approx.add(model.theta >= (
+            lamb 
+            + k[0]*model.pi_S 
+            + sum(k[1][t]*model.pi_Q[t] for t in range(self.T - self.stage)) 
+            + k[2]*model.pi_o 
+            + k[3]*model.pi_b 
+            + k[4]*model.pi_q 
+            + k[5]*model.pi_E)
+            )
+    
+    def solve(self):
+        
+        SOLVER.solve(self)
+        self.solved = True
+        
+    def get_solution_value(self):
+        
+        self.solve()
+        self.solved = True
+
+        pi = [
+            pyo.value(self.pi_S),
+            [pyo.value(self.pi_Q[t]) for t in range(self.T - self.stage)],
+            pyo.value(self.pi_o),
+            pyo.value(self.pi_b),
+            pyo.value(self.pi_q),
+            pyo.value(self.pi_E)
+        ]
+        
+        return pi
+    
+    def get_objective_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        return pyo.value(self.theta) 
+
+class dual_approx_lev_da(pyo.ConcreteModel): ## Level method
+    
+    def __init__(self, reg, pi):
+        
+        super().__init__()
+        
+        self.solved = False
+        
+        self.reg = reg
+        self.pi = pi
+        
+        self.T = T
+    
+        self._build_model()
+    
+    def _build_model(self):
+        
+        model = self.model()
+        
+        model.TIME = pyo.RangeSet(0, self.T - 1)
+        
+        # Vars
+        
+        model.theta = pyo.Var(domain = pyo.Reals)
+        
+        model.pi_b = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
+        model.pi_q = pyo.Var(model.TIME, domain = pyo.Reals, initialize = 0.0)
+                
+        # Constraints
+        
+        def initialize_theta_rule(model):
+            return model.theta >= -10000000
+        
+        model.initialize_theta = pyo.Constraint(rule = initialize_theta_rule)
+        
+        model.dual_fcn_approx = pyo.ConstraintList() 
+        
+        # Obj Fcn
+        
+        def objective_rule(model):
+            return (
+                model.theta
+                + self.reg*(
+                    + sum((model.pi_b[t])**2 for t in range(self.T))
+                    + sum((model.pi_q[t])**2 for t in range(self.T))
+                )
+            )
+            
+        model.objective = pyo.Objective(rule = objective_rule, sense = pyo.minimize)
+
+    def add_plane(self, coeff):
+        
+        lamb = coeff[0]
+        k = coeff[1]
+                
+        model = self.model()
+        
+        model.dual_fcn_approx.add(model.theta >= (
+                lamb 
+                + sum(k[0][t]*model.pi_b[t] for t in range(self.T)) 
+                + sum(k[1][t]*model.pi_q[t] for t in range(self.T)) 
+                )
+            )
+    
+    def solve(self):
+        
+        SOLVER.solve(self)
+        self.solved = True
+        
+    def get_solution_value(self):
+        
+        self.solve()
+        self.solved = True
+
+        pi = [
+            [pyo.value(self.pi_b[t]) for t in range(self.T)],
+            [pyo.value(self.pi_q[t]) for t in range(self.T)],
+        ]
+        
+        return pi
+    
+    def get_objective_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        return pyo.value(self.theta) 
+
+
+
 # PSDDiP Algorithm
-                                 
+
+
+def inner_product(t, pi, sol):
+    
+    return sum(pi[i]*sol[i] for i in [0, 2, 3, 4, 5]) + sum(pi[1][j]*sol[1][j] for j in range(T - t))
+
+
+def process_single_subproblem_last_stage(j, prev_solution, P_da, delta, cut_mode):
+    
+    fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax(prev_solution, P_da, delta)
+    psi_sub = fw_rt_last_LP_relax_subp.get_cut_coefficients()
+    
+    if cut_mode in ['B']:
+        v = psi_sub[0]
+        
+    else:
+        lag = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 7)], P_da, delta)
+        v = lag.get_objective_value()
+        
+    return psi_sub, v            
+
+def process_single_subproblem_inner_stage(j, t, prev_solution, psi_next, P_da, delta, cut_mode):
+    
+    fw_rt_LP_relax_subp = fw_rt_LP_relax(t, prev_solution, psi_next, P_da, delta)
+    psi_sub = fw_rt_LP_relax_subp.get_cut_coefficients()
+    
+    if cut_mode in ['B']:
+        v = psi_sub[0]
+        
+    else:
+        lag = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 7)], psi_next, P_da, delta)
+        v = lag.get_objective_value()
+        
+    return psi_sub, v
+
+
+def process_lag_last_stage(j, prev_solution, P_da, delta):
+
+    fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax(prev_solution, P_da, delta)
+    
+    pi = fw_rt_last_LP_relax_subp.get_cut_coefficients()[1:]
+    
+    reg = 0.00001
+    G = 10000000
+    gap = 1       
+    lamb = 0
+    k_lag = [0, [0], 0, 0, 0, 0]
+    l = 10000000
+    
+    dual_subp_sub_last = dual_approx_sub(T-1, reg, pi)
+    
+    fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, P_da, delta)
+    
+    L = fw_rt_last_Lag_subp.get_objective_value()
+    z = fw_rt_last_Lag_subp.get_auxiliary_value()
+    
+    Lag_iter = 1
+                
+    pi_minobj = 10000000
+
+    while gap >= dual_tolerance:            
+        
+        if Lag_iter >= 3:
+            
+            dual_subp_sub_last.reg = 0
+        
+        lamb = L + inner_product(T - 1, pi, z)
+        
+        for l in [0, 2, 3, 4, 5]:
+            
+            k_lag[l] = prev_solution[l] - z[l]
+        
+        for l in [1]:
+            
+            k_lag[l][0] = prev_solution[l][0] - z[l][0]
+        
+        dual_coeff = [lamb, k_lag]
+                                    
+        dual_subp_sub_last.add_plane(dual_coeff)
+        pi = dual_subp_sub_last.get_solution_value()
+        obj = dual_subp_sub_last.get_objective_value()
+        
+        fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, P_da, delta)
+                
+        L = fw_rt_last_Lag_subp.get_objective_value()
+        z = fw_rt_last_Lag_subp.get_auxiliary_value()
+                                                            
+        pi_obj = L + inner_product(T - 1, pi, prev_solution)
+                        
+        if pi_obj < pi_minobj:
+            
+            pi_minobj = pi_obj
+            pi_min = pi
+        
+        if pi_obj == -G:
+            Lag_iter += 1
+            continue
+        
+        gap = (pi_obj - obj)/(pi_obj+G)
+                                                                    
+        Lag_iter += 1
+        
+        if Lag_iter == Lag_iter_UB:
+            
+            break
+
+    return pi, L
+
+def process_lag_inner_stage(j, t, prev_solution, psi_next, P_da, delta):
+
+    fw_rt_LP_relax_subp = fw_rt_LP_relax(t, prev_solution, psi_next, P_da, delta)
+    
+    pi = fw_rt_LP_relax_subp.get_cut_coefficients()[1:]
+        
+    reg = 0.00001
+    G = 10000000
+    gap = 1       
+    lamb = 0
+    k_lag = [0, [0 for _ in range(T - t)], 0, 0, 0, 0]
+    l = 10000000*(T - t)
+    
+    dual_subp_sub = dual_approx_sub(t, reg, pi)
+    fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, psi_next, P_da, delta)
+    
+    L = fw_rt_Lag_subp.get_objective_value()
+    z = fw_rt_Lag_subp.get_auxiliary_value()
+    
+    Lag_iter = 1
+                    
+    pi_minobj = 10000000*(T - t)
+                    
+    while gap >= dual_tolerance:
+        
+        if Lag_iter >= 3:
+            
+            dual_subp_sub.reg = 0
+        
+        lamb = L + inner_product(t, pi, z)
+        
+        for l in [0, 2, 3, 4, 5]:
+            
+            k_lag[l] = prev_solution[l] - z[l]
+            
+        for l in [1]:
+            
+            for i in range(T - t):
+                
+                k_lag[l][i] = prev_solution[l][i] - z[l][i]
+                            
+        dual_coeff = [lamb, k_lag]
+                        
+        dual_subp_sub.add_plane(dual_coeff)
+        pi = dual_subp_sub.get_solution_value()
+        obj = dual_subp_sub.get_objective_value()
+                            
+        fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, psi_next, P_da, delta)
+                
+        L = fw_rt_Lag_subp.get_objective_value()
+        z = fw_rt_Lag_subp.get_auxiliary_value()
+                                
+        pi_obj = L + inner_product(t, pi, prev_solution)
+        
+        if pi_obj < pi_minobj:
+        
+            pi_minobj = pi_obj
+            pi_min = pi
+        
+        if pi_obj == -G:
+            Lag_iter += 1
+            continue
+        
+        gap = (pi_obj - obj)/(pi_obj+G)
+                                                                
+        Lag_iter += 1    
+        
+        if Lag_iter == Lag_iter_UB:
+        
+            break
+        
+    return pi, L
+
+
+def process_hyb_last_stage(j, prev_solution, P_da, delta, threshold):
+
+    fw_rt_last_LP_relax_subp    = fw_rt_last_LP_relax(prev_solution, P_da, delta)
+    
+    psi_sub   = fw_rt_last_LP_relax_subp.get_cut_coefficients()
+    
+    pi = psi_sub[1:]
+    
+    P_rt = delta[1]
+
+    if P_rt <= P_da[T-1] + threshold:
+        
+        fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian(pi, P_da, delta)
+        v = fw_rt_last_Lagrangian_subp.get_objective_value()
+        
+    else:
+
+        G = 10000000
+        gap = 1       
+        lamb = 0
+        k_lag = [0, [0], 0, 0, 0, 0]
+        l = 10000000
+        reg = 0.00001
+
+        dual_subp_sub_last = dual_approx_sub(T - 1, reg, pi)
+        
+        fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, P_da, delta)
+        
+        L = fw_rt_last_Lag_subp.get_objective_value()
+        z = fw_rt_last_Lag_subp.get_auxiliary_value()
+        
+        Lag_iter = 1
+                    
+        pi_minobj = 10000000
+        
+        while gap >= dual_tolerance:            
+            
+            if Lag_iter >= 3:
+                
+                dual_subp_sub_last.reg = 0
+            
+            lamb = L + inner_product(T - 1, pi, z)
+            
+            for l in [0, 2, 3, 4, 5]:
+                
+                k_lag[l] = prev_solution[l] - z[l]
+            
+            for l in [1]:
+                
+                k_lag[l][0] = prev_solution[l][0] - z[l][0]
+            
+            dual_coeff = [lamb, k_lag]            
+            
+            dual_subp_sub_last.add_plane(dual_coeff)
+            pi = dual_subp_sub_last.get_solution_value()
+            obj = dual_subp_sub_last.get_objective_value()
+            
+            fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, P_da, delta)
+                        
+            L = fw_rt_last_Lag_subp.get_objective_value()
+            z = fw_rt_last_Lag_subp.get_auxiliary_value()
+                                                                
+            pi_obj = L + inner_product(T - 1, pi, prev_solution)
+                            
+            if pi_obj < pi_minobj:
+                
+                pi_minobj = pi_obj
+                pi_min = pi
+            
+            if pi_obj == -G:
+                Lag_iter += 1
+                continue
+            
+            gap = (pi_obj - obj)/(pi_obj+G)
+                                                                            
+            Lag_iter += 1
+            
+            if Lag_iter == Lag_iter_UB:
+                
+                break
+            
+        v = L
+
+    return pi, v
+
+def process_hyb_inner_stage(j, t, prev_solution, psi_next, P_da, delta, threshold):
+
+    fw_rt_LP_relax_subp    = fw_rt_LP_relax(t, prev_solution, psi_next, P_da, delta)
+    
+    psi_sub   = fw_rt_LP_relax_subp.get_cut_coefficients()
+    
+    pi = psi_sub[1:]
+    
+    P_rt = delta[1]
+
+    if P_rt <= P_da[t] + threshold:
+        
+        fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, pi, psi_next, P_da, delta)
+        v = fw_rt_Lagrangian_subp.get_objective_value()
+        
+    else:
+        
+        G = 10000000
+        gap = 1
+        lamb = 0
+        k_lag = [0, [0 for _ in range(T - t)], 0, 0, 0, 0]
+        l = 10000000*(T - t)
+        reg = 0.00001
+                        
+        dual_subp_sub = dual_approx_sub(t, reg, pi)
+        
+        fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, psi_next, P_da, delta)
+        
+        L = fw_rt_Lag_subp.get_objective_value()
+        z = fw_rt_Lag_subp.get_auxiliary_value()    
+                        
+        Lag_iter = 1
+                        
+        pi_minobj = 10000000*(T - t)
+        
+        while gap >= dual_tolerance:
+            
+            if Lag_iter >= 3:
+                
+                dual_subp_sub.reg = 0
+            
+            lamb = L + inner_product(t, pi, z)
+            
+            for l in [0, 2, 3, 4, 5]:
+                
+                k_lag[l] = prev_solution[l] - z[l]
+                
+            for l in [1]:
+                
+                for i in range(T - t):
+                    
+                    k_lag[l][i] = prev_solution[l][i] - z[l][i]
+                                
+            dual_coeff = [lamb, k_lag]
+                                
+            dual_subp_sub.add_plane(dual_coeff)
+            pi = dual_subp_sub.get_solution_value()
+            obj = dual_subp_sub.get_objective_value()
+                                
+            fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, psi_next, P_da, delta)
+                        
+            L = fw_rt_Lag_subp.get_objective_value()
+            z = fw_rt_Lag_subp.get_auxiliary_value()
+                                    
+            pi_obj = L + inner_product(t, pi, prev_solution)
+            
+            if pi_obj < pi_minobj:
+            
+                pi_minobj = pi_obj
+                pi_min = pi
+            
+            if pi_obj == -G:
+                Lag_iter += 1
+                continue
+            
+            gap = (pi_obj - obj)/(pi_obj+G)
+                                                                    
+            Lag_iter += 1    
+            
+            if Lag_iter == Lag_iter_UB:
+            
+                break
+        v = L
+
+    return pi, v
+
+
 class PSDDiPModel:
         
     def __init__(
@@ -3054,6 +3609,7 @@ class PSDDiPModel:
         alpha = 0.95, 
         cut_mode = 'B',
         tol = 0.001,
+        parallel_mode = 0
         ):
 
         ## STAGE = -1, 0, ..., STAGE - 1
@@ -3074,12 +3630,14 @@ class PSDDiPModel:
         self.alpha = alpha
         self.cut_mode = cut_mode
         self.tol = tol
+        
+        self.parallel_mode = parallel_mode
                 
         self.iteration = 0
         
         self.K = len(self.DA_params)
         self.N_t = len(self.RT_params[0][0])
-        
+            
         self.K_eval = len(self.DA_params_evaluation)
                 
         self.start_time = time.time()
@@ -3181,10 +3739,11 @@ class PSDDiPModel:
 
     def find_cluster_index_for_evaluation(self, n):
         
-        P_da = 10
-        k = 10
+        actual_P_da = np.array(self.DA_params_evaluation[n])
+        centers = np.array(self.DA_params)  
+        dists = np.linalg.norm(centers - actual_P_da, axis=1)
         
-        return k
+        return int(np.argmin(dists))
             
     def forward_pass(self, scenarios):
         
@@ -3297,7 +3856,7 @@ class PSDDiPModel:
             
             k = self.find_cluster_index_for_evaluation(n)
             
-            P_da = self.DA_params[k]  ## <--- bitch
+            P_da = self.DA_params_evaluation[n]  ## <--- bitch
             
             fw_rt_init_subp = fw_rt_init(fw_da_state, self.psi[k][0], P_da)
             fw_rt_init_state = fw_rt_init_subp.get_state_solutions()
@@ -3325,16 +3884,13 @@ class PSDDiPModel:
                 f.append(f_scenario)
             
         mu_hat = np.mean(f)
+        
         sigma_hat = np.std(f, ddof=1)  
 
         z_alpha_half = 1.96  
         
-        #self.LB.append(mu_hat - z_alpha_half * (sigma_hat / np.sqrt(self.M))) 
-        self.LB.append(mu_hat) 
+        self.eval = mu_hat 
         
-        return mu_hat
-
-
     def inner_product(self, t, pi, sol):
         
         return sum(pi[i]*sol[i] for i in [0, 2, 3, 4, 5]) + sum(pi[1][j]*sol[1][j] for j in range(self.STAGE - t))
@@ -3342,7 +3898,7 @@ class PSDDiPModel:
     def backward_pass(self):
         
         BL = ['B']
-        SBL = ['SB', 'L-sub', 'L-lev', 'hyb']
+        SBL = ['SB', 'L-sub', 'L-lev']
         
         for k, P_da in enumerate(self.DA_params):
             
@@ -3374,7 +3930,7 @@ class PSDDiPModel:
                     
                     v_sum += psi_sub[0]
                 
-                elif self.cut_mode in SBL:
+                elif self.cut_mode in SBL or self.cut_mode.startswith('hyb'):
                     
                     fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 7)], P_da, delta)
 
@@ -3384,7 +3940,7 @@ class PSDDiPModel:
                     
                 v = v_sum/self.N_t - self.inner_product(self.STAGE - 1, pi_mean, prev_solution)
             
-            elif self.cut_mode in SBL:
+            elif self.cut_mode in SBL or self.cut_mode.startswith('hyb'):
                 
                 v = v_sum/self.N_t
                 
@@ -3429,7 +3985,7 @@ class PSDDiPModel:
                         
                         v_sum += psi_sub[0]
                         
-                    elif self.cut_mode in SBL:
+                    elif self.cut_mode in SBL or self.cut_mode.startswith('hyb'):
                         
                         fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 7)], self.psi[k][t+1], P_da, delta)
 
@@ -3439,7 +3995,7 @@ class PSDDiPModel:
                     
                     v = v_sum/self.N_t - self.inner_product(t, pi_mean, prev_solution)
             
-                if self.cut_mode in SBL:
+                if self.cut_mode in SBL or self.cut_mode.startswith('hyb'):
                     
                     v = v_sum/self.N_t
             
@@ -3472,7 +4028,7 @@ class PSDDiPModel:
                 
                 v_sum += psi_sub[0]
                 
-            elif self.cut_mode in SBL:
+            elif self.cut_mode in SBL or self.cut_mode.startswith('hyb'):
                 
                 fw_rt_init_Lagrangian_subp = fw_rt_init_Lagrangian(
                     [psi_sub[i] for i in [1, 2]], 
@@ -3486,7 +4042,7 @@ class PSDDiPModel:
             
             v = v_sum/self.K - self.inner_product_da(pi_mean, prev_solution)
             
-        elif self.cut_mode in SBL:
+        elif self.cut_mode in SBL or self.cut_mode.startswith('hyb'):
             
             v = v_sum/self.K
         
@@ -3787,278 +4343,108 @@ class PSDDiPModel:
         self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))   
 
     def backward_pass_hybrid(self):
-                
-        ## t = {T-1 -> T-2}
         
-        v_sum = 0 
-        pi_mean = [0, [0], 0, 0, 0, 0]
-        
-        Lag_elapsed_time = 0
-        
-        prev_solution = self.forward_solutions[self.STAGE - 1][0]
+        for k, P_da in enumerate(self.DA_params):
                 
-        for j in range(self.N_t): 
-            
-            delta = stage_params[T - 1][j]      
-            
-            P_rt = delta[1]
-            P_da = P_da_partial[T - 1]
-            
-            fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax(prev_solution, delta, 0)
-            
-            psi_sub = fw_rt_last_LP_relax_subp.get_cut_coefficients()
-            
-            if P_rt <= P_da:
+            stage_params = self.RT_params[k]    
                 
-                pi_mean[0] += psi_sub[1]/self.N_t
-                pi_mean[1][0] += psi_sub[2][0]/self.N_t
-                pi_mean[2] += psi_sub[3]/self.N_t
-                pi_mean[3] += psi_sub[4]/self.N_t
-                pi_mean[4] += psi_sub[5]/self.N_t
-                pi_mean[5] += psi_sub[6]/self.N_t
-                                    
-                fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 7)], delta)
+            ## t = {T-1 -> T-2}
+            
+            reg = 0.00001
+            
+            G = 10000000
+            lev = 0.9
+            gap = 1  
+            
+            v_sum = 0 
+            pi_mean = [0, [0], 0, 0, 0, 0]
+            
+            threshold = int(self.cut_mode.split('-')[1])
+                        
+            prev_solution = self.forward_solutions[k][self.STAGE - 1][0]
+                    
+            for j in range(self.N_t): 
+                
+                delta = stage_params[self.STAGE - 1][j]      
+                
+                P_rt_branch = delta[1]
+                P_da_branch = P_da[self.STAGE - 1]
+                
+                fw_rt_last_LP_relax_subp = fw_rt_last_LP_relax(prev_solution, P_da, delta)
+                
+                psi_sub = fw_rt_last_LP_relax_subp.get_cut_coefficients()
+                
+                if P_rt_branch <= P_da_branch + threshold:
+                        
+                    pi_mean[0] += psi_sub[1]/self.N_t
+                    pi_mean[1][0] += psi_sub[2][0]/self.N_t
+                    pi_mean[2] += psi_sub[3]/self.N_t
+                    pi_mean[3] += psi_sub[4]/self.N_t
+                    pi_mean[4] += psi_sub[5]/self.N_t
+                    pi_mean[5] += psi_sub[6]/self.N_t    
+                    
+                    fw_rt_last_Lagrangian_subp = fw_rt_last_Lagrangian([psi_sub[i] for i in range(1, 7)], P_da, delta)
 
-                v_sum += fw_rt_last_Lagrangian_subp.get_objective_value()
-                
-            else:
-                
-                pi_LP = psi_sub[1:]
-                
-                pi = pi_LP
-                pi_min = pi_LP
-                
-                reg = 0.00001
-                G = 10000000
-                lev = 0.9
-                gap = 1       
-                lamb = 0
-                k = [0, [0], 0, 0, 0, 0]
-                l = 10000000
+                    v_sum += fw_rt_last_Lagrangian_subp.get_objective_value()
+                    
+                else:
                             
-                dual_subp_sub_last = dual_approx_sub(self.STAGE - 1, reg, pi_LP)
-                #dual_subp_lev_last = dual_approx_lev(self.STAGE - 1, reg, pi_LP, l)
-                
-                fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, delta)
-                
-                L = fw_rt_last_Lag_subp.get_objective_value()
-                z = fw_rt_last_Lag_subp.get_auxiliary_value()
-                
-                Lag_iter = 1
+                    pi_LP = psi_sub[1:]
+                    
+                    pi = pi_LP
+                    pi_min = pi_LP
+                    
+                    G = 10000000
+                    lev = 0.9
+                    gap = 1       
+                    lamb = 0
+                    k_lag = [0, [0], 0, 0, 0, 0]
+                    l = 10000000
+                                
+                    dual_subp_sub_last = dual_approx_sub(self.STAGE - 1, reg, pi_LP)
+                    
+                    fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, P_da, delta)
+                    
+                    L = fw_rt_last_Lag_subp.get_objective_value()
+                    z = fw_rt_last_Lag_subp.get_auxiliary_value()
+                    
+                    Lag_iter = 1
+                                
+                    pi_minobj = 10000000
+                    
+                    while gap >= dual_tolerance:            
+                        
+                        if Lag_iter >= 3:
                             
-                pi_minobj = 10000000
-                
-                while gap >= dual_tolerance:            
-                    
-                    if Lag_iter >= 3:
-                    
-                        dual_subp_sub_last.reg = 0
-                    
-                    lamb = L + self.inner_product(self.STAGE - 1, pi, z)
-                    
-                    for l in [0, 2, 3, 4, 5]:
+                            dual_subp_sub_last.reg = 0
                         
-                        k[l] = prev_solution[l] - z[l]
-                    
-                    for l in [1]:
+                        lamb = L + self.inner_product(self.STAGE - 1, pi, z)
                         
-                        k[l][0] = prev_solution[l][0] - z[l][0]
-                    
-                    dual_coeff = [lamb, k]
-                                    
-                    if self.cut_mode == 'hyb':
+                        for l in [0, 2, 3, 4, 5]:
+                            
+                            k_lag[l] = prev_solution[l] - z[l]
+                        
+                        for l in [1]:
+                            
+                            k_lag[l][0] = prev_solution[l][0] - z[l][0]
+                        
+                        dual_coeff = [lamb, k_lag]            
                         
                         dual_subp_sub_last.add_plane(dual_coeff)
                         pi = dual_subp_sub_last.get_solution_value()
                         obj = dual_subp_sub_last.get_objective_value()
                         
-                    elif self.cut_mode == 'L-lev':
-                                                                
-                        dual_subp_sub_last.add_plane(dual_coeff)
-                        #dual_subp_lev_last.add_plane(dual_coeff)
-                                            
-                        f_lb = dual_subp_sub_last.get_objective_value()
-                        f_ub = pi_minobj
-                                            
-                        l = f_lb + lev*(f_ub - f_lb)
-                                            
-                        #dual_subp_lev_last.level = l
-                        #dual_subp_lev_last.pi = pi_min
-                                            
-                        #pi = dual_subp_lev_last.get_solution_value()
-                        
-                        obj = f_lb
-                    
-                    fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, delta)
-                    
-                    start_time = time.time()
-                    
-                    L = fw_rt_last_Lag_subp.get_objective_value()
-                    z = fw_rt_last_Lag_subp.get_auxiliary_value()
-                              
-                    Lag_elapsed_time += time.time() - start_time
-                                    
-                    pi_obj = L + self.inner_product(self.STAGE - 1, pi, prev_solution)
-                                    
-                    if pi_obj < pi_minobj:
-                        
-                        pi_minobj = pi_obj
-                        pi_min = pi
-                    
-                    if pi_obj == -G:
-                        Lag_iter += 1
-                        continue
-                    
-                    gap = (pi_obj - obj)/(pi_obj+G)
-                                            
-                    #print(f"k = {k}, \npi = {pi} \n, \ngap = {gap}, \npi_obj = {pi_obj}, \nobj = {obj}")
-                                                
-                    Lag_iter += 1
-                            
-                    if Lag_iter == Lag_iter_UB:
-                    
-                        break        
-                            
-                pi_mean[0] += pi[0]/self.N_t
-                pi_mean[1][0] += pi[1][0]/self.N_t
-                pi_mean[2] += pi[2]/self.N_t
-                pi_mean[3] += pi[3]/self.N_t
-                pi_mean[4] += pi[4]/self.N_t
-                pi_mean[5] += pi[5]/self.N_t
-                
-                v_sum += L
-                    
-        v = v_sum/self.N_t
-            
-        cut_coeff = []
-        
-        cut_coeff.append(v)
-        
-        for i in range(6):
-            cut_coeff.append(pi_mean[i])
-        
-        self.psi[self.STAGE - 1].append(cut_coeff)
-                
-        #print(f"last_stage_cut_coeff = {self.psi[T-1]}")
-        
-        ## t = {T-2 -> T-3}, ..., {0 -> -1}
-        
-        for t in range(self.STAGE - 2, -1, -1): 
-            
-            v_sum = 0 
-            pi_mean = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
-            
-            prev_solution = self.forward_solutions[t][0]
-                        
-            for j in range(self.N_t):
-                                
-                delta = stage_params[t][j]
-                
-                P_rt = delta[1]
-                P_da = P_da_partial[t]
-                
-                fw_rt_LP_relax_subp = fw_rt_LP_relax(t, prev_solution, self.psi[t+1], delta, 0)
-
-                psi_sub = fw_rt_LP_relax_subp.get_cut_coefficients()
-                
-                if P_rt <= P_da:
-                    
-                    pi_mean[0] += psi_sub[1]/self.N_t
-                
-                    for i in range(self.STAGE - t):
-                        pi_mean[1][i] += psi_sub[2][i]/self.N_t
-                        
-                    pi_mean[2] += psi_sub[3]/self.N_t
-                    pi_mean[3] += psi_sub[4]/self.N_t
-                    pi_mean[4] += psi_sub[5]/self.N_t
-                    pi_mean[5] += psi_sub[6]/self.N_t
-                        
-                    fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 7)], self.psi[t+1], delta)
-
-                    v_sum += fw_rt_Lagrangian_subp.get_objective_value()
-                
-                else:
-                
-                    pi_LP = psi_sub[1:]
-                    
-                    pi = pi_LP
-                    pi_min = pi_LP
-                                    
-                    lev = 0.9
-                    G = 10000000
-                    reg = 0.00001
-                    gap = 1
-                    lamb = 0
-                    k = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
-                    l = 10000000*(self.STAGE - t)
-                        
-                    dual_subp_sub = dual_approx_sub(t, reg, pi_LP)
-                    dual_subp_lev = dual_approx_lev(t, reg, pi_LP, l)
-                    
-                    fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, self.psi[t+1], delta)
-                    
-                    L = fw_rt_Lag_subp.get_objective_value()
-                    z = fw_rt_Lag_subp.get_auxiliary_value()    
-                                    
-                    Lag_iter = 1
-                                    
-                    pi_minobj = 10000000*(self.STAGE - t)
-                    
-                    while gap >= dual_tolerance:
-                        
-                        if Lag_iter >= 3:
-                            
-                            dual_subp_sub.reg = 0
-                        
-                        lamb = L + self.inner_product(t, pi, z)
-                        
-                        for l in [0, 2, 3, 4, 5]:
-                            
-                            k[l] = prev_solution[l] - z[l]
-                            
-                        for l in [1]:
-                            
-                            for i in range(self.STAGE - t):
-                                
-                                k[l][i] = prev_solution[l][i] - z[l][i]
-                                            
-                        dual_coeff = [lamb, k]
-                                            
-                        if self.cut_mode == 'hyb':
-                            dual_subp_sub.add_plane(dual_coeff)
-                            pi = dual_subp_sub.get_solution_value()
-                            obj = dual_subp_sub.get_objective_value()
-                        
-                        elif self.cut_mode == 'L-lev':
-                            
-                            dual_subp_sub.add_plane(dual_coeff)
-                            dual_subp_lev.add_plane(dual_coeff)
-                            
-                            f_lb = dual_subp_sub.get_objective_value()
-                            f_ub = pi_minobj
-                            
-                            l = f_lb + lev*(f_ub - f_lb)
-                            
-                            dual_subp_lev.level = l
-                            dual_subp_lev.pi = pi_min
-
-                            pi = dual_subp_lev.get_solution_value()
-                            
-                            obj = f_lb
-                                            
-                        fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, self.psi[t+1], delta)
+                        fw_rt_last_Lag_subp = fw_rt_last_Lagrangian(pi, P_da, delta)
                         
                         start_time = time.time()
                         
-                        L = fw_rt_Lag_subp.get_objective_value()
-                        z = fw_rt_Lag_subp.get_auxiliary_value()
-                        
-                        Lag_elapsed_time += time.time() - start_time
-                        
-                        pi_obj = L + self.inner_product(t, pi, prev_solution)
-                        
+                        L = fw_rt_last_Lag_subp.get_objective_value()
+                        z = fw_rt_last_Lag_subp.get_auxiliary_value()
+                                                                            
+                        pi_obj = L + self.inner_product(self.STAGE - 1, pi, prev_solution)
+                                        
                         if pi_obj < pi_minobj:
-                        
+                            
                             pi_minobj = pi_obj
                             pi_min = pi
                         
@@ -4067,46 +4453,538 @@ class PSDDiPModel:
                             continue
                         
                         gap = (pi_obj - obj)/(pi_obj+G)
-                                                                                
-                        Lag_iter += 1      
-                        #print(Lag_iter)                  
+                                                
+                        #print(f"k = {k}, \npi = {pi} \n, \ngap = {gap}, \npi_obj = {pi_obj}, \nobj = {obj}")
+                                                    
+                        Lag_iter += 1
+                        
                         if Lag_iter == Lag_iter_UB:
-                        
+                            
                             break
-                                        
+                                    
                     pi_mean[0] += pi[0]/self.N_t
-                    
-                    for i in range(self.STAGE - t):
-                        pi_mean[1][i] += pi[1][i]/self.N_t
-                        
+                    pi_mean[1][0] += pi[1][0]/self.N_t
                     pi_mean[2] += pi[2]/self.N_t
                     pi_mean[3] += pi[3]/self.N_t
                     pi_mean[4] += pi[4]/self.N_t
                     pi_mean[5] += pi[5]/self.N_t
-                                    
+                    
                     v_sum += L
-                            
+                    
             v = v_sum/self.N_t
-        
+                
             cut_coeff = []
             
             cut_coeff.append(v)
             
             for i in range(6):
                 cut_coeff.append(pi_mean[i])
-        
-            self.psi[t].append(cut_coeff)
-            #print(f"stage {t - 1} _cut_coeff = {self.psi[t]}")
+            
+            self.psi[k][self.STAGE - 1].append(cut_coeff)
+                    
+            #print(f"last_stage_cut_coeff = {self.psi[T-1]}")
+            
+            ## t = {T-2 -> T-3}, ..., {0 -> -1}
+            
+            for t in range(self.STAGE - 2, -1, -1): 
+                
+                v_sum = 0 
+                pi_mean = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
+                
+                prev_solution = self.forward_solutions[k][t][0]
+                            
+                for j in range(self.N_t):
+                                    
+                    delta = stage_params[t][j]
+                    
+                    P_rt_branch = delta[1]
+                    P_da_branch = P_da[t]
+                    
+                    fw_rt_LP_relax_subp = fw_rt_LP_relax(t, prev_solution, self.psi[k][t+1], P_da, delta)
 
-        self.forward_solutions = [
-            [] for _ in range(self.STAGE)
-        ]
+                    psi_sub = fw_rt_LP_relax_subp.get_cut_coefficients()
+                    
+                    if P_rt_branch <= P_da_branch + threshold:
+                        
+                        pi_mean[0] += psi_sub[1]/self.N_t
+                        
+                        for i in range(self.STAGE - t):
+                            pi_mean[1][i] += psi_sub[2][i]/self.N_t
+                            
+                        pi_mean[2] += psi_sub[3]/self.N_t
+                        pi_mean[3] += psi_sub[4]/self.N_t
+                        pi_mean[4] += psi_sub[5]/self.N_t
+                        pi_mean[5] += psi_sub[6]/self.N_t
+                        
+                        fw_rt_Lagrangian_subp = fw_rt_Lagrangian(t, [psi_sub[i] for i in range(1, 7)], self.psi[k][t+1], P_da, delta)
+
+                        v_sum += fw_rt_Lagrangian_subp.get_objective_value()
+
+                    else: 
+                        
+                        pi_LP = psi_sub[1:]
+                        
+                        pi = pi_LP
+                        pi_min = pi_LP
+                                        
+                        lev = 0.9
+                        gap = 1
+                        lamb = 0
+                        k_lag = [0, [0 for _ in range(self.STAGE - t)], 0, 0, 0, 0]
+                        l = 10000000*(self.STAGE - t)
+                            
+                        dual_subp_sub = dual_approx_sub(t, reg, pi_LP)
+                        
+                        fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, self.psi[k][t+1], P_da, delta)
+                        
+                        L = fw_rt_Lag_subp.get_objective_value()
+                        z = fw_rt_Lag_subp.get_auxiliary_value()    
+                                        
+                        Lag_iter = 1
+                                        
+                        pi_minobj = 10000000*(self.STAGE - t)
+                        
+                        while gap >= dual_tolerance:
+                            
+                            if Lag_iter >= 3:
+                                
+                                dual_subp_sub.reg = 0
+                            
+                            lamb = L + self.inner_product(t, pi, z)
+                            
+                            for l in [0, 2, 3, 4, 5]:
+                                
+                                k_lag[l] = prev_solution[l] - z[l]
+                                
+                            for l in [1]:
+                                
+                                for i in range(self.STAGE - t):
+                                    
+                                    k_lag[l][i] = prev_solution[l][i] - z[l][i]
+                                                
+                            dual_coeff = [lamb, k_lag]
+                                                
+                            dual_subp_sub.add_plane(dual_coeff)
+                            pi = dual_subp_sub.get_solution_value()
+                            obj = dual_subp_sub.get_objective_value()
+                                                
+                            fw_rt_Lag_subp = fw_rt_Lagrangian(t, pi, self.psi[k][t+1], P_da, delta)
+                            
+                            start_time = time.time()
+                            
+                            L = fw_rt_Lag_subp.get_objective_value()
+                            z = fw_rt_Lag_subp.get_auxiliary_value()
+                                                    
+                            pi_obj = L + self.inner_product(t, pi, prev_solution)
+                            
+                            if pi_obj < pi_minobj:
+                            
+                                pi_minobj = pi_obj
+                                pi_min = pi
+                            
+                            if pi_obj == -G:
+                                Lag_iter += 1
+                                continue
+                            
+                            gap = (pi_obj - obj)/(pi_obj+G)
+                                                                                    
+                            Lag_iter += 1    
+                            
+                            if Lag_iter == Lag_iter_UB:
+                            
+                                break
+                                                                                    
+                        pi_mean[0] += pi[0]/self.N_t
+                        
+                        for i in range(self.STAGE - t):
+                            pi_mean[1][i] += pi[1][i]/self.N_t
+                            
+                        pi_mean[2] += pi[2]/self.N_t
+                        pi_mean[3] += pi[3]/self.N_t
+                        pi_mean[4] += pi[4]/self.N_t
+                        pi_mean[5] += pi[5]/self.N_t
+                                        
+                        v_sum += L
+                                
+                v = v_sum/self.N_t
+            
+                cut_coeff = []
+                
+                cut_coeff.append(v)
+                
+                for i in range(6):
+                    cut_coeff.append(pi_mean[i])
+            
+                self.psi[k][t].append(cut_coeff)
+                #print(f"stage {t - 1} _cut_coeff = {self.psi[t]}")
+
+        v_sum = 0
+        pi_mean = [[0 for _ in range(self.STAGE)], [0 for _ in range(self.STAGE)]]
         
-        fw_da_for_UB = fw_da(self.psi[0])
+        prev_solution = self.forward_solutions_da[0] 
         
-        self.Lag_elapsed_time_list.append(Lag_elapsed_time)
+        for k, P_da in enumerate(self.DA_params):
+            
+            fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(prev_solution, self.psi[k][0], P_da)
+
+            psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+            
+            for i in range(self.STAGE):
+                pi_mean[0][i] += psi_sub[1][i]/self.K
+                pi_mean[1][i] += psi_sub[2][i]/self.K
+                
+            fw_rt_init_Lagrangian_subp = fw_rt_init_Lagrangian(
+                [psi_sub[i] for i in [1, 2]], 
+                self.psi[k][0], 
+                P_da
+                )
+
+            v_sum += fw_rt_init_Lagrangian_subp.get_objective_value()
+                        
+        v = v_sum/self.K
+        
+        cut_coeff = []
+        
+        cut_coeff.append(v)
+        
+        for i in [0, 1]:
+            cut_coeff.append(pi_mean[i])
+        
+        self.psi_da.append(cut_coeff)
+
+        self.forward_solutions_da = []
+        
+        self.forward_solutions = [  
+                [
+                    [] for _ in range(self.STAGE)
+                ] for _ in range(self.K)
+            ]
+        
+        fw_da_for_UB = fw_da(self.psi_da)
         
         self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))   
+
+
+    def backward_pass_1(self):
+     
+        BL  = ['B']
+        SBL = ['SB', 'L-sub', 'L-lev']
+
+        for k, P_da in enumerate(self.DA_params):
+            
+            stage_params = self.RT_params[k]
+
+            with mp.Pool() as pool:
+
+                t_last        = self.STAGE - 1
+                prev_solution = self.forward_solutions[k][t_last][0]
+                deltas_last   = stage_params[t_last]
+
+                last_args = [
+                    (j, prev_solution, P_da, deltas_last[j], self.cut_mode)
+                    for j in range(self.N_t)
+                ]
+                
+                last_results = pool.starmap(
+                    process_single_subproblem_last_stage,
+                    last_args
+                )
+
+                v_sum   = 0.0
+                pi_mean = [0, [0], 0, 0, 0, 0]
+                
+                for psi_sub, v in last_results:
+                    
+                    v_sum += v
+                    pi_mean[0]    += psi_sub[1]    / self.N_t
+                    pi_mean[1][0] += psi_sub[2][0] / self.N_t
+                    pi_mean[2]    += psi_sub[3]    / self.N_t
+                    pi_mean[3]    += psi_sub[4]    / self.N_t
+                    pi_mean[4]    += psi_sub[5]    / self.N_t
+                    pi_mean[5]    += psi_sub[6]    / self.N_t
+
+                if self.cut_mode in BL:
+                    v = v_sum/self.N_t - self.inner_product(t_last, pi_mean, prev_solution)
+                
+                else:
+                    v = v_sum/self.N_t
+
+                cut_coeff = [v] + pi_mean
+                self.psi[k][t_last].append(cut_coeff)
+
+                for t in range(self.STAGE - 2, -1, -1):
+                    prev_solution = self.forward_solutions[k][t][0]
+                    psi_next      = self.psi[k][t+1]
+                    deltas        = stage_params[t]
+
+                    inner_args = [
+                        (j, t, prev_solution, psi_next, P_da, deltas[j], self.cut_mode)
+                        for j in range(self.N_t)
+                    ]
+                    inner_results = pool.starmap(
+                        process_single_subproblem_inner_stage,
+                        inner_args
+                    )
+
+                    v_sum   = 0.0
+                    pi_mean = [0, [0]*(self.STAGE - t), 0, 0, 0, 0]
+                    
+                    for psi_sub, v in inner_results:
+                        v_sum += v
+                        pi_mean[0] += psi_sub[1] / self.N_t
+                        
+                        for i in range(self.STAGE - t):
+                            pi_mean[1][i] += psi_sub[2][i] / self.N_t
+                        pi_mean[2] += psi_sub[3] / self.N_t
+                        pi_mean[3] += psi_sub[4] / self.N_t
+                        pi_mean[4] += psi_sub[5] / self.N_t
+                        pi_mean[5] += psi_sub[6] / self.N_t
+
+                    if self.cut_mode in BL:
+                        v = v_sum/self.N_t - self.inner_product(t, pi_mean, prev_solution)
+                    
+                    else:
+                        v = v_sum/self.N_t
+
+                    cut_coeff = [v] + pi_mean
+                    self.psi[k][t].append(cut_coeff)
+
+        v_sum   = 0.0
+        pi_mean = [[0]*self.STAGE, [0]*self.STAGE]
+        prev_solution = self.forward_solutions_da[0]
+
+        for k, P_da in enumerate(self.DA_params):
+            
+            fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(prev_solution, self.psi[k][0], P_da)
+            psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+            
+            for i in range(self.STAGE):
+                pi_mean[0][i] += psi_sub[1][i]/self.K
+                pi_mean[1][i] += psi_sub[2][i]/self.K
+
+            if self.cut_mode in BL or self.cut_mode.startswith('hyb'):
+                v_sum += psi_sub[0]
+                
+            else:
+                lag = fw_rt_init_Lagrangian([psi_sub[i] for i in [1,2]], self.psi[k][0], P_da)
+                v_sum += lag.get_objective_value()
+
+        if self.cut_mode in BL:
+            v = v_sum/self.K - self.inner_product_da(pi_mean, prev_solution)
+            
+        else:
+            v = v_sum/self.K
+
+        cut_coeff = [v] + pi_mean
+        self.psi_da.append(cut_coeff)
+
+        self.forward_solutions_da = []
+        self.forward_solutions = [[[] for _ in range(self.STAGE)] for _ in range(self.K)]
+        
+        fw_da_for_UB = fw_da(self.psi_da)
+        self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+
+    def backward_pass_Lagrangian_1(self):
+        
+        for k, P_da in enumerate(self.DA_params):
+            
+            stage_params = self.RT_params[k]
+
+            with mp.Pool() as pool:
+
+                t_last        = self.STAGE - 1
+                prev_solution = self.forward_solutions[k][t_last][0]
+                deltas_last   = stage_params[t_last]
+                
+                last_args = [
+                    (j, prev_solution, P_da, deltas_last[j])
+                    for j in range(self.N_t)
+                ]
+                
+                last_results = pool.starmap(process_lag_last_stage, last_args)
+
+                v_sum = 0.0
+                pi_mean = [0, [0], 0, 0, 0, 0]
+                
+                for pi, L in last_results:
+                    
+                    v_sum += L
+                    pi_mean[0]    += pi[0] / self.N_t
+                    pi_mean[1][0] += pi[1][0] / self.N_t
+                    pi_mean[2]    += pi[2] / self.N_t
+                    pi_mean[3]    += pi[3] / self.N_t
+                    pi_mean[4]    += pi[4] / self.N_t
+                    pi_mean[5]    += pi[5] / self.N_t
+
+                v = v_sum/self.N_t
+                
+                cut_coeff = [v] + pi_mean
+                
+                self.psi[k][t_last].append(cut_coeff)
+
+                for t in range(self.STAGE-2, -1, -1):
+                    
+                    prev = self.forward_solutions[k][t][0]
+                    psi_next = self.psi[k][t+1]
+                    
+                    args_inner = [
+                        (j, t, prev, psi_next, P_da, stage_params[t][j])
+                        for j in range(self.N_t)
+                    ]
+                    
+                    results_inner = pool.starmap(process_lag_inner_stage,
+                                                 args_inner)
+
+                    v_sum = 0.0
+                    pi_mean = [0, [0]*(self.STAGE-t), 0, 0, 0, 0]
+                    
+                    for pi, L in results_inner:
+                        
+                        v_sum += L
+                        pi_mean[0] += pi[0] / self.N_t
+                        
+                        for i in range(self.STAGE-t):
+                            pi_mean[1][i] += pi[1][i] / self.N_t
+                            
+                        pi_mean[2] += pi[2] / self.N_t
+                        pi_mean[3] += pi[3] / self.N_t
+                        pi_mean[4] += pi[4] / self.N_t
+                        pi_mean[5] += pi[5] / self.N_t
+
+                    v = v_sum/self.N_t
+                    cut_coeff = [v] + pi_mean
+                    self.psi[k][t].append(cut_coeff)
+                    
+        v_sum_da = 0.0
+
+        pi_mean_da = [[0.0]*self.STAGE, [0.0]*self.STAGE]
+        prev_da = self.forward_solutions_da[0]
+
+        for k, P_da in enumerate(self.DA_params):
+            
+            lp = fw_rt_init_LP_relax(prev_da, self.psi[k][0], P_da)
+            psi_sub = lp.get_cut_coefficients()
+
+            for i in range(self.STAGE):
+                pi_mean_da[0][i] += psi_sub[1][i] / self.K
+                pi_mean_da[1][i] += psi_sub[2][i] / self.K
+
+            lag = fw_rt_init_Lagrangian([psi_sub[i] for i in (1,2)],
+                                         self.psi[k][0], P_da)
+            v_sum_da += lag.get_objective_value()
+
+        v_da = v_sum_da / self.K
+        cut_coeff_da = [v_da, pi_mean_da[0], pi_mean_da[1]]
+        self.psi_da.append(cut_coeff_da)
+
+        self.forward_solutions_da = []
+        self.forward_solutions    = [[[] for _ in range(self.STAGE)]
+                                     for _ in range(self.K)]
+
+        fw_da_for_UB = fw_da(self.psi_da)
+        self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+
+    def backward_pass_hybrid_1(self):
+        
+        for k, P_da in enumerate(self.DA_params):
+            
+            stage_params = self.RT_params[k]
+
+            threshold = int(self.cut_mode.split('-')[1])
+
+            with mp.Pool() as pool:
+
+                t_last        = self.STAGE - 1
+                prev_solution = self.forward_solutions[k][t_last][0]
+                deltas_last   = stage_params[t_last]
+                
+                last_args = [
+                    (j, prev_solution, P_da, deltas_last[j], threshold)
+                    for j in range(self.N_t)
+                ]
+                
+                last_results = pool.starmap(process_hyb_last_stage, last_args)
+
+                v_sum = 0.0
+                pi_mean = [0, [0], 0, 0, 0, 0]
+                
+                for pi, L in last_results:
+                    
+                    v_sum += L
+                    pi_mean[0]    += pi[0] / self.N_t
+                    pi_mean[1][0] += pi[1][0] / self.N_t
+                    pi_mean[2]    += pi[2] / self.N_t
+                    pi_mean[3]    += pi[3] / self.N_t
+                    pi_mean[4]    += pi[4] / self.N_t
+                    pi_mean[5]    += pi[5] / self.N_t
+
+                v = v_sum/self.N_t
+                
+                cut_coeff = [v] + pi_mean
+                
+                self.psi[k][t_last].append(cut_coeff)
+
+                for t in range(self.STAGE-2, -1, -1):
+                    
+                    prev = self.forward_solutions[k][t][0]
+                    psi_next = self.psi[k][t+1]
+                    
+                    args_inner = [
+                        (j, t, prev, psi_next, P_da, stage_params[t][j], threshold)
+                        for j in range(self.N_t)
+                    ]
+                    
+                    results_inner = pool.starmap(process_hyb_inner_stage, args_inner)
+
+                    v_sum = 0.0
+                    pi_mean = [0, [0]*(self.STAGE-t), 0, 0, 0, 0]
+                    
+                    for pi, L in results_inner:
+                        
+                        v_sum += L
+                        pi_mean[0] += pi[0] / self.N_t
+                        
+                        for i in range(self.STAGE-t):
+                            pi_mean[1][i] += pi[1][i] / self.N_t
+                            
+                        pi_mean[2] += pi[2] / self.N_t
+                        pi_mean[3] += pi[3] / self.N_t
+                        pi_mean[4] += pi[4] / self.N_t
+                        pi_mean[5] += pi[5] / self.N_t
+
+                    v = v_sum/self.N_t
+                    cut_coeff = [v] + pi_mean
+                    self.psi[k][t].append(cut_coeff)
+                    
+        v_sum_da = 0.0
+
+        pi_mean_da = [[0.0]*self.STAGE, [0.0]*self.STAGE]
+        prev_da = self.forward_solutions_da[0]
+
+        for k, P_da in enumerate(self.DA_params):
+            
+            lp = fw_rt_init_LP_relax(prev_da, self.psi[k][0], P_da)
+            psi_sub = lp.get_cut_coefficients()
+
+            for i in range(self.STAGE):
+                pi_mean_da[0][i] += psi_sub[1][i] / self.K
+                pi_mean_da[1][i] += psi_sub[2][i] / self.K
+
+            lag = fw_rt_init_Lagrangian([psi_sub[i] for i in (1,2)],
+                                         self.psi[k][0], P_da)
+            v_sum_da += lag.get_objective_value()
+
+        v_da = v_sum_da / self.K
+        cut_coeff_da = [v_da, pi_mean_da[0], pi_mean_da[1]]
+        self.psi_da.append(cut_coeff_da)
+
+        self.forward_solutions_da = []
+        self.forward_solutions    = [[[] for _ in range(self.STAGE)]
+                                     for _ in range(self.K)]
+
+        fw_da_for_UB = fw_da(self.psi_da)
+        self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+
 
     def stopping_criterion(self, tol = 1e-5):
         
@@ -4114,17 +4992,10 @@ class PSDDiPModel:
         
         self.running_time = time.time() - self.start_time
         
-        print(f"run_time = {self.running_time}, criteria = {Total_time}")
-        
-        if self.iteration <= 3:
-            baseline = 1e9
-            
-        elif self.iteration >= 4:
-            baseline = self.UB[self.iteration-3]
+        #print(f"run_time = {self.running_time}, criteria = {Total_time}")
         
         if (
-            (baseline - self.UB[self.iteration])/self.UB[self.iteration] < self.tol 
-            or self.running_time > Total_time
+            self.running_time > Total_time
         ):
             return True
 
@@ -4147,13 +5018,15 @@ class PSDDiPModel:
                 break
 
             self.iteration += 1
-            print(f"\n=== Iteration {self.iteration} ===")
+            #print(f"\n=== Iteration {self.iteration} ===")
 
             if final_pass:
                 scenarios = self.sample_scenarios_for_stopping()
+                scenarios_for_eval = self.sample_scenarios_for_evaluation()
                     
-                if self.cut_mode in ['B', 'SB', 'L-sub', 'L-lev', 'hyb']:
+                if self.cut_mode in ['B', 'SB', 'L-sub', 'L-lev'] or self.cut_mode.startswith('hyb'):
                     self.forward_pass_for_stopping(scenarios)
+                    self.forward_pass_for_eval(scenarios_for_eval)
                     
                 else:
                     print("Not a proposed cut")
@@ -4161,74 +5034,153 @@ class PSDDiPModel:
             else:
                 scenarios = self.sample_scenarios()
 
-                if self.cut_mode in ['B', 'SB', 'L-sub', 'L-lev', 'hyb']:
+                if self.cut_mode in ['B', 'SB', 'L-sub', 'L-lev'] or self.cut_mode.startswith('hyb'):
                     self.forward_pass(scenarios)
                     
                 else:
                     print("Not a proposed cut")
                     break
 
-            print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
-
-            if self.cut_mode in ['B', 'SB']:
-                self.backward_pass()
-                
-            elif self.cut_mode in ['L-sub', 'L-lev']:
-                
-                if self.iteration <= 4:
+            #print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
+            
+            if self.parallel_mode == 0:
+            
+                if self.cut_mode in ['B', 'SB']:
                     self.backward_pass()
                     
-                else:
-                    self.backward_pass_Lagrangian()
+                elif self.cut_mode in ['L-sub', 'L-lev']:
                     
-            elif self.cut_mode == 'hyb':
-                
-                if self.iteration <= 4:
-                    self.backward_pass()
+                    if self.iteration <= 4:
+                        self.backward_pass()
+                        
+                    else:
+                        self.backward_pass_Lagrangian()
+                        
+                elif self.cut_mode.startswith('hyb'):
                     
+                    if self.iteration <= 4:
+                        self.backward_pass()
+                        
+                    else:
+                        self.backward_pass_hybrid()
                 else:
-                    self.backward_pass_hybrid()
-            else:
-                print("Not a proposed cut")
-                break
+                    print("Not a proposed cut")
+                    break
 
-            print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
+            elif self.parallel_mode == 1:
+            
+                if self.cut_mode in ['B', 'SB']:
+                    self.backward_pass_1()
+                    
+                elif self.cut_mode in ['L-sub', 'L-lev']:
+                    
+                    if self.iteration <= 4:
+                        self.backward_pass_1()
+                        
+                    else:
+                        self.backward_pass_Lagrangian_1()
+                        
+                elif self.cut_mode.startswith('hyb'):
+                    
+                    if self.iteration <= 4:
+                        self.backward_pass_1()
+                        
+                    else:
+                        self.backward_pass_hybrid_1()
+                else:
+                    print("Not a proposed cut")
+                    break
 
-        print("\nSDDiP complete.")
+            #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
+
+        print(f"\nSDDiP complete. for T = {self.STAGE}, k = {self.K}, cut mode = {self.cut_mode}")
         print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {(self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]:.4f}")
-
+        print(f"Evaluation : {self.eval}, iteration : {self.iteration}")
 
 
 if __name__ == "__main__":
+
     
-    #print(len(Reduced_scenario_trees))
+    print(len(Reduced_scenario_trees))
+    
+    l = 0
+    ## (l, k, sample_num) : (0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 10), (9, 12), (10, 15), (11, 20) 
+    
+    sample_num = int(500/K_list[l])
+    evaluation_num = 5
     
     psddip_1 = PSDDiPModel(
             STAGE = T,
             DA_params=P_da_evaluate,
             RT_params=Sceanrio_tree_evaluate,
-            DA_params_reduced=Reduced_P_da[1],
-            RT_params_reduced=Reduced_scenario_trees[1],
-            sample_num=50,
-            evaluation_num=10,
+            DA_params_reduced=Reduced_P_da[l],
+            RT_params_reduced=Reduced_scenario_trees[l],
+            sample_num=sample_num,
+            evaluation_num=evaluation_num,
             alpha = 0.95,
-            cut_mode='L-sub',
-            tol=0.00000001
+            cut_mode='SB',
+            tol=0.00000001,
+            parallel_mode=1
         )
     
     psddip_2 = PSDDiPModel(
             STAGE = T,
             DA_params=P_da_evaluate,
             RT_params=Sceanrio_tree_evaluate,
-            DA_params_reduced=Reduced_P_da[1],
-            RT_params_reduced=Reduced_scenario_trees[1],
-            sample_num=50,
-            evaluation_num=10,
+            DA_params_reduced=Reduced_P_da[l],
+            RT_params_reduced=Reduced_scenario_trees[l],
+            sample_num=sample_num,
+            evaluation_num=evaluation_num,
             alpha = 0.95,
-            cut_mode='SB',
-            tol=0.00000001
+            cut_mode='L-sub',
+            tol=0.00000001,
+            parallel_mode=1
         )
+    
+    psddip_3 = PSDDiPModel(
+            STAGE = T,
+            DA_params=P_da_evaluate,
+            RT_params=Sceanrio_tree_evaluate,
+            DA_params_reduced=Reduced_P_da[l],
+            RT_params_reduced=Reduced_scenario_trees[l],
+            sample_num=sample_num,
+            evaluation_num=evaluation_num,
+            alpha = 0.95,
+            cut_mode='hyb-0',
+            tol=0.00000001,
+            parallel_mode=1
+        )
+    
+    psddip_4 = PSDDiPModel(
+            STAGE = T,
+            DA_params=P_da_evaluate,
+            RT_params=Sceanrio_tree_evaluate,
+            DA_params_reduced=Reduced_P_da[l],
+            RT_params_reduced=Reduced_scenario_trees[l],
+            sample_num=sample_num,
+            evaluation_num=evaluation_num,
+            alpha = 0.95,
+            cut_mode='hyb-40',
+            tol=0.00000001,
+            parallel_mode=1
+        )
+    
+    psddip_5 = PSDDiPModel(
+            STAGE = T,
+            DA_params=P_da_evaluate,
+            RT_params=Sceanrio_tree_evaluate,
+            DA_params_reduced=Reduced_P_da[l],
+            RT_params_reduced=Reduced_scenario_trees[l],
+            sample_num=sample_num,
+            evaluation_num=evaluation_num,
+            alpha = 0.95,
+            cut_mode='hyb-80',
+            tol=0.00000001,
+            parallel_mode=1
+        ) 
     
     psddip_1.run_sddip()
     psddip_2.run_sddip()
-        
+    psddip_3.run_sddip()
+    psddip_4.run_sddip()
+    psddip_5.run_sddip()

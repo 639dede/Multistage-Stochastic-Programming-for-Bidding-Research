@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 # Given Parameters
 
 P_r = 80
-P_max = 350
+P_max = 300
 
 T = 24
 
@@ -123,13 +123,13 @@ real_time_prices = [item for sublist in real_time_prices_daily for item in subli
 
 print(len(E_0_values), len(day_ahead_prices), len(real_time_prices))
 
-E_0_values = E_0_values[1464:2208]
-day_ahead_prices = day_ahead_prices[1464:2208]
-real_time_prices = real_time_prices[1464:2208]
+E_0_values = E_0_values
+day_ahead_prices = day_ahead_prices
+real_time_prices = real_time_prices
 
 ## Dataframe for TGMM
 
-date_range_pre = pd.date_range(start='2024-05-01', periods=744, freq='H')
+date_range_pre = pd.date_range(start='2024-03-01', periods=9000, freq='H')
 
 omit_dates = [pd.Timestamp("2024-12-19"), pd.Timestamp("2025-01-11"), pd.Timestamp("2025-02-15")]
 
@@ -396,7 +396,7 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
                 'means': means,
                 'stds': stds
             }
-            #plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
+            plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
         except Exception as e:
             print(f'Failed to train TGMM for bin {bin_interval}: {e}')
     
@@ -405,10 +405,10 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
 
 
 inspect_bins(data, 'E_0_value', 'day_ahead_price', num_bins)
-#plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
+plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
 
 inspect_bins(data, 'day_ahead_price', 'real_time_price', num_bins)
-#plot_histogram(data, 'real_time_price', LB_price, UB_price)
+plot_histogram(data, 'real_time_price', LB_price, UB_price)
 
 tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
     data=data,
@@ -631,6 +631,7 @@ class scenario():
             
         return scenario
 
+
 if __name__ == '__main__':
     
     # Save Energy forecast csv file
@@ -647,11 +648,11 @@ if __name__ == '__main__':
     
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
     
-    scenario_generator = scenario(4, E_0)
+    scenario_generator = scenario(3, E_0)
     
     sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(1000))
     
-    K_list = [1, 5, 10, 25, 60, 100, 1000]
+    K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 1000]
     
     Reduced_P_da = []
     Reduced_scenario_trees = []

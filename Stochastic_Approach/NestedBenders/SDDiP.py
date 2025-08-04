@@ -60,8 +60,8 @@ tol = 1e-5
 Node_num = 1
 Lag_iter_UB = 600
 
-P_da_minus_mode = False
-P_rt_minus_mode = False 
+P_da_minus_mode = True
+P_rt_minus_mode = True 
 
 E_0 = Scenario.E_0
 
