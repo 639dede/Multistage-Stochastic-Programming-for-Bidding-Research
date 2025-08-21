@@ -123,9 +123,10 @@ real_time_prices = [item for sublist in real_time_prices_daily for item in subli
 
 print(len(E_0_values), len(day_ahead_prices), len(real_time_prices))
 
-E_0_values = E_0_values
+E_0_values = np.array(E_0_values)
 day_ahead_prices = day_ahead_prices
 real_time_prices = real_time_prices
+
 
 ## Dataframe for TGMM
 
@@ -137,12 +138,26 @@ date_range = date_range_pre[~date_range_pre.normalize().isin(omit_dates)]
 
 print(len(date_range))
 
-data = pd.DataFrame({
+df = pd.DataFrame({
     'date': date_range,
     'day_ahead_price': day_ahead_prices,
     'real_time_price': real_time_prices,
     'E_0_value': E_0_values
 })
+
+date_only = df["date"].dt.normalize()
+neg_counts_by_day = df["day_ahead_price"].lt(0).groupby(date_only).sum()
+
+eligible_days = neg_counts_by_day[neg_counts_by_day >= 2].index
+
+data = df[date_only.isin(eligible_days)].reset_index(drop=True)
+
+pd.set_option('display.max_rows', None)   # Show all rows
+pd.set_option('display.max_columns', None) # Show all columns
+pd.set_option('display.width', None)       # Don't wrap columns
+pd.set_option('display.max_colwidth', None) # Don't truncate column text
+
+print(data)
 
 
 # Delta_E distribution
@@ -206,32 +221,46 @@ UB_energy = 18000
 num_bins = 8
 
 bin_edges_energy = np.linspace(LB_energy, UB_energy, num_bins + 1)
-bin_edges_price = np.linspace(LB_price, UB_price, num_bins + 1)
+bin_edges_price = np.linspace(LB_price, UB_price, num_bins)
 
-def merge_bins(data, conditioning_var, bin_edges, min_data_per_bin=10):
+def merge_bins(data, conditioning_var, bin_edges, min_data_per_bin=10, tol=1e-9):
 
-    data['bin'] = pd.cut(data[conditioning_var], bins=bin_edges, include_lowest=True)
-    bin_counts = data['bin'].value_counts().sort_index()
-    
-    bins_to_merge = bin_counts[bin_counts < min_data_per_bin].index.tolist()
-    
-    for bin_interval in bins_to_merge:
-        idx = bin_edges.tolist().index(bin_interval.left)
-        if idx > 0:
-            new_left = bin_edges[idx - 1]
-            new_right = bin_interval.right
-            bin_edges[idx - 1] = new_left
-            bin_edges = np.delete(bin_edges, idx)
-            
-        elif idx < len(bin_edges) - 1:
-            new_left = bin_interval.left
-            new_right = bin_edges[idx + 1]
-            bin_edges[idx] = new_right
-            bin_edges = np.delete(bin_edges, idx + 1)
-            
-    data.drop('bin', axis=1, inplace=True)
-    return bin_edges
-    
+    df_tmp = data[[conditioning_var]].copy()
+
+    edges = list(map(float, bin_edges))
+
+    def _find_left_idx(edges_list, interval_left):
+        arr = np.asarray(edges_list, dtype=float)
+        hit = np.where(np.isclose(arr, float(interval_left), atol=tol, rtol=0))[0]
+        if len(hit) == 0:
+            return int(np.argmin(np.abs(arr - float(interval_left))))
+        return int(hit[0])
+
+    while True:
+        binned = pd.cut(df_tmp[conditioning_var], bins=edges, include_lowest=True)
+        counts = binned.value_counts().sort_index()
+
+        too_small = counts[counts < min_data_per_bin]
+        if too_small.empty:
+            break
+
+        interval = too_small.index[0]  
+        i_left = _find_left_idx(edges, interval.left)    
+        i_bin = i_left  
+
+        left_neighbor = counts.iloc[i_bin - 1] if i_bin - 1 >= 0 else np.inf
+        right_neighbor = counts.iloc[i_bin + 1] if i_bin + 1 < len(counts) else np.inf
+
+        if left_neighbor <= right_neighbor and i_left > 0:
+            edges.pop(i_left)
+        else:
+            if i_left + 1 < len(edges):
+                edges.pop(i_left + 1)
+            else:
+                edges.pop(i_left)
+
+    return np.array(edges, dtype=float)
+
 bin_edges_energy = merge_bins(data, 'E_0_value', bin_edges_energy, min_data_per_bin=3)
 bin_edges_price = merge_bins(data, 'day_ahead_price', bin_edges_price, min_data_per_bin=3)
 
@@ -497,6 +526,7 @@ E_0_daily = E_0_daily[61:92]
 P_da_daily = day_ahead_prices_daily[61:92]
 P_rt_daily = real_time_prices_daily[61:92]
 
+
 # Generate Scenario
 
 class scenario():
@@ -638,6 +668,7 @@ if __name__ == '__main__':
     
     E_0 = np.mean(E_0_daily, axis=0)
     np.set_printoptions(suppress=True, precision=4)
+    E_0 = np.array(E_0) * 1.2
     print(E_0)
 
     save_path = './Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv'
@@ -648,11 +679,13 @@ if __name__ == '__main__':
     
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
     
-    scenario_generator = scenario(3, E_0)
+    scenario_generator = scenario(6, E_0)
     
-    sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(1000))
+    evaluation_num = 100
     
-    K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 1000]
+    sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(evaluation_num))
+    
+    K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, evaluation_num]
     
     Reduced_P_da = []
     Reduced_scenario_trees = []
@@ -709,6 +742,9 @@ if __name__ == '__main__':
 
     axes[-1].set_xlabel("Hour")
     plt.tight_layout()
+    
+    plt.savefig('./Stochastic_Approach/Scenarios/P_rt_density.png', dpi=300)
+    
     plt.show()
        
         
@@ -846,4 +882,115 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     plt.show()
+    """
+    
+    
+    # For SDDiP
+    """
+    branch_num = 6
+    
+    scenario_generator = scenario(branch_num, E_0)
+            
+    P_da_list = [
+        [
+            120, 130, 120, 100, 
+            90, 100, 100, 100, 
+            90, 80, 90, 100, 
+            90, 70, 90, 90,
+            100, 120, 130, 120,
+            100, 110, 140, 130
+        ],
+        [
+            110, 100, 120, 110,
+            90, 100, 110, 90,
+            80, 40, -40, -79,
+            -79, -70, -60, 50,
+            50, 100, 90, 100,
+            110, 120, 100, 100  
+        ],
+        [
+            100, 90, 100, 90,
+            80, 100, 0, -10,
+            -50, -70, -79, -79,
+            -79, -79, -60, -40,
+            -50, -20, 0, 50,
+            70, 80, 100, 90
+        ]
+    ]
+    
+    scenario_trees = []
+    
+    for P_da in P_da_list:
+        
+        scenario_tree = scenario_generator.generate_scenario_tree(P_da)
+        scenario_trees.append(scenario_tree)
+    
+
+    fig, axs = plt.subplots(2, 3, figsize=(18, 8), sharex=True)
+
+    for idx, (P_da, tree) in enumerate(zip(P_da_list, scenario_trees)):
+        # Plot P_da
+        axs[0, idx].plot(range(24), P_da, color='tab:blue')
+        axs[0, idx].set_title(f'Day-ahead Price {idx+1}')
+        axs[0, idx].set_ylabel('P_da')
+        axs[0, idx].set_ylim(-100, 300)
+        axs[0, idx].set_xticks(range(0, 24, 4))
+        axs[0, idx].grid(True)
+
+        # Plot each P_rt branch (6 branches)
+        
+        P_rt_lists = [[] for _ in range(branch_num)]
+        
+        for branches in tree:
+            
+            for b_idx, branch in enumerate(branches):
+                P_rt_lists[b_idx].append(branch[1])
+
+        for P_rt_list in P_rt_lists:
+            
+            axs[1, idx].plot(range(24), P_rt_list, label=f's{idx}', alpha=0.3, color='black')
+
+        axs[1, idx].set_title(f'Real-time Scenarios {idx+1}')
+        axs[1, idx].set_xlabel('Hour')
+        axs[1, idx].set_ylabel('P_rt')
+        axs[1, idx].set_ylim(-100, 300)
+        axs[1, idx].set_xticks(range(0, 24, 4))
+        axs[1, idx].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+    
+    base_dir_P_da   = './Stochastic_Approach/Scenarios/P_da_settings'
+    base_dir_trees  = './Stochastic_Approach/Scenarios/Trees_settings'
+    
+    os.makedirs(base_dir_P_da, exist_ok=True)
+    os.makedirs(base_dir_trees, exist_ok=True)
+    
+    for idx, (P_da, tree) in enumerate(zip(P_da_list, scenario_trees)):
+
+        # === Save P_da ===
+        P_da_path = os.path.join(base_dir_P_da, f'P_da_{idx}.csv')
+        pd.DataFrame(P_da).to_csv(P_da_path, index=False, header=False)
+
+        # === Save Scenario Tree ===
+        # Convert tree to 3D list → shape: (num_branches, 24, 3)
+        # You can flatten each branch (24 rows, each with 3 columns)
+        tree_path = os.path.join(base_dir_trees, f'Tree_{idx}.csv')
+
+        # Flatten and save as DataFrame
+        flat_tree = []
+        for branch in tree:
+            flat_tree.append(branch)  # branch: list of 24 [*, P_rt, *]
+
+        # Resulting DataFrame: 3D flattened into 2D → long csv with index over branches
+        # You may want to use MultiIndex later to identify branch #
+        full_df = pd.concat([
+            pd.DataFrame(b, columns=['x0', 'P_rt', 'x2']).assign(branch=i)
+            for i, b in enumerate(flat_tree)
+        ])
+
+        # Optional: reorder columns
+        full_df = full_df[['branch', 'x0', 'P_rt', 'x2']]
+
+        full_df.to_csv(tree_path, index=False)
     """
