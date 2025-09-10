@@ -4038,7 +4038,7 @@ if __name__ == "__main__":
     plot_mode = False
     
     fw_scenario_num = 200  ## M
-    time_lim = 7200
+    time_lim = 400
     
     l = 0
     

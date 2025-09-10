@@ -157,8 +157,6 @@ pd.set_option('display.max_columns', None) # Show all columns
 pd.set_option('display.width', None)       # Don't wrap columns
 pd.set_option('display.max_colwidth', None) # Don't truncate column text
 
-print(data)
-
 
 # Delta_E distribution
 
@@ -425,7 +423,7 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
                 'means': means,
                 'stds': stds
             }
-            plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
+            #plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
         except Exception as e:
             print(f'Failed to train TGMM for bin {bin_interval}: {e}')
     
@@ -666,22 +664,84 @@ if __name__ == '__main__':
     
     # Save Energy forecast csv file
     
-    E_0 = np.mean(E_0_daily, axis=0)
-    np.set_printoptions(suppress=True, precision=4)
-    E_0 = np.array(E_0) * 1.2
-    print(E_0)
+    base = np.asarray(E_0, dtype=float)  # from your earlier calculation
+    hours = np.arange(24)
 
-    save_path = './Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv'
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    def remap_daylight_window(base, start_shift=0, end_shift=0, scale=1.0,
+                            min_width=4, cut_frac=0.01):
 
-    pd.DataFrame(E_0).to_csv(save_path, index=False, header=False)
+        y = np.asarray(base, dtype=float)
+        # detect original daylight window (ignore tiny twilight)
+        cut = max(cut_frac * y.max(), 1e-9)
+        nz = np.where(y > cut)[0]
+        if nz.size == 0:
+            
+            # fallback if base is all zeros: assume 6..18 with a hump
+            x = np.linspace(-1, 1, 24)
+            y = (np.maximum(0, 1 - x**2)) * y.max()
+            nz = np.where(y > cut)[0]
+
+        s0, e0 = int(nz[0]), int(nz[-1])             # original sunrise/sunset
+        s1 = int(np.clip(s0 + start_shift, 0, 23))   # new sunrise
+        e1 = int(np.clip(e0 + end_shift,   0, 23))   # new sunset
+
+        # keep a reasonable width
+        if e1 <= s1:
+            e1 = min(23, s1 + min_width)
+
+        # original daylight segment and normalized positions
+        seg0 = y[s0:e0+1]
+        t0 = np.linspace(0, 1, len(seg0))
+
+        # target positions in the new window
+        seg_len = e1 - s1 + 1
+        t1 = np.linspace(0, 1, seg_len)
+        seg1 = np.interp(t1, t0, seg0) * scale
+
+        out = np.zeros_like(y)
+        out[s1:e1+1] = seg1
+        return out
+
+    # --- Make the three profiles ---
+    E_0_cloudy = remap_daylight_window(base, start_shift=+2, end_shift=-2, scale=0.5)  # later start, earlier end
+    E_0_normal = remap_daylight_window(base, start_shift= +1, end_shift= 0, scale=0.9)  # baseline
+    E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+1, scale=1.5)  # earlier start, later end
+
+    # Save CSVs (optional)
+    outdir = './Stochastic_Approach/Scenarios/Energy_forecast'
+    os.makedirs(outdir, exist_ok=True)
+    pd.DataFrame(E_0_cloudy).to_csv(os.path.join(outdir, 'E_0_cloudy.csv'), index=False, header=False)
+    pd.DataFrame(E_0_normal).to_csv(os.path.join(outdir, 'E_0_normal.csv'), index=False, header=False)
+    pd.DataFrame(E_0_sunny ).to_csv(os.path.join(outdir, 'E_0_sunny.csv' ), index=False, header=False)
+
+    # Plot (0, 20000) as requested
+    def plot_E_0(ax, y, title):
+        ax.plot(hours, y, linewidth=2.0)
+        ax.set_title(title)
+        ax.set_xlabel('Hour')
+        ax.set_ylabel('E₀')
+        ax.set_ylim(0, 20000)
+        ax.grid(True)
+
+    fig, axs = plt.subplots(1, 3, figsize=(12, 3.2), sharey=True)
+    plot_E_0(axs[0], E_0_cloudy, "Cloudy")
+    plot_E_0(axs[1], E_0_normal, "Normal")
+    plot_E_0(axs[2], E_0_sunny,  "Sunny")
+    plt.tight_layout()
+    plt.savefig('./Stochastic_Approach/Scenarios/E_0_profiles_cloudy_normal_sunny.png', dpi=300)
+    plt.close()
     
     
+    E_0 = E_0_normal
+    
+    pd.DataFrame(E_0).to_csv("./Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv", index=False)
+
+
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
     
     scenario_generator = scenario(6, E_0)
     
-    evaluation_num = 100
+    evaluation_num = 500
     
     sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(evaluation_num))
     
@@ -745,7 +805,7 @@ if __name__ == '__main__':
     
     plt.savefig('./Stochastic_Approach/Scenarios/P_rt_density.png', dpi=300)
     
-    plt.show()
+    #plt.show()
        
         
     T = sampled_P_da.shape[1]
@@ -760,7 +820,7 @@ if __name__ == '__main__':
         ax.set_ylabel("Price")
         ax.grid(True)
         plt.tight_layout()
-        plt.show()
+        #plt.show()
     
     
     save_dir = './Stochastic_Approach/Scenarios/Clustered_P_da'
@@ -793,97 +853,22 @@ if __name__ == '__main__':
     axes[-1].set_xlabel("Hour")
     
     plt.savefig('./Stochastic_Approach/Scenarios/combined_scenario_density.png', dpi=300)
-    plt.show()
+    #plt.show()
         
-    """
-    num_days = sampled_P_da.shape[0]
-    hours = np.arange(T)
-    
-    fig, axes = plt.subplots(1, 1, figsize=(10, 6), sharex=True)
-    axes = np.array([axes])  
-
-    for i in range(num_days):
-        axes[0].plot(hours, sampled_P_da[i], color='black', alpha=0.2)
-    axes[0].set_title("Day-Ahead Price Density")
-    axes[0].set_ylabel("Price")
-    axes[0].grid(True)
-    
-    plt.tight_layout()
-    plt.show()
-    """
-    
-    
-    """
-    minus_instances = []
-    plus_instances = []
-
-    for P_da in sampled_P_da:
-        negative_count = np.sum(np.array(P_da) <= 1)
-    
-        if negative_count >= 2:
-            minus_instances.append(P_da)
-        else:
-            plus_instances.append(P_da)
+    fig, axes = plt.subplots(len(K_list), 1, figsize=(12, 2.5 * len(K_list)), sharex=True, constrained_layout=True)
+    for i, (k, P_da_list) in enumerate(zip(K_list, Reduced_P_da)):
+        ax = axes[i] if len(K_list) > 1 else axes
+        for profile in P_da_list:
+            ax.plot(hours, profile, color='blue', linewidth=2.0, alpha=0.8)
+        ax.set_title(f"K = {k}: Clustered Day-Ahead Price Profiles (P_da only)")
+        ax.set_ylabel("P_da")
+        ax.set_ylim(-120, 200)
+        ax.grid(True)
+    axes[-1].set_xlabel("Hour")
+    plt.savefig('./Stochastic_Approach/Scenarios/P_da_only_byK.png', dpi=300)
+    plt.close(fig)
         
-    minus_instances = np.array(minus_instances)
-    plus_instances = np.array(plus_instances)
-    
-    print(len(minus_instances), len(plus_instances))
-    
-    hours = np.arange(T)
-    
-    fig, axes = plt.subplots(1, 2, figsize=(10, 6), sharex=True)
-
-    axes[0].set_ylim(-120, 200)
-    axes[1].set_ylim(-120, 200)
-
-    # Plot minus instances
-    for row in minus_instances:
-        axes[0].plot(hours, row, color='red', alpha=0.2)
-    axes[0].set_title("Minus Instances (≥ 2 negative values)")
-    axes[0].set_ylabel("Price")
-    axes[0].set_xlabel("Hour")
-    axes[0].grid(True)
-
-    # Plot plus instances
-    for row in plus_instances:
-        axes[1].plot(hours, row, color='blue', alpha=0.2)
-    axes[1].set_title("Plus Instances (< 2 negative values)")
-    axes[1].set_ylabel("Price")
-    axes[1].set_xlabel("Hour")
-    axes[1].grid(True)
-
-    plt.tight_layout()
-    plt.show()
-    
-    """
-    
-    """
-    P_da_array = np.array(day_ahead_prices_daily[61:92])
-    P_rt_array = np.array(real_time_prices_daily[61:92])
-
-    num_days = P_da_array.shape[0]
-    hours = np.arange(24)
-
-    fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-
-    for i in range(num_days):
-        axes[0].plot(hours, P_da_array[i], color='black', alpha=0.2)
-    axes[0].set_title("Day-Ahead Price Density")
-    axes[0].set_ylabel("Price")
-    axes[0].grid(True)
-
-    for i in range(num_days):
-        axes[1].plot(hours, P_rt_array[i], color='black', alpha=0.2)
-    axes[1].set_title("Real-Time Price Density")
-    axes[1].set_xlabel("Hour of Day")
-    axes[1].set_ylabel("Price")
-    axes[1].grid(True)
-
-    plt.tight_layout()
-    plt.show()
-    """
-    
+ 
     
     # For SDDiP
     """
@@ -958,7 +943,7 @@ if __name__ == '__main__':
         axs[1, idx].grid(True)
 
     plt.tight_layout()
-    plt.show()
+    #plt.show()
     
     base_dir_P_da   = './Stochastic_Approach/Scenarios/P_da_settings'
     base_dir_trees  = './Stochastic_Approach/Scenarios/Trees_settings'
