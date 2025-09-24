@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 # Given Parameters
 
 P_r = 80
-P_max = 300
+P_max = 200
 
 T = 24
 
@@ -703,7 +703,7 @@ if __name__ == '__main__':
         return out
 
     # --- Make the three profiles ---
-    E_0_cloudy = remap_daylight_window(base, start_shift=+2, end_shift=-2, scale=0.5)  # later start, earlier end
+    E_0_cloudy = remap_daylight_window(base, start_shift=+2, end_shift=-2, scale=0)  # later start, earlier end
     E_0_normal = remap_daylight_window(base, start_shift= +1, end_shift= 0, scale=0.9)  # baseline
     E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+1, scale=1.5)  # earlier start, later end
 
@@ -732,7 +732,7 @@ if __name__ == '__main__':
     plt.close()
     
     
-    E_0 = E_0_normal
+    E_0 = E_0_sunny
     
     pd.DataFrame(E_0).to_csv("./Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv", index=False)
 
@@ -766,7 +766,7 @@ if __name__ == '__main__':
         Reduced_scenario_trees.append(scenario_trees)
     
     
-    base_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees'
+    base_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees_sunny'
     os.makedirs(base_dir, exist_ok=True)
 
     for i, (k, scenario_trees) in enumerate(zip(K_list, Reduced_scenario_trees)):
@@ -823,7 +823,7 @@ if __name__ == '__main__':
         #plt.show()
     
     
-    save_dir = './Stochastic_Approach/Scenarios/Clustered_P_da'
+    save_dir = './Stochastic_Approach/Scenarios/Clustered_P_da_sunny'
     os.makedirs(save_dir, exist_ok=True)
     
     for i, P_da_list in enumerate(Reduced_P_da):

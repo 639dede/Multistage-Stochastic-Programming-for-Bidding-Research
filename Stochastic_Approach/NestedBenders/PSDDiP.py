@@ -35,9 +35,25 @@ assert SOLVER.available(), f"Solver {solver} is available."
 
 # Load Energy Forecast list
 
-E_0_path = './Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv'
+E_0_path_cloudy = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_cloudy.csv'
 np.set_printoptions(suppress=True, precision=4)
-E_0 = np.loadtxt(E_0_path, delimiter=',')
+
+E_0_cloudy = np.loadtxt(E_0_path_cloudy, delimiter=',')
+
+
+E_0_path_normal = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_normal.csv'
+np.set_printoptions(suppress=True, precision=4)
+
+E_0_normal = np.loadtxt(E_0_path_normal, delimiter=',')
+
+
+E_0_path_sunny = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_sunny.csv'
+np.set_printoptions(suppress=True, precision=4)
+
+E_0_sunny = np.loadtxt(E_0_path_sunny, delimiter=',')
+
+
+E_0 = E_0_normal
 
 
 # Load Price and Scenario csv files
@@ -156,7 +172,7 @@ gamma_over = P_max
 gamma_under = P_max
 
 if T == 24:
-    Total_time = 3600
+    Total_time = 3600*3
     
     E_0_partial = E_0
     
@@ -9489,7 +9505,7 @@ class PSDDiPModel_multicut:
         
         Timeline = 0
         
-        while Timeline <= 2:
+        while Timeline <= 0:
         
             final_pass = False
 
@@ -12005,8 +12021,7 @@ if __name__ == "__main__":
 
     # Full length of T = 24
     
-    l = 4
-    D = 4
+    l = 7
     parallel = 0
     
     ## (l, k, sample_num) : (0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 10), (9, 12), (10, 15), (11, 20) 
@@ -12084,13 +12099,13 @@ if __name__ == "__main__":
             parallel_mode=parallel,
         ) 
     
-    psddip_1.run_sddip()
-    psddip_2.run_sddip()
-    psddip_3.run_sddip()
-    psddip_4.run_sddip()
-    psddip_5.run_sddip()
-
-
+    #psddip_1.run_sddip()
+    #psddip_2.run_sddip()
+    #psddip_3.run_sddip()
+    #psddip_4.run_sddip()
+    #psddip_5.run_sddip()
+    
+    
     psddip_multi_1 = PSDDiPModel_multicut(
             STAGE = T,
             DA_params=P_da_evaluate,
@@ -12161,11 +12176,13 @@ if __name__ == "__main__":
             parallel_mode=parallel,
         ) 
     
+    
     psddip_multi_1.run_sddip()
     psddip_multi_2.run_sddip()
     psddip_multi_3.run_sddip()
-    psddip_multi_4.run_sddip()
-    psddip_multi_5.run_sddip()
+    #psddip_multi_4.run_sddip()
+    #psddip_multi_5.run_sddip()
+    
     
     def notify_done_via_plot(title="✅ PSDDiP finished", subtitle="hyb-40 & hyb-80 complete"):
         fig, ax = plt.subplots(figsize=(6, 3))
