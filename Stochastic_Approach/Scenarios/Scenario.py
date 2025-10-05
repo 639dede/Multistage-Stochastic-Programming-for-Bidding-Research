@@ -527,6 +527,7 @@ P_rt_daily = real_time_prices_daily[61:92]
 
 # Generate Scenario
 
+
 class scenario():
     
     def __init__(self, N_t, E_0):
@@ -664,26 +665,25 @@ if __name__ == '__main__':
     
     # Save Energy forecast csv file
     
-    base = np.asarray(E_0, dtype=float)  # from your earlier calculation
+    base = np.asarray(E_0, dtype=float) 
     hours = np.arange(24)
 
     def remap_daylight_window(base, start_shift=0, end_shift=0, scale=1.0,
                             min_width=4, cut_frac=0.01):
 
         y = np.asarray(base, dtype=float)
-        # detect original daylight window (ignore tiny twilight)
+
         cut = max(cut_frac * y.max(), 1e-9)
         nz = np.where(y > cut)[0]
         if nz.size == 0:
             
-            # fallback if base is all zeros: assume 6..18 with a hump
             x = np.linspace(-1, 1, 24)
             y = (np.maximum(0, 1 - x**2)) * y.max()
             nz = np.where(y > cut)[0]
 
-        s0, e0 = int(nz[0]), int(nz[-1])             # original sunrise/sunset
-        s1 = int(np.clip(s0 + start_shift, 0, 23))   # new sunrise
-        e1 = int(np.clip(e0 + end_shift,   0, 23))   # new sunset
+        s0, e0 = int(nz[0]), int(nz[-1])             
+        s1 = int(np.clip(s0 + start_shift, 0, 23))   
+        e1 = int(np.clip(e0 + end_shift,   0, 23))   
 
         # keep a reasonable width
         if e1 <= s1:
@@ -702,12 +702,11 @@ if __name__ == '__main__':
         out[s1:e1+1] = seg1
         return out
 
-    # --- Make the three profiles ---
     E_0_cloudy = remap_daylight_window(base, start_shift=+2, end_shift=-2, scale=0)  # later start, earlier end
     E_0_normal = remap_daylight_window(base, start_shift= +1, end_shift= 0, scale=0.9)  # baseline
     E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+1, scale=1.5)  # earlier start, later end
 
-    # Save CSVs (optional)
+    # Save CSVs 
     outdir = './Stochastic_Approach/Scenarios/Energy_forecast'
     os.makedirs(outdir, exist_ok=True)
     pd.DataFrame(E_0_cloudy).to_csv(os.path.join(outdir, 'E_0_cloudy.csv'), index=False, header=False)
@@ -732,7 +731,7 @@ if __name__ == '__main__':
     plt.close()
     
     
-    E_0 = E_0_sunny
+    E_0 = E_0_normal
     
     pd.DataFrame(E_0).to_csv("./Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv", index=False)
 
@@ -766,7 +765,7 @@ if __name__ == '__main__':
         Reduced_scenario_trees.append(scenario_trees)
     
     
-    base_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees_sunny'
+    base_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees_normal'
     os.makedirs(base_dir, exist_ok=True)
 
     for i, (k, scenario_trees) in enumerate(zip(K_list, Reduced_scenario_trees)):
@@ -805,7 +804,7 @@ if __name__ == '__main__':
     
     plt.savefig('./Stochastic_Approach/Scenarios/P_rt_density.png', dpi=300)
     
-    #plt.show()
+    plt.show()
        
         
     T = sampled_P_da.shape[1]
@@ -823,7 +822,7 @@ if __name__ == '__main__':
         #plt.show()
     
     
-    save_dir = './Stochastic_Approach/Scenarios/Clustered_P_da_sunny'
+    save_dir = './Stochastic_Approach/Scenarios/Clustered_P_da_normal'
     os.makedirs(save_dir, exist_ok=True)
     
     for i, P_da_list in enumerate(Reduced_P_da):

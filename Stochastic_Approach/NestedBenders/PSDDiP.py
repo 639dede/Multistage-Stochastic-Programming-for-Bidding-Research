@@ -53,10 +53,53 @@ np.set_printoptions(suppress=True, precision=4)
 E_0_sunny = np.loadtxt(E_0_path_sunny, delimiter=',')
 
 
+"""
+# Plot E_0 profiles for each K
+
+def make_hours(n):
+    return np.arange(n)
+
+def plot_E0_single(y, title, outpath, ylim=None):
+    hours = make_hours(len(y))
+    fig, ax = plt.subplots(figsize=(8, 3.6)) 
+    ax.plot(hours, y, linewidth=2.0)
+
+    # Title, labels
+    ax.set_title(title, fontsize=20)
+    ax.set_xlabel('Hour', fontsize=20)
+    ax.set_ylabel('kW', fontsize=20)
+
+    # Y-limit if provided
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
+    # X ticks and labels
+    xmax = hours[-1]
+    tick_positions = [0, 6, 12, 18, 24] if xmax >= 24 else np.linspace(0, xmax, 5, dtype=int)
+    tick_labels = ['0h', '6h', '12h', '18h', '24h'] if len(tick_positions) == 5 else [str(t) for t in tick_positions]
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels, fontsize=20)
+
+    # Y ticks fontsize
+    ax.tick_params(axis='y', labelsize=20)
+
+    ax.grid(True)
+    fig.tight_layout()
+    fig.savefig(outpath, dpi=300)
+    plt.close(fig)
+    plt.show()
+
+plot_E0_single(E_0_cloudy, "Cloudy", "./Stochastic_Approach/Scenarios/E_0_cloudy.png",  ylim=None)
+plot_E0_single(E_0_normal, "Day Ahead PV Forecast (E₀)", "./Stochastic_Approach/Scenarios/E_0_normal.png",  ylim=None)
+plot_E0_single(E_0_sunny,  "Sunny",  "./Stochastic_Approach/Scenarios/E_0_sunny.png",   ylim=None)
+"""
+
 E_0 = E_0_normal
 
 
 # Load Price and Scenario csv files
+
+price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
 
 def load_clustered_P_da(directory_path):
     Reduced_P_da = []
@@ -72,7 +115,8 @@ def load_clustered_P_da(directory_path):
 
     return Reduced_P_da
 
-cluster_dir = './Stochastic_Approach/Scenarios/Clustered_P_da'
+cluster_dir = f'./Stochastic_Approach/Scenarios/Clustered_P_da_{price_setting}'
+
 Reduced_P_da = load_clustered_P_da(cluster_dir)
 
 K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 500]
@@ -81,17 +125,30 @@ T = 24
 hours = np.arange(T)
 
 """
+# Plot clustered P_da profiles for each K
 for i, P_da_list in enumerate(Reduced_P_da):
     fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Plot all profiles
     for profile in P_da_list:
         ax.plot(hours, profile, color='blue', alpha=0.6)
-    ax.set_title(f"K = {K_list[i]}: Clustered Day-Ahead Price Profiles")
-    ax.set_xlabel("Hour")
-    ax.set_ylabel("Price")
+    
+    # Title and labels with fontsize 20
+    ax.set_title(f"K = {K_list[i]}: Clustered Day-Ahead Price Profiles", fontsize=20)
+    ax.set_xlabel("Hour", fontsize=20)
+    ax.set_ylabel("Price (KRW)", fontsize=20)
+    
+    # Ticks fontsize
+    ax.tick_params(axis='both', labelsize=20)
+    
     ax.grid(True)
+    ax.set_ylim(-120, 200)
     plt.tight_layout()
     plt.show()
+
 """
+
+
 
 def load_scenario_trees(base_dir):
     Reduced_scenario_trees = []
@@ -117,35 +174,75 @@ def load_scenario_trees(base_dir):
 
     return Reduced_scenario_trees
 
-clustered_tree_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees'
+
+
+clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Clustered_scenario_trees_{price_setting}'
 Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
 
+
 """
-fig, axes = plt.subplots(len(K_list), 1, figsize=(12, 2.5 * len(K_list)), sharex=True, constrained_layout=True)
+# Plot clustered P_rt profiles for each K
+
 hours = np.arange(24)
+outdir = './Stochastic_Approach/Scenarios/P_rt_fan_byK'
+os.makedirs(outdir, exist_ok=True)
 
-for i, (k, (scenario_trees, P_da_list)) in enumerate(zip(K_list, zip(Reduced_scenario_trees, Reduced_P_da))):
-    ax = axes[i] if len(K_list) > 1 else axes
+for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
+    # --- collect all trajectories for this K into an array [n_paths, 24] ---
+    paths = []
+    for scenario in scenario_trees:
+        N_b = len(scenario[0])  # branches at hour 0
+        for b in range(N_b):
+            traj = [scenario[t][b][1] for t in range(24)]
+            paths.append(traj)
+    P = np.asarray(paths)  # shape: (n_paths, 24)
+    if P.ndim != 2 or P.shape[1] != 24:
+        raise ValueError(f"Unexpected shape for P (got {P.shape})")
 
-    for P_da, scenario in zip(P_da_list, scenario_trees):
-        ax.plot(hours, P_da, color='blue', linewidth=2.0, alpha=0.8)  # Day-ahead
+    # --- compute quantiles hour-by-hour ---
+    q25 = np.percentile(P, 25, axis=0)
+    q75 = np.percentile(P, 75, axis=0)
+    mean = P.mean(axis=0)
 
-        N_t = len(scenario[0])
-        for b in range(N_t):
-            P_rt_values = [scenario[t][b][1] for t in range(24)]
-            ax.plot(hours, P_rt_values, color='black', linewidth=0.6, alpha=0.3)  # Real-time branches
+    # --- plot fan chart ---
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.set_title(f"K = {k}: P_da (blue) & P_rt branches (black)", fontsize=10)
-    ax.set_ylabel("Price")
+    # Central 50% band (green)
+    band_50 = ax.fill_between(hours, q25, q75, alpha=0.3, color="green", label='Central 50% (25–75%)')
+
+    # Sample paths in **black**
+    n_show = min(15, len(P))  # show up to 15 paths
+    rng_idx = np.linspace(0, len(P) - 1, n_show, dtype=int)
+    for idx in rng_idx:
+        ax.plot(hours, P[idx], color='black', alpha=0.2, linewidth=1.0)
+
+    # Mean line (orange dashed)
+    mean_line, = ax.plot(hours, mean, linewidth=1.8, linestyle='--', color='orange', label='Mean')
+
+    # Axes, ticks, limits
+    ax.set_title(f"K = {k}: Real-Time Price Scenarios", fontsize=20)
+    ax.set_xlabel("Hour", fontsize=20)
+    ax.set_ylabel("P_rt (KRW)", fontsize=20)
     ax.set_ylim(-120, 200)
+    ax.set_xlim(0, 23)
+    ax.set_xticks([0, 6, 12, 18, 23])
+    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=20)
     ax.grid(True)
 
-axes[-1].set_xlabel("Hour")
+    # Legend (only Central 50% + Mean)
+    ax.legend(
+        loc='upper right',
+        frameon=True,
+        fontsize=18,        # font size for labels like "Central 50%"
+        title_fontsize=18   # font size for "Legend"
+    )
 
-plt.show()
+    plt.tight_layout()
+    fig.savefig(os.path.join(outdir, f'P_rt_fan_K{k}.png'), dpi=300)
+    plt.show()
+    plt.close(fig)
 
 """
-
 
 # SDDiP Model Parameters
 
@@ -154,7 +251,7 @@ D = 1
 
 E_0 = E_0
 
-print(f'E_0 = {E_0}')
+#print(f'E_0 = {E_0}')
 
 C = 21022.1
 S = C*3
@@ -202,7 +299,7 @@ elif T in [2, 4]:
 P_da_evaluate = Reduced_P_da[-1]
 Sceanrio_tree_evaluate = Reduced_scenario_trees[-1]
 
-
+"""
 fig, axes = plt.subplots(len(K_list), 1, figsize=(12, 2.5 * len(K_list)), sharex=True, constrained_layout=True)
 hours = np.arange(T)
 
@@ -219,7 +316,7 @@ for i, (k, (scenario_trees, P_da_list)) in enumerate(zip(K_list, zip(Reduced_sce
             ax.plot(hours, P_rt_values, color='black', linewidth=0.6, alpha=0.3)  # Real-time branches
 
     ax.set_title(f"K = {k}: P_da (blue) & P_rt branches (black)", fontsize=10)
-    ax.set_ylabel("Price")
+    ax.set_ylabel("Price (KRW)")
     ax.set_ylim(-120, 200)
     ax.grid(True)
 
@@ -227,7 +324,7 @@ axes[-1].set_xlabel("Hour")
 
 plt.show()
 
-
+"""
 
 dual_tolerance = 1e-3
 dual_tolerance_da = 1e-4
@@ -9613,7 +9710,7 @@ class PSDDiPModel_multicut:
                 
                 #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
 
-            print(f"\nPSDDiPModel_multicut For running_time = {Total_time*Timeline}")
+            print(f"\nPSDDiPModel_multicut for price setting = {price_setting}, running_time = {Total_time*Timeline}")
             print(f"used cuts = {(len(self.psi[0][2]))}")
             print(f"SDDiP complete. for T = {self.STAGE}, k = {self.K}, cut mode = {self.cut_mode}")
             print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {(self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]:.4f}")
@@ -12021,7 +12118,7 @@ if __name__ == "__main__":
 
     # Full length of T = 24
     
-    l = 7
+    l = 10
     parallel = 0
     
     ## (l, k, sample_num) : (0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 10), (9, 12), (10, 15), (11, 20) 
