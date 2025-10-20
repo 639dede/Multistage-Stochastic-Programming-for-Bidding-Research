@@ -6,7 +6,8 @@ import os
 import warnings
 from scipy.stats import bernoulli, truncnorm
 from sklearn.cluster import KMeans
-
+from pathlib import Path
+import sys
 
 # Given Parameters
 
@@ -432,10 +433,10 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
 
 
 inspect_bins(data, 'E_0_value', 'day_ahead_price', num_bins)
-plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
+#plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
 
 inspect_bins(data, 'day_ahead_price', 'real_time_price', num_bins)
-plot_histogram(data, 'real_time_price', LB_price, UB_price)
+#plot_histogram(data, 'real_time_price', LB_price, UB_price)
 
 tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
     data=data,
@@ -737,6 +738,8 @@ if __name__ == '__main__':
 
 
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
+    
+    
     
     scenario_generator = scenario(6, E_0)
     

@@ -99,7 +99,7 @@ E_0 = E_0_normal
 
 # Load Price and Scenario csv files
 
-price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
 
 def load_clustered_P_da(directory_path):
     Reduced_P_da = []
@@ -115,30 +115,27 @@ def load_clustered_P_da(directory_path):
 
     return Reduced_P_da
 
-cluster_dir = f'./Stochastic_Approach/Scenarios/Clustered_P_da_{price_setting}'
+cluster_dir = f'./Stochastic_Approach/Scenarios/Clustered_data/P_da_{price_setting}'
 
 Reduced_P_da = load_clustered_P_da(cluster_dir)
 
-K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 500]
+K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 500]
     
 T = 24
 hours = np.arange(T)
 
-"""
+
 # Plot clustered P_da profiles for each K
 for i, P_da_list in enumerate(Reduced_P_da):
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Plot all profiles
     for profile in P_da_list:
         ax.plot(hours, profile, color='blue', alpha=0.6)
     
-    # Title and labels with fontsize 20
     ax.set_title(f"K = {K_list[i]}: Clustered Day-Ahead Price Profiles", fontsize=20)
     ax.set_xlabel("Hour", fontsize=20)
     ax.set_ylabel("Price (KRW)", fontsize=20)
     
-    # Ticks fontsize
     ax.tick_params(axis='both', labelsize=20)
     
     ax.grid(True)
@@ -146,7 +143,7 @@ for i, P_da_list in enumerate(Reduced_P_da):
     plt.tight_layout()
     plt.show()
 
-"""
+
 
 
 
@@ -176,7 +173,7 @@ def load_scenario_trees(base_dir):
 
 
 
-clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Clustered_scenario_trees_{price_setting}'
+clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Clustered_data/scenario_trees_{price_setting}'
 Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
 
 
@@ -12274,9 +12271,9 @@ if __name__ == "__main__":
         ) 
     
     
-    psddip_multi_1.run_sddip()
-    psddip_multi_2.run_sddip()
-    psddip_multi_3.run_sddip()
+    #psddip_multi_1.run_sddip()
+    #psddip_multi_2.run_sddip()
+    #psddip_multi_3.run_sddip()
     #psddip_multi_4.run_sddip()
     #psddip_multi_5.run_sddip()
     
@@ -12293,7 +12290,7 @@ if __name__ == "__main__":
             pass
         plt.show()  # blocks until you close it
 
-    notify_done_via_plot()
+    #notify_done_via_plot()
     
     """    
     psddip_1 = PSDDiPModel_Block(
