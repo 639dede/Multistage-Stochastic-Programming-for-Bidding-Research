@@ -424,7 +424,7 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
                 'means': means,
                 'stds': stds
             }
-            #plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
+            plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
         except Exception as e:
             print(f'Failed to train TGMM for bin {bin_interval}: {e}')
     
@@ -433,10 +433,10 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
 
 
 inspect_bins(data, 'E_0_value', 'day_ahead_price', num_bins)
-#plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
+plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
 
 inspect_bins(data, 'day_ahead_price', 'real_time_price', num_bins)
-#plot_histogram(data, 'real_time_price', LB_price, UB_price)
+plot_histogram(data, 'real_time_price', LB_price, UB_price)
 
 tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
     data=data,
@@ -508,16 +508,6 @@ def sample_real_time_price(P_da_value, tgmm_params, bin_edges, num_samples=1):
     samples = sample_from_tgmm(params['weights'], params['means'], params['stds'], LB_price, UB_price, num_samples)
     return samples
 
-"""
-
-try:
-    sampled_real_time = sample_real_time_price(new_E0_value, tgmm_model2_params, model2_bin_edges, num_samples=100)
-    print(f'\nSampled real_time_price values for day_ahead_price={new_E0_value}:')
-    print(sampled_real_time)
-except ValueError as e:
-    print(e)
-
-"""
 
 
 E_0_daily = E_0_daily[61:92]
@@ -526,6 +516,8 @@ P_da_daily = day_ahead_prices_daily[61:92]
 P_rt_daily = real_time_prices_daily[61:92]
 
 
+
+"""
 # Generate Scenario
 
 
@@ -737,17 +729,18 @@ if __name__ == '__main__':
     pd.DataFrame(E_0).to_csv("./Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv", index=False)
 
 
+
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
-    
-    
-    
+        
+    price_mode = 'normal'  # 'cloudy', 'normal', 'sunny'
+            
     scenario_generator = scenario(6, E_0)
     
     evaluation_num = 500
     
     sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(evaluation_num))
-    
-    K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, evaluation_num]
+        
+    K_list = [1, 2, 3, 4, 5, 6, 7, 8, 10, 15, evaluation_num]
     
     Reduced_P_da = []
     Reduced_scenario_trees = []
@@ -768,7 +761,7 @@ if __name__ == '__main__':
         Reduced_scenario_trees.append(scenario_trees)
     
     
-    base_dir = './Stochastic_Approach/Scenarios/Clustered_scenario_trees_normal'
+    base_dir = f'./Stochastic_Approach/Scenarios/Clustered_scenario_trees_{price_mode}_test'
     os.makedirs(base_dir, exist_ok=True)
 
     for i, (k, scenario_trees) in enumerate(zip(K_list, Reduced_scenario_trees)):
@@ -825,7 +818,7 @@ if __name__ == '__main__':
         #plt.show()
     
     
-    save_dir = './Stochastic_Approach/Scenarios/Clustered_P_da_normal'
+    save_dir = f'./Stochastic_Approach/Scenarios/Clustered_P_da_{price_mode}_test'
     os.makedirs(save_dir, exist_ok=True)
     
     for i, P_da_list in enumerate(Reduced_P_da):
@@ -871,113 +864,4 @@ if __name__ == '__main__':
     plt.close(fig)
         
  
-    
-    # For SDDiP
-    """
-    branch_num = 6
-    
-    scenario_generator = scenario(branch_num, E_0)
-            
-    P_da_list = [
-        [
-            120, 130, 120, 100, 
-            90, 100, 100, 100, 
-            90, 80, 90, 100, 
-            90, 70, 90, 90,
-            100, 120, 130, 120,
-            100, 110, 140, 130
-        ],
-        [
-            110, 100, 120, 110,
-            90, 100, 110, 90,
-            80, 40, -40, -79,
-            -79, -70, -60, 50,
-            50, 100, 90, 100,
-            110, 120, 100, 100  
-        ],
-        [
-            100, 90, 100, 90,
-            80, 100, 0, -10,
-            -50, -70, -79, -79,
-            -79, -79, -60, -40,
-            -50, -20, 0, 50,
-            70, 80, 100, 90
-        ]
-    ]
-    
-    scenario_trees = []
-    
-    for P_da in P_da_list:
-        
-        scenario_tree = scenario_generator.generate_scenario_tree(P_da)
-        scenario_trees.append(scenario_tree)
-    
-
-    fig, axs = plt.subplots(2, 3, figsize=(18, 8), sharex=True)
-
-    for idx, (P_da, tree) in enumerate(zip(P_da_list, scenario_trees)):
-        # Plot P_da
-        axs[0, idx].plot(range(24), P_da, color='tab:blue')
-        axs[0, idx].set_title(f'Day-ahead Price {idx+1}')
-        axs[0, idx].set_ylabel('P_da')
-        axs[0, idx].set_ylim(-100, 300)
-        axs[0, idx].set_xticks(range(0, 24, 4))
-        axs[0, idx].grid(True)
-
-        # Plot each P_rt branch (6 branches)
-        
-        P_rt_lists = [[] for _ in range(branch_num)]
-        
-        for branches in tree:
-            
-            for b_idx, branch in enumerate(branches):
-                P_rt_lists[b_idx].append(branch[1])
-
-        for P_rt_list in P_rt_lists:
-            
-            axs[1, idx].plot(range(24), P_rt_list, label=f's{idx}', alpha=0.3, color='black')
-
-        axs[1, idx].set_title(f'Real-time Scenarios {idx+1}')
-        axs[1, idx].set_xlabel('Hour')
-        axs[1, idx].set_ylabel('P_rt')
-        axs[1, idx].set_ylim(-100, 300)
-        axs[1, idx].set_xticks(range(0, 24, 4))
-        axs[1, idx].grid(True)
-
-    plt.tight_layout()
-    #plt.show()
-    
-    base_dir_P_da   = './Stochastic_Approach/Scenarios/P_da_settings'
-    base_dir_trees  = './Stochastic_Approach/Scenarios/Trees_settings'
-    
-    os.makedirs(base_dir_P_da, exist_ok=True)
-    os.makedirs(base_dir_trees, exist_ok=True)
-    
-    for idx, (P_da, tree) in enumerate(zip(P_da_list, scenario_trees)):
-
-        # === Save P_da ===
-        P_da_path = os.path.join(base_dir_P_da, f'P_da_{idx}.csv')
-        pd.DataFrame(P_da).to_csv(P_da_path, index=False, header=False)
-
-        # === Save Scenario Tree ===
-        # Convert tree to 3D list → shape: (num_branches, 24, 3)
-        # You can flatten each branch (24 rows, each with 3 columns)
-        tree_path = os.path.join(base_dir_trees, f'Tree_{idx}.csv')
-
-        # Flatten and save as DataFrame
-        flat_tree = []
-        for branch in tree:
-            flat_tree.append(branch)  # branch: list of 24 [*, P_rt, *]
-
-        # Resulting DataFrame: 3D flattened into 2D → long csv with index over branches
-        # You may want to use MultiIndex later to identify branch #
-        full_df = pd.concat([
-            pd.DataFrame(b, columns=['x0', 'P_rt', 'x2']).assign(branch=i)
-            for i, b in enumerate(flat_tree)
-        ])
-
-        # Optional: reorder columns
-        full_df = full_df[['branch', 'x0', 'P_rt', 'x2']]
-
-        full_df.to_csv(tree_path, index=False)
-    """
+"""
