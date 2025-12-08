@@ -424,7 +424,7 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
                 'means': means,
                 'stds': stds
             }
-            plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
+            #plot_tgmm(subset, weights, means, stds, LB_price, UB_price, title=f'TGMM Fit for {conditioning_var} in {bin_interval}')
         except Exception as e:
             print(f'Failed to train TGMM for bin {bin_interval}: {e}')
     
@@ -433,10 +433,10 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
 
 
 inspect_bins(data, 'E_0_value', 'day_ahead_price', num_bins)
-plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
+#plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
 
 inspect_bins(data, 'day_ahead_price', 'real_time_price', num_bins)
-plot_histogram(data, 'real_time_price', LB_price, UB_price)
+#plot_histogram(data, 'real_time_price', LB_price, UB_price)
 
 tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
     data=data,
@@ -517,7 +517,7 @@ P_rt_daily = real_time_prices_daily[61:92]
 
 
 
-"""
+
 # Generate Scenario
 
 
@@ -732,7 +732,7 @@ if __name__ == '__main__':
 
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
         
-    price_mode = 'normal'  # 'cloudy', 'normal', 'sunny'
+    price_mode = 'sunny'  # 'cloudy', 'normal', 'sunny'
             
     scenario_generator = scenario(6, E_0)
     
@@ -864,4 +864,3 @@ if __name__ == '__main__':
     plt.close(fig)
         
  
-"""

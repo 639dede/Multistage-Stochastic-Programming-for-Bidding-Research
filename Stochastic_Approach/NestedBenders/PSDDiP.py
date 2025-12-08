@@ -1404,7 +1404,6 @@ class fw_rt(pyo.ConcreteModel):
                 + self.m_2 
                 - gamma_over*model.phi_over 
                 - gamma_under*model.phi_under
-                + model.u*P_r
                 )
         
         model.da_Q = pyo.Constraint(rule = da_Q_rule)
@@ -1796,7 +1795,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
                 (model.u - model.Q_da)*self.P_rt 
                 + self.m_2 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
-                + model.u*P_r
                 )
         
         
@@ -2145,7 +2143,6 @@ class fw_rt_Lagrangian(pyo.ConcreteModel): ## (Backward - Strengthened Benders' 
                 (model.u - model.Q_da)*self.P_rt 
                 + self.m_2 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
-                + model.u*P_r
                 )
 
         model.da_Q = pyo.Constraint(rule = da_Q_rule)
@@ -2429,7 +2426,6 @@ class fw_rt_last(pyo.ConcreteModel):
                 (model.u - model.Q_da)*self.P_rt 
                 + self.m_2 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
-                + model.u*P_r                
                 )
         
         model.da_Q = pyo.Constraint(rule = da_Q_rule)
@@ -2722,7 +2718,6 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
                 (model.u - model.Q_da)*self.P_rt 
                 + self.m_2 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
-                + model.u*P_r
                 )
         
         
@@ -3016,7 +3011,6 @@ class fw_rt_last_Lagrangian(pyo.ConcreteModel): ## (Backward - Strengthened Bend
                 (model.u - model.Q_da)*self.P_rt 
                 + self.m_2 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
-                + model.u*P_r
                 )
         
         model.da_Q = pyo.Constraint(rule = da_Q_rule)
@@ -3502,7 +3496,6 @@ class rolling_da(pyo.ConcreteModel):
                 + self.m_2[t] 
                 - gamma_over*model.phi_over[t] 
                 - gamma_under*model.phi_under[t]
-                + model.u[t]*P_r
                 )
         
         model.da_bidding_amount = pyo.Constraint(model.TIME, rule = da_bidding_amount_rule)
@@ -3763,7 +3756,6 @@ class rolling_rt_init(pyo.ConcreteModel):
                 + self.m_2[t] 
                 - gamma_over*model.phi_over[t] 
                 - gamma_under*model.phi_under[t]
-                + model.u[t]*P_r
                 )
         
         model.da_market_clearing_1 = pyo.Constraint(model.TIME, rule = da_market_clearing_1_rule)
@@ -4073,7 +4065,6 @@ class rolling_rt(pyo.ConcreteModel):
                 + self.m_2[self.stage] 
                 - gamma_over*model.phi_over[self.stage] 
                 - gamma_under*model.phi_under[self.stage]
-                + model.u[self.stage]*P_r
                 )
         
         def rt_settlement_fcn_rule(model, t):
@@ -4082,7 +4073,6 @@ class rolling_rt(pyo.ConcreteModel):
                 + self.m_2[t] 
                 - gamma_over*model.phi_over[t] 
                 - gamma_under*model.phi_under[t]
-                + model.u[t]*P_r
                 )
         
         model.da_awarded_amount = pyo.Constraint(model.TIME, rule = da_awarded_amount_rule)
@@ -4356,7 +4346,6 @@ class rolling_rt_last(pyo.ConcreteModel):
                 + self.m_2[self.stage] 
                 - gamma_over*model.phi_over[self.stage] 
                 - gamma_under*model.phi_under[self.stage]
-                + model.u[self.stage]*P_r
                 )
 
         model.da_awarded_amount = pyo.Constraint(model.TIME, rule = da_awarded_amount_rule)
