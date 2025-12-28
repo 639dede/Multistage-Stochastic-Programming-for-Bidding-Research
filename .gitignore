@@ -1,0 +1,50 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.venv/
+venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+.vscode/
+
+# Gurobi license file
+gurobi.lic
+
+# Compressed files
+*.tar.gz
+*.zip
+
+# Data files
+*.csv
+*.xlsx
+*.pkl
+*.h5
+*.npy
+
+# Logs
+*.log
+
+# Optimization solvers and binaries
+Ipopt/
+gurobi952/
+
+# Gurobi files
+gurobi.ilp
+gurobi9.5.2_linux64.tar.gz
+gurobi11.0.1_linux64.tar.gz
+# experiment outputs
+Stochastic_Approach/NestedBenders/psi_full/
+
+# accidental pasted command filenames
+eval *
