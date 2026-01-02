@@ -34,11 +34,6 @@ SOLVER.options['TimeLimit'] = 300
 assert SOLVER.available(), f"Solver {solver} is available."
 
 
-price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
-cut_mode = 'L-sub'  # 'SB', 'L-sub'
-time_limit = '3600' # '3600', '7200', '10800'
-
-
 # Load Energy Forecast list
 
 E_0_path_cloudy = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_cloudy.csv'
@@ -64,11 +59,11 @@ E_0 = E_0_normal
 
 ## 0. Load Price and Scenario csv files
 
-K_list = [1, 3, 6, 10, 15, 500, 500]
+K_list = [1, 3, 6, 10, 15]
 
-price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
 cut_mode = 'L-sub'  # 'SB', 'L-sub'
-time_limit = '3600' # '3600', '7200', '10800'
+time_limit = '10800' # '3600', '7200', '10800'
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
@@ -229,7 +224,7 @@ def exp_P_rt_given_P_da(n):
 exp_P_rt_glob = expectation_P_rt()
 
 
-## 1. Load evaluation/test paths
+## 1. Load evaluation/test scenario paths
 
 K_eval = len(P_da_eval)
 
@@ -255,22 +250,24 @@ PSI_DA_DIR = BASE_DIR / "psi_DA" / price_setting / cut_mode / time_limit
 
 psi_DA = []
 
-for K in [1, 3, 6, 10, 15, 50]:
-    
-    for cut in ['SB', 'L-sub']:
-    
-        path = PSI_DA_DIR / f"psi_DA_{K}.npy"
-        psi_DA.append(np.load(path, allow_pickle=True).tolist())
+for K in K_list:
+    psi_DA_path = PSI_DA_DIR / f"psi_DA_{K}.npy"
+    if not psi_DA_path.exists():
+        raise FileNotFoundError(f"Missing psi_DA file: {psi_DA_path}")
+    psi_DA.append(np.load(psi_DA_path, allow_pickle=True).tolist())
 
 
+## 3. Load ECTG functions for ID stages
 
-## 3. Load ECTG functions for evaluation
+PSI_FULL_DIR = BASE_DIR / "psi_full"
+state_path = PSI_FULL_DIR / f"{price_setting}_state.npy"
 
-PSI_DIR = BASE_DIR / "psi_full"
-psi_path = PSI_DIR / f"{price_setting}_psi_ID.npy"
+if not state_path.exists():
+    raise FileNotFoundError(f"Missing full checkpoint: {state_path}")
 
-psi_ID = np.load(psi_path, allow_pickle=True)
-psi_ID = psi_ID.tolist()  
+state = np.load(state_path, allow_pickle=True).item()
+
+psi_ID = state["psi_ID"]        # this is the list you saved as model.psi
 
 
 ## 4. Evaluate
@@ -292,7 +289,7 @@ from NestedBenders.PSDDiP import (
 # Evaluation
 
 
-def evaluation_rolling_rolling():
+def evaluation_rolling_rolling(scenarios):
     
     da_subp = rolling_da(exp_P_da, exp_P_rt_glob)
     
@@ -307,7 +304,7 @@ def evaluation_rolling_rolling():
     f_E  = [0]*T
     f_Im = [0]*T
     
-    for n, scenarios_n in enumerate(scenarios_for_test):
+    for n, scenarios_n in enumerate(scenarios):
                     
         P_da = P_da_test[n]  
                     
@@ -365,7 +362,7 @@ def evaluation_rolling_rolling():
     print(f"Evaluation : {eval}")
 
 
-def evaluation_rolling_sddip():
+def evaluation_rolling_sddip(scenarios):
         
     da_subp = rolling_da(exp_P_da, exp_P_rt_glob)
     
@@ -380,7 +377,7 @@ def evaluation_rolling_sddip():
     f_E  = [0]*T
     f_Im = [0]*T
         
-    for n, scenarios_n in enumerate(scenarios_for_test):
+    for n, scenarios_n in enumerate(scenarios):
                     
         P_da = P_da_test[n]
         
@@ -437,24 +434,29 @@ def evaluation_rolling_sddip():
     print(f"\nRolling Horizon -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
    
+ 
+def evaluation_SP_sddip(stage_num, scenarios):
         
-def evaluation_psddip_sddip(K):
-    
-    k_idx = K_list.index(K)
+    if stage_num == 2:
         
-    da_subp = fw_da(psi_DA[k_idx])
+        da_subp = two_stage_da(exp_P_da, exp_P_rt_glob)
+        
+    elif stage_num == 3:
+        
+        da_subp = three_stage_da(exp_P_da, exp_P_rt_glob)  
+          
     da_state = da_subp.get_state_solutions()
-    
+                
     q_da = da_state[0]
-    
+                        
     f = []
     
     f_DA = [0]*T
     f_P  = [0]*T
     f_E  = [0]*T
     f_Im = [0]*T
-    
-    for n, scenarios_n in enumerate(scenarios_for_test):
+        
+    for n, scenarios_n in enumerate(scenarios):
                     
         P_da = P_da_test[n]
         
@@ -508,16 +510,91 @@ def evaluation_psddip_sddip(K):
     
     eval = mu_hat 
     
+    print(f"\nRolling Horizon -> SDDiP for price setting = {price_setting}")
+    print(f"Evaluation : {eval}")
+    
+        
+def evaluation_psddip_sddip(K, scenarios):
+    
+    k_idx = K_list.index(K)
+        
+    da_subp = fw_da(psi_DA[k_idx])
+    da_state = da_subp.get_state_solutions()
+    
+    q_da = da_state[0]
+    
+    f = []
+    
+    f_DA = [0]*T
+    f_P  = [0]*T
+    f_E  = [0]*T
+    f_Im = [0]*T
+    
+    for n, scenarios_n in enumerate(scenarios):
+                    
+        P_da = P_da_test[n]
+                
+        rt_init_subp = fw_rt_init(da_state, psi_ID[n][0], P_da)
+        rt_init_state = rt_init_subp.get_state_solutions()
+        
+        f_DA_list = rt_init_subp.get_DA_profit()
+        
+        for i in range(T):
+            f_DA[i] += f_DA_list[i]/K_eval
+        
+        fcn_value = rt_init_subp.get_settlement_fcn_value()
+            
+        for scenario in scenarios_n:
+            
+            state = rt_init_state
+            
+            f_scenario = fcn_value
+            
+            for t in range(T - 1): ## t = 0, ..., T-2
+                
+                rt_subp = fw_rt(t, state, psi_ID[n][t+1], P_da, scenario[t])
+                
+                f_P[t] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
+                f_E[t] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
+                f_Im[t] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+                
+                state = rt_subp.get_state_solutions()
+                
+                f_scenario += rt_subp.get_settlement_fcn_value()
+            
+            ## t = T-1
+            
+            rt_last_subp = fw_rt_last(state, P_da, scenario[T-1])
+
+            f_P[T-1] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
+            f_E[T-1] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
+            f_Im[T-1] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+
+            f_scenario += rt_last_subp.get_settlement_fcn_value()
+                        
+            f.append(f_scenario)
+        
+    mu_hat = np.mean(f)
+    
+    sigma_hat = np.std(f, ddof=1)  
+
+    z_alpha_half = 1.96  
+    
+    eval = mu_hat 
+    
     print(f"\nPSDDiP K = {K}, cut = {cut_mode} -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
-    
+
 #evaluation_rolling_rolling()
-evaluation_rolling_sddip()  
+#evaluation_rolling_sddip(scenarios_for_eval)  
+#evaluation_SP_sddip(2, scenarios_for_eval)
+evaluation_SP_sddip(3, scenarios_for_eval)
 
+"""
 for K in K_list:
-    evaluation_psddip_sddip(K)
-
+    evaluation_psddip_sddip(K, scenarios_for_eval)
+"""
         
 
 """

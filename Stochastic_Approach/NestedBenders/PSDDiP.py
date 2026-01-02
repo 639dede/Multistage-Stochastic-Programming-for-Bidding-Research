@@ -3653,6 +3653,16 @@ class two_stage_da(pyo.ConcreteModel):
     
         return pyo.value(self.objective)
 
+    def get_state_solutions(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+        State_var = []
+        
+        State_var.append([pyo.value(self.q_da[t]) for t in range(self.T)])
+        
+        return State_var    
 
 ## 4) 3-stage stochastic programming model
 
@@ -3875,7 +3885,16 @@ class three_stage_da(pyo.ConcreteModel):
     
         return pyo.value(self.objective)
 
-
+    def get_state_solutions(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+        State_var = []
+        
+        State_var.append([pyo.value(self.q_da[t]) for t in range(self.T)])
+        
+        return State_var  
 
 
 # 3. Algorithms instances
@@ -5076,7 +5095,7 @@ if __name__ == "__main__":
     random.seed(42)
     np.random.seed(42)
 
-    evaluation_num = 10
+    evaluation_num = 20
 
     def sample_scenario_paths(Scenario_tree, N):
         scenarios = []
@@ -5092,7 +5111,7 @@ if __name__ == "__main__":
         return scenarios
     
     # Sample
-    scenarios_for_eval = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num)
+    scenarios_for_eval = sample_scenario_paths(Scenario_tree_test, evaluation_num)
     scenarios_for_test = sample_scenario_paths(Scenario_tree_test, evaluation_num)
 
     # Base directory
@@ -5171,7 +5190,8 @@ if __name__ == "__main__":
     )
 
     checkpoint_path = PSI_DIR / f"{price_setting}_state.npy"
-
+    
+    """
     if checkpoint_path.exists():
         load_psddip_state(
             psddip_multi_full,
@@ -5180,68 +5200,69 @@ if __name__ == "__main__":
         )
     else:
         print("ℹ️ No checkpoint found — starting fresh")
-
     
-    psddip_multi_full.run_sddip()
-
+    
+    #psddip_multi_full.run_sddip()
+    
+    
     save_psddip_state(
         psddip_multi_full,
         PSI_DIR,
         price_setting
     ) 
-
+    """
     
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
     
-    cut_mode = 'SB'
-    
-    time_interval = 3600
-    time_num = 3
-    
-    for k, K in enumerate(K_list):
-        
-        psddip_multi_da = PSDDiPModel(
-            STAGE = T,
-            DA_params=P_da_evaluate,
-            ID_params=Scenario_tree_evaluate,
-            DA_params_reduced=Reduced_P_da[k],
-            ID_params_reduced=Reduced_scenario_trees[k],
-            sample_num=int(500/K),
-            alpha = 0.95,
-            cut_mode=cut_mode,
-            tol=0.00000001,
-            parallel_mode=1,
-            total_time=time_interval,
-            time_num=time_num,
-            breakstage_Lag=4,
-            breakstage_selection=4,
-        )
-        
-        
-        psi_DA = [
-            psddip_multi_da.psi_da_save[0],
-            psddip_multi_da.psi_da_save[1],
-            psddip_multi_da.psi_da
-        ]
-        
-        
-        BASE_DIR = Path(__file__).resolve().parent           # NestedBenders
-        
-        for count in range(time_num):
-        
-            PSI_DIR  = BASE_DIR / "psi_DA" / f"{price_setting}" / f"{cut_mode}" / f"{(count+1)*time_interval}"
-            PSI_DIR.mkdir(parents=True, exist_ok=True)
+    """
+    for cut_mode in ['SB', 'L-sub']:
 
-            psi_path = PSI_DIR / f"psi_DA_{K}.npy"
-
-            np.save(
-                psi_path,
-                np.array(psi_DA[count], dtype=object),
-                allow_pickle=True
+        time_interval = 3600
+        time_num = 3
+        
+        for k, K in enumerate([K for K in K_list if K <= 15]):
+            
+            psddip_multi_da = PSDDiPModel(
+                STAGE = T,
+                DA_params_reduced=Reduced_P_da[k],
+                ID_params_reduced=Reduced_scenario_trees[k],
+                sample_num=int(500/K),
+                alpha = 0.95,
+                cut_mode=cut_mode,
+                tol=0.00000001,
+                parallel_mode=1,
+                total_time=time_interval,
+                time_num=time_num,
+                breakstage_Lag=4,
+                breakstage_selection=4,
             )
+            
+            psddip_multi_da.run_sddip()
+            
+            psi_DA = [
+                psddip_multi_da.psi_da_save[0],
+                psddip_multi_da.psi_da_save[1],
+                psddip_multi_da.psi_da
+            ]
+            
+            
+            BASE_DIR = Path(__file__).resolve().parent           # NestedBenders
+            
+            for count in range(time_num):
+            
+                PSI_DIR  = BASE_DIR / "psi_DA" / f"{price_setting}" / f"{cut_mode}" / f"{(count+1)*time_interval}"
+                PSI_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("✅ psd_DA saved as .npy:")
-    
+                psi_path = PSI_DIR / f"psi_DA_{K}.npy"
+
+                np.save(
+                    psi_path,
+                    np.array(psi_DA[count], dtype=object),
+                    allow_pickle=True
+                )
+
+        print("✅ psd_DA saved as .npy:")
+    """
     
     ## 4. Notify done via plot
     
@@ -5256,8 +5277,6 @@ if __name__ == "__main__":
             pass
         plt.show()
     
-    
-    #save_arrays_DA()
-    #save_arrays_ID()
+
     notify_done_via_plot()
         
