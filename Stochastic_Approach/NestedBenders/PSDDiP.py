@@ -62,7 +62,9 @@ E_0 = E_0_normal
 
 ## Load Price and Scenario csv files
 
-K_list = [1, 3, 6, 10, 15, 50, 50]
+evaluation_num = 20 
+
+K_list = [1, 3, 6, 10, 15, evaluation_num]
 
 price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
 
@@ -162,7 +164,6 @@ def load_scenario_trees(base_dir):
 cluster_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/P_da_{price_setting}'
 Reduced_P_da, Reduced_Probs = load_clustered_P_da(cluster_dir)
 
-
 clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_{price_setting}'
 Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
 
@@ -170,7 +171,9 @@ Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
 T = 24
 hours = np.arange(T)
 
+
 """
+
 ## Plot clustered P_da profiles for each K
 
 for i, P_da_list in enumerate(Reduced_P_da):
@@ -251,8 +254,8 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     fig.savefig(os.path.join(outdir, f'P_rt_fan_K{k}.png'), dpi=300)
     plt.show()
     plt.close(fig)
-"""
 
+"""
 
 ## Parameters 
 
@@ -278,16 +281,13 @@ gamma_under = P_max
 
 E_0_partial = E_0
 
-Reduced_P_da = Reduced_P_da
-Reduced_scenario_trees = Reduced_scenario_trees
+P_da_evaluate = Reduced_P_da[-1]
+Probs_evaluate = Reduced_Probs[-1]
 
-P_da_evaluate = Reduced_P_da[-2]
-Scenario_tree_evaluate = Reduced_scenario_trees[-2]
-
-P_da_test = Reduced_P_da[-1]
-Scenario_tree_test = Reduced_scenario_trees[-1]
+Scenario_tree_evaluate = Reduced_scenario_trees[-1]
 
 K_eval = len(P_da_evaluate)
+
 
 dual_tolerance = 1e-3
 dual_tolerance_da = 1e-4
@@ -306,7 +306,7 @@ E_0_partial_max = max(E_0_partial)
 for t in range(len(E_0_partial)):
     E_0_sum += E_0_partial[t]
     
-K = [1.23*E_0_partial[t] + 1.02*B for t in range(T)]
+K = [1.43*E_0_partial[t] + 1.02*B for t in range(T)]
 
 M_gen = [[1.04*K[t], 2*K[t]] for t in range(T)]
 
@@ -320,11 +320,13 @@ M_gen = [[1.04*K[t], 2*K[t]] for t in range(T)]
 
 class fw_da(pyo.ConcreteModel): 
     
-    def __init__(self, psi):
+    def __init__(self, probs, psi):
         
         super().__init__()
 
         self.solved = False
+        
+        self.probs = probs
         
         self.psi = psi
         
@@ -345,6 +347,7 @@ class fw_da(pyo.ConcreteModel):
         # Vars
         
         def _value_index_init(m): 
+            
             for k in m.KRANGE:
                 for l in m.PSIRANGE[k]:
                     yield (k, l)
@@ -380,7 +383,7 @@ class fw_da(pyo.ConcreteModel):
         
         def objective_rule(model):
             return (
-                sum(model.theta[k] for k in range(self.K))/self.K
+                sum(model.theta[k]*self.probs[k] for k in range(self.K))
             )
         
         model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
@@ -402,6 +405,7 @@ class fw_da(pyo.ConcreteModel):
         return State_var 
 
     def get_objective_value(self):
+       
         if not self.solved:
             self.solve()
             self.solved = True        
@@ -435,17 +439,17 @@ class fw_rt_init(pyo.ConcreteModel):
         
         # Vars
         
-        model.theta = pyo.Var(domain = pyo.Reals)
+        model.theta = pyo.Var(bounds = (0, 1e8), domain = pyo.Reals)
         
-        model.q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.q_da = pyo.Var(model.TIME, domain = pyo.Reals)
                 
         model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
         
-        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
-        model.T_Q = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
-        model.T_o = pyo.Var(domain = pyo.NonNegativeReals)
+        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.Reals)
+        model.T_Q = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.T_o = pyo.Var(domain = pyo.Reals)
         model.T_q = pyo.Var(domain = pyo.Reals)
-        model.T_E = pyo.Var(domain = pyo.NonNegativeReals)
+        model.T_E = pyo.Var(domain = pyo.Reals)
         
         model.f = pyo.Var(domain = pyo.Reals)
         
@@ -3562,7 +3566,7 @@ class two_stage_da(pyo.ConcreteModel):
             return model.S[k, t] == model.S[k, t-1] + v*model.c[k, t] - (1/v)*model.d[k, t]
         
         def generation_rule(model, k, t):
-            return model.g[k, t] <= E_0_partial[k, t]
+            return model.g[k, t] <= E_0_partial[t]
         
         def charge_rule(model, k, t):
             return model.c[k, t] <= model.g[k, t]
@@ -3573,13 +3577,13 @@ class two_stage_da(pyo.ConcreteModel):
         ## min, max reformulation constraints
         
         def minmax_rule_1_1(model, k, t):
-            return model.m_1[k, t] >= model.q_da[k, t] - model.u[k, t]
+            return model.m_1[k, t] >= model.q_da[t] - model.u[k, t]
         
         def minmax_rule_1_2(model, k, t):
             return model.m_1[k, t] >= 0
 
         def minmax_rule_1_3(model, k, t):
-            return model.m_1[k, t] <= model.q_da[k, t] - model.u[k, t] + M_gen[t][0]*(1 - model.n_1[k, t])
+            return model.m_1[k, t] <= model.q_da[t] - model.u[k, t] + M_gen[t][0]*(1 - model.n_1[k, t])
         
         def minmax_rule_1_4(model, k, t):
             return model.m_1[k, t] <= M_gen[t][0]*model.n_1[k, t]
@@ -3598,11 +3602,11 @@ class two_stage_da(pyo.ConcreteModel):
         ## settlement fcn
         
         def da_settlement_fcn_rule(model, k, t):
-            return model.f_DA[k, t] == self.P_da_params[k][t]*model.q_da[k, t] 
+            return model.f_DA[k, t] == self.P_da_params[k][t]*model.q_da[t] 
         
         def rt_settlement_fcn_rule(model, k, t):
             return model.f_RT[k, t] == (
-                (model.u[k, t] - model.q_da[k, t])*self.P_rt_exp_list[k][t] 
+                (model.u[k, t] - model.q_da[t])*self.P_rt_exp_list[k][t] 
                 + model.m_2[k, t] 
                 - gamma_over*model.phi_over[k, t] 
                 - gamma_under*model.phi_under[k, t]
@@ -3756,7 +3760,7 @@ class three_stage_da(pyo.ConcreteModel):
         
         ## settlement fcn Vars
         
-        model.f_DA = pyo.Var(model.DANODE, model.IDNODE, model.TIME, domain = pyo.Reals)
+        model.f_DA = pyo.Var(model.DANODE, model.TIME, domain = pyo.Reals)
         model.f_RT = pyo.Var(model.DANODE, model.IDNODE, model.TIME, domain = pyo.Reals)
         
         # Constraints
@@ -3775,15 +3779,15 @@ class three_stage_da(pyo.ConcreteModel):
             return model.q_rt[k, 0, 0] == model.q_rt[k, m, 0]
 
         def rt_bidding_amount_rule(model, k, m, t):
-            return model.q_rt[k, m, t] <= E_0_partial[t] + B
-        
-        def rt_overbid_rule(model, m, k):
-            return sum(model.q_rt[k, m, t] for s in range(self.M) for t in range(self.T)) <= E_0_sum
+            return model.q_rt[k, m, t] <= self.delta_E_0_paths[k][m][t]*E_0_partial[t] + B
+
+        def rt_overbid_rule(model, k, m):
+            return sum(model.q_rt[k, m, t] for t in range(self.T)) <= E_0_sum
         
         ## Operations rules
 
         def dispatch_rule(model, k, m, t):
-            return model.Q_c[k, m, t] == model.q_rt[k, m, t]
+            return model.Q_c[k, m, t] == (1 + self.delta_c_paths[k][m][t])*model.q_rt[k, m, t]
 
         def SOC_init_rule(model, k, m):
             return model.S[k, m, -1] == 0.5*S
@@ -3792,7 +3796,7 @@ class three_stage_da(pyo.ConcreteModel):
             return model.S[k, m, t] == model.S[k, m, t-1] + v*model.c[k, m, t] - (1/v)*model.d[k, m, t]
         
         def generation_rule(model, k, m, t):
-            return model.g[k, m, t] <= E_0_partial[t]
+            return model.g[k, m, t] <= self.delta_E_0_paths[k][m][t]*E_0_partial[t]
         
         def charge_rule(model, k, m, t):
             return model.c[k, m, t] <= model.g[k, m, t]
@@ -4087,6 +4091,7 @@ class PSDDiPModel:
         self, 
         STAGE = T, 
         DA_params_reduced = Reduced_P_da[0], 
+        DA_prob = Reduced_Probs[0],
         ID_params_reduced = Reduced_scenario_trees[0],
         sample_num = 1000,
         alpha = 0.95, 
@@ -4106,6 +4111,7 @@ class PSDDiPModel:
         self.STAGE = STAGE
         
         self.DA_params = DA_params_reduced
+        self.DA_probs = DA_prob
         self.RT_params = ID_params_reduced
         
         self.M = sample_num
@@ -4293,7 +4299,7 @@ class PSDDiPModel:
             
     def forward_pass(self, scenarios):
         
-        fw_da_subp = fw_da(self.psi_da)
+        fw_da_subp = fw_da(self.DA_probs, self.psi_da)
         fw_da_state = fw_da_subp.get_state_solutions()
         
         self.forward_solutions_da.append(fw_da_state)
@@ -4342,14 +4348,16 @@ class PSDDiPModel:
       
     def forward_pass_for_stopping(self, scenarios):
         
-        fw_da_subp = fw_da(self.psi_da)
+        fw_da_subp = fw_da(self.DA_probs, self.psi_da)
         fw_da_state = fw_da_subp.get_state_solutions()
         
         self.forward_solutions_da.append(fw_da_state)
         
-        f = []
+        mu_hat = 0.0
         
         for k, scenarios_k in enumerate(scenarios):
+            
+            f = []
             
             P_da = self.DA_params[k]
             
@@ -4358,11 +4366,13 @@ class PSDDiPModel:
             
             self.forward_solutions[k][0].append(fw_rt_init_state) ## x(-1)
             
+            f_init = fw_rt_init_subp.get_settlement_fcn_value()
+            
             for scenario in scenarios_k:
                 
                 state = fw_rt_init_state
                 
-                f_scenario = fw_rt_init_subp.get_settlement_fcn_value()
+                f_scenario = f_init
                 
                 for t in range(self.STAGE - 1): ## t = 0, ..., T-2
                     
@@ -4381,10 +4391,11 @@ class PSDDiPModel:
                             
                 f.append(f_scenario)
             
-        mu_hat = np.mean(f)
-        sigma_hat = np.std(f, ddof=1)  
+            mu_hat += np.mean(f)*self.DA_probs[k]
+            
+        #sigma_hat = np.std(f, ddof=1)  
 
-        z_alpha_half = 1.96  
+        #z_alpha_half = 1.96  
         
         #self.LB.append(mu_hat - z_alpha_half * (sigma_hat / np.sqrt(self.M))) 
         self.LB.append(mu_hat) 
@@ -4878,7 +4889,7 @@ class PSDDiPModel:
             cut_coeff = [v] + [pi[0]] 
             self.psi_da[k].append(cut_coeff)
         
-        fw_da_for_UB = fw_da(self.psi_da)
+        fw_da_for_UB = fw_da(self.DA_probs, self.psi_da)
         self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
 
     def backward_pass_Lagrangian_1(self):
@@ -4968,7 +4979,7 @@ class PSDDiPModel:
             cut_coeff = [v] + [pi[0]] 
             self.psi_da[k].append(cut_coeff)
 
-        fw_da_for_UB = fw_da(self.psi_da)
+        fw_da_for_UB = fw_da(self.DA_probs, self.psi_da)
         self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
 
 
@@ -5078,10 +5089,10 @@ class PSDDiPModel:
                 
                 #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
 
-            print(f"\nPSDDiPModel for price setting = {price_setting}, running_time = {self.total_time*Timeline}")
+            print(f"\nPSDDiPModel for price setting = {price_setting}")
             print(f"SDDiP complete. for T = {self.STAGE}, k = {self.K}, cut mode = {self.cut_mode}")
             print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {(self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]:.4f}")
-            print(f"iteration : {self.iteration}")
+            print(f"iteration : {self.iteration}, time_num : {Timeline}, total_time : {self.running_time:.2f} seconds\n")
 
 
 
@@ -5095,7 +5106,7 @@ if __name__ == "__main__":
     random.seed(42)
     np.random.seed(42)
 
-    evaluation_num = 20
+    evaluation_num = 50
 
     def sample_scenario_paths(Scenario_tree, N):
         scenarios = []
@@ -5111,8 +5122,9 @@ if __name__ == "__main__":
         return scenarios
     
     # Sample
-    scenarios_for_eval = sample_scenario_paths(Scenario_tree_test, evaluation_num)
-    scenarios_for_test = sample_scenario_paths(Scenario_tree_test, evaluation_num)
+    scenarios_for_eval = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num)
+    scenarios_for_test = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num)
+    scenarios_for_SP = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num)
 
     # Base directory
     BASE_OUTDIR = Path(f"./Stochastic_Approach/NestedBenders/scenario_paths/{price_setting}")
@@ -5121,6 +5133,7 @@ if __name__ == "__main__":
     # Save as npy (single file each)
     np.save(BASE_OUTDIR / "scenarios_eval.npy", np.asarray(scenarios_for_eval, dtype=object))
     np.save(BASE_OUTDIR / "scenarios_test.npy", np.asarray(scenarios_for_test, dtype=object))
+    np.save(BASE_OUTDIR / "scenarios_SP.npy", np.asarray(scenarios_for_SP, dtype=object))
 
     print("✅ Scenario paths saved as .npy:")
     print(BASE_OUTDIR)
@@ -5128,6 +5141,7 @@ if __name__ == "__main__":
     
     ## 2. Run full-PSDDiP to get psi_ID and save as npy
     
+    """
     def save_psddip_state(model, base_dir, price_setting):
         
         base_dir = Path(base_dir)
@@ -5176,22 +5190,22 @@ if __name__ == "__main__":
     
     psddip_multi_full = PSDDiPModel(
         STAGE=T,
-        DA_params_reduced=P_da_test,
-        ID_params_reduced=Scenario_tree_test,
+        DA_params_reduced=P_da_evaluate,
+        DA_prob=Probs_evaluate,
+        ID_params_reduced=Scenario_tree_evaluate,
         sample_num=evaluation_num,
         alpha=0.95,
         cut_mode='L-sub',
         tol=1e-8,
         parallel_mode=1,
-        total_time=10800,
-        time_num=15,
+        total_time=7200,
+        time_num=12,
         breakstage_Lag=300,
         breakstage_selection=10,
     )
 
     checkpoint_path = PSI_DIR / f"{price_setting}_state.npy"
     
-    """
     if checkpoint_path.exists():
         load_psddip_state(
             psddip_multi_full,
@@ -5202,7 +5216,7 @@ if __name__ == "__main__":
         print("ℹ️ No checkpoint found — starting fresh")
     
     
-    #psddip_multi_full.run_sddip()
+    psddip_multi_full.run_sddip()
     
     
     save_psddip_state(
@@ -5214,17 +5228,18 @@ if __name__ == "__main__":
     
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
     
-    """
+    
     for cut_mode in ['SB', 'L-sub']:
 
         time_interval = 3600
-        time_num = 3
+        time_num = 2
         
         for k, K in enumerate([K for K in K_list if K <= 15]):
             
             psddip_multi_da = PSDDiPModel(
                 STAGE = T,
                 DA_params_reduced=Reduced_P_da[k],
+                DA_prob=Reduced_Probs[k],
                 ID_params_reduced=Reduced_scenario_trees[k],
                 sample_num=int(500/K),
                 alpha = 0.95,
@@ -5241,7 +5256,6 @@ if __name__ == "__main__":
             
             psi_DA = [
                 psddip_multi_da.psi_da_save[0],
-                psddip_multi_da.psi_da_save[1],
                 psddip_multi_da.psi_da
             ]
             
@@ -5262,7 +5276,8 @@ if __name__ == "__main__":
                 )
 
         print("✅ psd_DA saved as .npy:")
-    """
+        
+        
     
     ## 4. Notify done via plot
     

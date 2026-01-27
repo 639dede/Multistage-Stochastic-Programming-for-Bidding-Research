@@ -11,8 +11,10 @@ import sys
 
 # Given Parameters
 
-P_r = 80
-P_max = 200
+scaling_factor = 1
+
+P_r = 80*scaling_factor
+P_max = 200*scaling_factor
 
 T = 24
 
@@ -125,8 +127,8 @@ real_time_prices = [item for sublist in real_time_prices_daily for item in subli
 print(len(E_0_values), len(day_ahead_prices), len(real_time_prices))
 
 E_0_values = np.array(E_0_values)
-day_ahead_prices = day_ahead_prices
-real_time_prices = real_time_prices
+day_ahead_prices = [p * scaling_factor for p in day_ahead_prices]
+real_time_prices = [p * scaling_factor for p in real_time_prices]
 
 
 ## Dataframe for TGMM
@@ -178,9 +180,11 @@ filtered_df_Energy_for_dist['delta'] = filtered_df_Energy_for_dist['forecast_rt'
 
 delta_values_for_dist = filtered_df_Energy_for_dist['delta']
 
-std_E = delta_values_for_dist.std()  
+std_E = delta_values_for_dist.std()  # std_E = 39.37
 
-lower_E, upper_E = 0.8, 1.2
+std_E = 300
+
+lower_E, upper_E = 0.6, 1.4
 
 a_E, b_E = (lower_E - 1) / std_E, (upper_E - 1) / std_E
 
@@ -189,7 +193,7 @@ Energy_dist = truncnorm(a_E, b_E, loc=1, scale=std_E)
 
 # Q_c distribution
 
-std_c = 0.5
+std_c = 600
 
 lower_c, upper_c = -1, 1
 
@@ -197,13 +201,13 @@ a_c, b_c = (lower_c) / std_c, (upper_c) / std_c
 
 Q_c_truncnorm_dist = truncnorm(a_c, b_c, loc = 0, scale = std_c)
 
-p = 0.05
+p_c = 0.2
 
 def f_X(x):
     if x == 0:
-        return 0.95  
+        return 1-p_c  
     elif lower_c <= x <= upper_c:
-        return p * Q_c_truncnorm_dist.pdf(x)
+        return p_c * Q_c_truncnorm_dist.pdf(x)
     else:
         return 0 
 
@@ -217,10 +221,11 @@ LB_price = -P_r
 UB_price = P_max
 LB_energy = -540
 UB_energy = 18000
-num_bins = 8
+num_bins_E = 30
+num_bins_P = 30
 
-bin_edges_energy = np.linspace(LB_energy, UB_energy, num_bins + 1)
-bin_edges_price = np.linspace(LB_price, UB_price, num_bins)
+bin_edges_energy = np.linspace(LB_energy, UB_energy, num_bins_E + 1)
+bin_edges_price = np.linspace(LB_price, UB_price, num_bins_P)
 
 def merge_bins(data, conditioning_var, bin_edges, min_data_per_bin=10, tol=1e-9):
 
@@ -432,10 +437,10 @@ def train_conditional_tgmm(data, conditioning_var, target_var, bin_edges, K=5, m
     return tgmm_params, bin_edges
 
 
-inspect_bins(data, 'E_0_value', 'day_ahead_price', num_bins)
+inspect_bins(data, 'E_0_value', 'day_ahead_price', num_bins_E)
 #plot_histogram(data, 'day_ahead_price', LB_price, UB_price)
 
-inspect_bins(data, 'day_ahead_price', 'real_time_price', num_bins)
+inspect_bins(data, 'day_ahead_price', 'real_time_price', num_bins_P)
 #plot_histogram(data, 'real_time_price', LB_price, UB_price)
 
 tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
@@ -444,7 +449,7 @@ tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
     target_var='day_ahead_price',
     bin_edges=bin_edges_energy,  
     K=5,
-    min_data_per_bin=30
+    min_data_per_bin=20
 )
 
 tgmm_model2_params, model2_bin_edges = train_conditional_tgmm(
@@ -453,7 +458,7 @@ tgmm_model2_params, model2_bin_edges = train_conditional_tgmm(
     target_var='real_time_price',
     bin_edges=bin_edges_price,  
     K=5,
-    min_data_per_bin=30
+    min_data_per_bin=20
 )
 
 
@@ -516,8 +521,6 @@ P_da_daily = day_ahead_prices_daily[61:92]
 P_rt_daily = real_time_prices_daily[61:92]
 
 
-
-
 # Generate Scenario
 
 
@@ -555,7 +558,7 @@ class scenario():
         
         Q_c_samples = []
         for _ in range(self.T):
-            if np.random.rand() < 0.95:
+            if np.random.rand() < 1-p_c:
                 Q_c_samples.append(0)
             else:
                 Q_c_sample = Q_c_truncnorm_dist.rvs()
@@ -580,7 +583,7 @@ class scenario():
         delta_E = Energy_dist.rvs(1).tolist()[0]
         
         ## sample one delta_Q_c
-        if np.random.rand() < 0.95:
+        if np.random.rand() < 1-p_c:
                 delta_Q_c = 0
         else:
                 delta_Q_c = Q_c_truncnorm_dist.rvs()    
@@ -614,7 +617,7 @@ class scenario():
             delta_E = Energy_dist.rvs(1).tolist()[0]
             
             ## sample one delta_Q_c
-            if np.random.rand() < 0.95:
+            if np.random.rand() < 1-p_c:
                     delta_Q_c = 0
             else:
                     delta_Q_c = Q_c_truncnorm_dist.rvs()    
@@ -655,12 +658,14 @@ class scenario():
 
 
 
-evaluation_num = 50
+evaluation_num = 20
 
 K_list = [1, 3, 6, 10, 15, evaluation_num]
 
 
+"""
 if __name__ == '__main__':
+    
     
     # Save Energy forecast csv file
     
@@ -730,15 +735,11 @@ if __name__ == '__main__':
     plt.close()
     
     
-    E_0 = E_0_sunny
-    
-    pd.DataFrame(E_0).to_csv("./Stochastic_Approach/Scenarios/Energy_forecast/E_0.csv", index=False)
-
-
+    E_0 = E_0_cloudy
 
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
         
-    price_mode = 'sunny'  # 'cloudy', 'normal', 'sunny'
+    price_mode = 'cloudy'  # 'cloudy', 'normal', 'sunny'
             
     scenario_generator = scenario(6, E_0)
         
@@ -794,7 +795,7 @@ if __name__ == '__main__':
                 
         ax.set_title(f"Scenario Tree Density for K = {k}")
         ax.set_ylabel("P_rt")
-        ax.set_ylim(-120, 200)
+        ax.set_ylim(-120*scaling_factor, 200*scaling_factor)
         ax.grid(True)
 
     axes[-1].set_xlabel("Hour")
@@ -817,7 +818,7 @@ if __name__ == '__main__':
         ax.set_ylabel("Price")
         ax.grid(True)
         plt.tight_layout()
-        plt.show()
+        #plt.show()
     
     
     save_dir = f'./Stochastic_Approach/Scenarios/P_da_{price_mode}'
@@ -844,13 +845,13 @@ if __name__ == '__main__':
 
         ax.set_title(f"K = {k}: P_da (blue) & P_rt branches (black)", fontsize=10)
         ax.set_ylabel("Price")
-        ax.set_ylim(-120, 200)
+        ax.set_ylim(-120*scaling_factor, 200*scaling_factor)
         ax.grid(True)
 
     axes[-1].set_xlabel("Hour")
     
     plt.savefig('./Stochastic_Approach/Scenarios/combined_scenario_density.png', dpi=300)
-    plt.show()
+    #plt.show()
         
     fig, axes = plt.subplots(len(K_list), 1, figsize=(12, 2.5 * len(K_list)), sharex=True, constrained_layout=True)
     for i, (k, P_da_list) in enumerate(zip(K_list, Reduced_P_da)):
@@ -859,10 +860,11 @@ if __name__ == '__main__':
             ax.plot(hours, profile, color='blue', linewidth=2.0, alpha=0.8)
         ax.set_title(f"K = {k}: Clustered Day-Ahead Price Profiles (P_da only)")
         ax.set_ylabel("P_da")
-        ax.set_ylim(-120, 200)
+        ax.set_ylim(-120*scaling_factor, 200*scaling_factor)
         ax.grid(True)
     axes[-1].set_xlabel("Hour")
     plt.savefig('./Stochastic_Approach/Scenarios/P_da_only_byK.png', dpi=300)
     plt.close(fig)
         
  
+"""

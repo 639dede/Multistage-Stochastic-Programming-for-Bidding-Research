@@ -60,10 +60,10 @@ E_0 = E_0_normal
 ## 0. Load Price and Scenario csv files
 
 K_list = [1, 3, 6, 10, 15]
+cut_list = ['SB', 'L-sub']
 
 price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
-cut_mode = 'L-sub'  # 'SB', 'L-sub'
-time_limit = '10800' # '3600', '7200', '10800'
+time_limit = '7200' # '3600', '7200', '10800' 
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
@@ -169,13 +169,12 @@ T = 24
 
 E_0_partial = E_0
 
-Reduced_P_da = Reduced_P_da
-Reduced_scenario_trees = Reduced_scenario_trees
-
-P_da_eval = Reduced_P_da[-2]
-Scenario_tree_eval = Reduced_scenario_trees[-2]
+P_da_eval = Reduced_P_da[-1]
+Probs_eval = Reduced_Probs[-1]
+Scenario_tree_eval = Reduced_scenario_trees[-1]
 
 P_da_test = Reduced_P_da[-1]
+Probs_test = Reduced_Probs[-1]
 Scenario_tree_test = Reduced_scenario_trees[-1]
 
 exp_P_da = Reduced_P_da[0][0]
@@ -201,11 +200,11 @@ def expectation_P_rt():
                         
     return exp_P_rt_list 
 
-def exp_P_rt_given_P_da(n):
+def exp_P_rt_given_P_da(n, Scenario_tree_params):
 
     exp_P_rt_list = []
     
-    scenario_tree_rt = Scenario_tree_eval[n]
+    scenario_tree_rt = Scenario_tree_params[n]
     
     for t in range(T):
         
@@ -243,18 +242,29 @@ scenarios_for_test = np.load(
     allow_pickle=True
 ).tolist()
 
+scenarios_for_SP = np.load(
+    SCEN_ROOT / "scenarios_SP.npy",
+    allow_pickle=True
+).tolist()
+
 
 ## 2. Load ECTG functions for DA stage
 
-PSI_DA_DIR = BASE_DIR / "psi_DA" / price_setting / cut_mode / time_limit
+psi_DA_list = []
 
-psi_DA = []
+for cut_mode in cut_list:
 
-for K in K_list:
-    psi_DA_path = PSI_DA_DIR / f"psi_DA_{K}.npy"
-    if not psi_DA_path.exists():
-        raise FileNotFoundError(f"Missing psi_DA file: {psi_DA_path}")
-    psi_DA.append(np.load(psi_DA_path, allow_pickle=True).tolist())
+    PSI_DA_DIR = BASE_DIR / "psi_DA" / price_setting / cut_mode / time_limit
+
+    psi_DA = []
+
+    for K in K_list:
+        psi_DA_path = PSI_DA_DIR / f"psi_DA_{K}.npy"
+        if not psi_DA_path.exists():
+            raise FileNotFoundError(f"Missing psi_DA file: {psi_DA_path}")
+        psi_DA.append(np.load(psi_DA_path, allow_pickle=True).tolist())
+
+    psi_DA_list.append(psi_DA)
 
 
 ## 3. Load ECTG functions for ID stages
@@ -308,7 +318,7 @@ def evaluation_rolling_rolling(scenarios):
                     
         P_da = P_da_test[n]  
                     
-        exp_P_rt = exp_P_rt_given_P_da(n)
+        exp_P_rt = exp_P_rt_given_P_da(n, Scenario_tree_test)
                     
         rt_init_subp = rolling_rt_init(da_state, P_da, exp_P_rt)
         rt_init_state = rt_init_subp.get_state_solutions()       
@@ -380,9 +390,7 @@ def evaluation_rolling_sddip(scenarios):
     for n, scenarios_n in enumerate(scenarios):
                     
         P_da = P_da_test[n]
-        
-        exp_P_rt = exp_P_rt_given_P_da(n)
-        
+                
         rt_init_subp = fw_rt_init(da_state, psi_ID[n][0], P_da)
         rt_init_state = rt_init_subp.get_state_solutions()
         
@@ -433,17 +441,19 @@ def evaluation_rolling_sddip(scenarios):
     
     print(f"\nRolling Horizon -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
-   
- 
-def evaluation_SP_sddip(stage_num, scenarios):
+
+
+def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
         
     if stage_num == 2:
         
-        da_subp = two_stage_da(exp_P_da, exp_P_rt_glob)
+        exp_P_rt_each = [exp_P_rt_given_P_da(n, Scenario_tree_eval) for n in range(K_eval)]
+        
+        da_subp = two_stage_da(P_da_eval, exp_P_rt_each)
         
     elif stage_num == 3:
         
-        da_subp = three_stage_da(exp_P_da, exp_P_rt_glob)  
+        da_subp = three_stage_da(P_da_eval, scenarios_SP)  
           
     da_state = da_subp.get_state_solutions()
                 
@@ -459,9 +469,7 @@ def evaluation_SP_sddip(stage_num, scenarios):
     for n, scenarios_n in enumerate(scenarios):
                     
         P_da = P_da_test[n]
-        
-        exp_P_rt = exp_P_rt_given_P_da(n)
-        
+                
         rt_init_subp = fw_rt_init(da_state, psi_ID[n][0], P_da)
         rt_init_state = rt_init_subp.get_state_solutions()
         
@@ -510,15 +518,15 @@ def evaluation_SP_sddip(stage_num, scenarios):
     
     eval = mu_hat 
     
-    print(f"\nRolling Horizon -> SDDiP for price setting = {price_setting}")
+    print(f"\n{stage_num}-SP -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
         
-def evaluation_psddip_sddip(K, scenarios):
+def evaluation_psddip_sddip(K, cut_mode, scenarios):
     
     k_idx = K_list.index(K)
         
-    da_subp = fw_da(psi_DA[k_idx])
+    da_subp = fw_da(Reduced_Probs[k_idx], psi_DA_list[cut_mode][k_idx])
     da_state = da_subp.get_state_solutions()
     
     q_da = da_state[0]
@@ -582,107 +590,39 @@ def evaluation_psddip_sddip(K, scenarios):
     
     eval = mu_hat 
     
-    print(f"\nPSDDiP K = {K}, cut = {cut_mode} -> SDDiP for price setting = {price_setting}")
+    print(f"\nPSDDiP K = {K}, time_lim = {time_limit}, cut = {cut_mode} -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
 
-#evaluation_rolling_rolling()
-#evaluation_rolling_sddip(scenarios_for_eval)  
-#evaluation_SP_sddip(2, scenarios_for_eval)
-evaluation_SP_sddip(3, scenarios_for_eval)
+scenarios = scenarios_for_test
 
-"""
+#%% Cut mode index: 'SB' -> 0, 'L-sub' -> 1
+
+evaluation_rolling_rolling(scenarios)
+evaluation_rolling_sddip(scenarios)  
+evaluation_SP_sddip(2, scenarios, scenarios_for_SP)
+evaluation_SP_sddip(3, scenarios, scenarios_for_SP)
+evaluation_SP_sddip(3, scenarios, scenarios_for_eval)
+
+
 for K in K_list:
-    evaluation_psddip_sddip(K, scenarios_for_eval)
-"""
+    for cut_index in range(len(cut_list)):
+        evaluation_psddip_sddip(K, cut_index, scenarios)
+
+
+# *Notify done via plot*
+
+def notify_done_via_plot(title="✅ Evaluation finished", subtitle=f"price_setting={price_setting}, cut_mode={cut_mode}, time_limit={time_limit}"):
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.axis("off")
+    ax.text(0.5, 0.65, title, ha="center", va="center", fontsize=20, weight="bold")
+    ax.text(0.5, 0.40, subtitle, ha="center", va="center", fontsize=12)
+    try:
+        fig.canvas.manager.set_window_title("Evaluation — Done")
+    except Exception:
+        pass
+    plt.show()
+
+
+notify_done_via_plot()
         
-
-"""
-rolling_1 = RollingHorizonModel(
-    STAGE = T,
-    DA_params_eval=P_da,
-    Scenario_tree_eval=Scenario_tree,
-    scenario_eval=scenarios_for_eval,
-    DA_praram_exp=Reduced_P_da[0],
-    scenario_exp=Reduced_scenario_trees[0],
-    evaluation_num=evaluation_num,
-)
-
-
-q_da_1 = psddip_multi_1.q_da
-q_da_2 = psddip_multi_2.q_da
-q_da_3 = psddip_multi_3.q_da
-q_da_4 = rolling_1.q_da
-
-f_DA_1 = psddip_multi_1.f_DA
-f_DA_2 = psddip_multi_2.f_DA
-f_DA_3 = psddip_multi_3.f_DA
-f_DA_4 = rolling_1.f_DA
-
-f_P_1 = psddip_multi_1.f_P
-f_P_2 = psddip_multi_2.f_P
-f_P_3 = psddip_multi_3.f_P
-f_P_4 = rolling_1.f_P
-
-f_E_1 = psddip_multi_1.f_E
-f_E_2 = psddip_multi_2.f_E
-f_E_3 = psddip_multi_3.f_E
-f_E_4 = rolling_1.f_E
-
-f_Im_1 = psddip_multi_1.f_Im
-f_Im_2 = psddip_multi_2.f_Im
-f_Im_3 = psddip_multi_3.f_Im
-f_Im_4 = rolling_1.f_Im
-
-
-def save_arrays_DA():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    sol_dir = os.path.join(current_dir, f"DA_solutions_{price_setting}")
-
-    os.makedirs(sol_dir, exist_ok=True)
-
-    data_dict = {
-        "q_da_1": q_da_1,
-        "f_P_1": f_DA_1,
-        "q_da_2": q_da_2,
-        "f_P_2": f_DA_2,
-        "q_da_3": q_da_3,
-        "f_P_3": f_DA_3,
-        "q_da_4": q_da_4,
-        "f_P_4": f_DA_4,
-    }
-
-    for name, arr in data_dict.items():
-        df = pd.DataFrame(arr)
-        df.to_csv(os.path.join(sol_dir, f"{name}.csv"), index=False)
-
-    print("✓ All DA-solution CSV files saved inside DA_solutions/ folder.")
-
-def save_arrays_ID():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    sol_dir = os.path.join(current_dir, f"ID_solutions_{price_setting}")
-
-    os.makedirs(sol_dir, exist_ok=True)
-
-    data_dict = {
-        "f_P_1": f_P_1,
-        "f_E_1": f_E_1,
-        "f_Im_1": f_Im_1,
-        "f_P_2": f_P_2,
-        "f_E_2": f_E_2,
-        "f_Im_2": f_Im_2,
-        "f_P_3": f_P_3,
-        "f_E_3": f_E_3,
-        "f_Im_3": f_Im_3,
-        "f_P_4": f_P_4,
-        "f_E_4": f_E_4,
-        "f_Im_4": f_Im_4,
-    }
-
-    for name, arr in data_dict.items():
-        df = pd.DataFrame(arr)  # 3 x 24
-        df.to_csv(os.path.join(sol_dir, f"{name}.csv"), index=False)
-
-    print("✓ All ID-solution CSV files saved inside ID_solutions/ folder.")
-
-"""
