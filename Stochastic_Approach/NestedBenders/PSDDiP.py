@@ -35,6 +35,7 @@ SOLVER.options['TimeLimit'] = 300
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
+price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
 
 # 1. Parameters & Computational settings
 
@@ -62,11 +63,9 @@ E_0 = E_0_normal
 
 ## Load Price and Scenario csv files
 
-evaluation_num = 20 
+evaluation_num = 30 
 
 K_list = [1, 3, 6, 10, 15, evaluation_num]
-
-price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
@@ -173,7 +172,6 @@ hours = np.arange(T)
 
 
 """
-
 ## Plot clustered P_da profiles for each K
 
 for i, P_da_list in enumerate(Reduced_P_da):
@@ -254,8 +252,8 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     fig.savefig(os.path.join(outdir, f'P_rt_fan_K{k}.png'), dpi=300)
     plt.show()
     plt.close(fig)
-
 """
+
 
 ## Parameters 
 
@@ -265,8 +263,8 @@ D = 1
 E_0 = E_0
 
 C = 21022.1
-S = C*3
-B = C
+S = C
+B = C/3
 
 S_min = 0.1*S
 S_max = 0.9*S
@@ -314,7 +312,7 @@ M_gen = [[1.04*K[t], 2*K[t]] for t in range(T)]
 
 # 2. Subproblems
 
-## 1) Subproblems for SDDiP
+## 1) Subproblems for PSDDiP
 
 ### stage = DA
 
@@ -439,7 +437,7 @@ class fw_rt_init(pyo.ConcreteModel):
         
         # Vars
         
-        model.theta = pyo.Var(bounds = (0, 1e8), domain = pyo.Reals)
+        model.theta = pyo.Var(bounds = (-1e8, 1e8), domain = pyo.Reals)
         
         model.q_da = pyo.Var(model.TIME, domain = pyo.Reals)
                 
@@ -471,7 +469,7 @@ class fw_rt_init(pyo.ConcreteModel):
         ## State variable trainsition
         
         def State_SOC_rule(model):
-            return model.S == 0.5*S
+            return model.S == S_min
 
         def state_Q_da_rule(model, t):
             return model.T_Q[t] == model.q_da[t]
@@ -2712,7 +2710,7 @@ class rolling_da(pyo.ConcreteModel):
             return model.Q_c[t] == model.q_rt[t]
         
         def SOC_init_rule(model):
-            return model.S[-1] == 0.5*S
+            return model.S[-1] == S_min
         
         def SOC_balance_rule(model, t):
             return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
@@ -2893,7 +2891,7 @@ class rolling_rt_init(pyo.ConcreteModel):
             return model.Q_c[t] == model.q_rt[t]
         
         def SOC_init_rule(model):
-            return model.S[-1] == 0.5*S
+            return model.S[-1] == S_min
         
         def SOC_balance_rule(model, t):
             return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
@@ -3560,7 +3558,7 @@ class two_stage_da(pyo.ConcreteModel):
             return model.Q_c[k, t] == model.q_rt[k, t]
         
         def SOC_init_rule(model, k):
-            return model.S[k, -1] == 0.5*S
+            return model.S[k, -1] == S_min
         
         def SOC_balance_rule(model, k, t):
             return model.S[k, t] == model.S[k, t-1] + v*model.c[k, t] - (1/v)*model.d[k, t]
@@ -3790,7 +3788,7 @@ class three_stage_da(pyo.ConcreteModel):
             return model.Q_c[k, m, t] == (1 + self.delta_c_paths[k][m][t])*model.q_rt[k, m, t]
 
         def SOC_init_rule(model, k, m):
-            return model.S[k, m, -1] == 0.5*S
+            return model.S[k, m, -1] == S_min
         
         def SOC_balance_rule(model, k, m, t):
             return model.S[k, m, t] == model.S[k, m, t-1] + v*model.c[k, m, t] - (1/v)*model.d[k, m, t]
@@ -4276,7 +4274,7 @@ class PSDDiPModel:
                 scenario.append(param)
                 
             scenarios.append(scenario)
-                    
+                     
         return scenarios
     
     def sample_scenarios_for_stopping(self):
@@ -4309,7 +4307,7 @@ class PSDDiPModel:
         for k, scenario in enumerate(scenarios):
             
             P_da = self.DA_params[k]
-            
+                        
             fw_rt_init_subp = fw_rt_init(fw_da_state, self.psi[k][0], P_da)
             fw_rt_init_state = fw_rt_init_subp.get_state_solutions()
             
@@ -5095,8 +5093,6 @@ class PSDDiPModel:
             print(f"iteration : {self.iteration}, time_num : {Timeline}, total_time : {self.running_time:.2f} seconds\n")
 
 
-
-
 # 4. Main execution
 
 if __name__ == "__main__":
@@ -5140,7 +5136,6 @@ if __name__ == "__main__":
     
     
     ## 2. Run full-PSDDiP to get psi_ID and save as npy
-    
     """
     def save_psddip_state(model, base_dir, price_setting):
         
@@ -5199,7 +5194,7 @@ if __name__ == "__main__":
         tol=1e-8,
         parallel_mode=1,
         total_time=7200,
-        time_num=12,
+        time_num=4,
         breakstage_Lag=300,
         breakstage_selection=10,
     )
@@ -5218,7 +5213,6 @@ if __name__ == "__main__":
     
     psddip_multi_full.run_sddip()
     
-    
     save_psddip_state(
         psddip_multi_full,
         PSI_DIR,
@@ -5228,11 +5222,11 @@ if __name__ == "__main__":
     
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
     
-    
+      
     for cut_mode in ['SB', 'L-sub']:
 
-        time_interval = 3600
-        time_num = 2
+        time_interval = 7200
+        time_num = 1
         
         for k, K in enumerate([K for K in K_list if K <= 15]):
             
@@ -5255,7 +5249,7 @@ if __name__ == "__main__":
             psddip_multi_da.run_sddip()
             
             psi_DA = [
-                psddip_multi_da.psi_da_save[0],
+                #psddip_multi_da.psi_da_save[0],
                 psddip_multi_da.psi_da
             ]
             
@@ -5277,7 +5271,7 @@ if __name__ == "__main__":
 
         print("✅ psd_DA saved as .npy:")
         
-        
+    
     
     ## 4. Notify done via plot
     

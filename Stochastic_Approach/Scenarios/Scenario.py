@@ -201,7 +201,7 @@ a_c, b_c = (lower_c) / std_c, (upper_c) / std_c
 
 Q_c_truncnorm_dist = truncnorm(a_c, b_c, loc = 0, scale = std_c)
 
-p_c = 0.2
+p_c = 0.5
 
 def f_X(x):
     if x == 0:
@@ -583,10 +583,14 @@ class scenario():
         delta_E = Energy_dist.rvs(1).tolist()[0]
         
         ## sample one delta_Q_c
-        if np.random.rand() < 1-p_c:
-                delta_Q_c = 0
+        if P_da < 0:
+            if np.random.rand() < 1-p_c:
+                    delta_Q_c = 0
+            else:
+                    delta_Q_c = Q_c_truncnorm_dist.rvs()    
+        
         else:
-                delta_Q_c = Q_c_truncnorm_dist.rvs()    
+            delta_Q_c = 0
         
         ## sample one P_rt depending on P_da
         try:
@@ -617,10 +621,14 @@ class scenario():
             delta_E = Energy_dist.rvs(1).tolist()[0]
             
             ## sample one delta_Q_c
-            if np.random.rand() < 1-p_c:
-                    delta_Q_c = 0
+            if P_da < 0:
+                if np.random.rand() < 1-p_c:
+                        delta_Q_c = 0
+                else:
+                        delta_Q_c = Q_c_truncnorm_dist.rvs()    
+            
             else:
-                    delta_Q_c = Q_c_truncnorm_dist.rvs()    
+                delta_Q_c = 0
             
             ## sample one P_rt depending on E_0
             try:
@@ -647,7 +655,7 @@ class scenario():
             
         for t in range(self.T): 
             
-            branches = np.array(self.sample_multiple_delta(t, 100, P_da[t]))
+            branches = np.array(self.sample_multiple_delta(t, 6, P_da[t]))
             kmeans = KMeans(n_clusters=self.N_t, random_state=0, n_init='auto')
             kmeans.fit(branches)
             
@@ -658,12 +666,12 @@ class scenario():
 
 
 
-evaluation_num = 20
+evaluation_num = 30
 
 K_list = [1, 3, 6, 10, 15, evaluation_num]
 
 
-"""
+
 if __name__ == '__main__':
     
     
@@ -708,7 +716,7 @@ if __name__ == '__main__':
 
     E_0_cloudy = remap_daylight_window(base, start_shift=+2, end_shift=-2, scale=0)  # later start, earlier end
     E_0_normal = remap_daylight_window(base, start_shift= +1, end_shift= 0, scale=0.9)  # baseline
-    E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+1, scale=1.5)  # earlier start, later end
+    E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  # earlier start, later end
 
     # Save CSVs 
     outdir = './Stochastic_Approach/Scenarios/Energy_forecast'
@@ -735,11 +743,11 @@ if __name__ == '__main__':
     plt.close()
     
     
-    E_0 = E_0_cloudy
+    E_0 = E_0_sunny
 
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
         
-    price_mode = 'cloudy'  # 'cloudy', 'normal', 'sunny'
+    price_mode = 'sunny'  # 'cloudy', 'normal', 'sunny'
             
     scenario_generator = scenario(6, E_0)
         
@@ -818,7 +826,7 @@ if __name__ == '__main__':
         ax.set_ylabel("Price")
         ax.grid(True)
         plt.tight_layout()
-        #plt.show()
+        plt.show()
     
     
     save_dir = f'./Stochastic_Approach/Scenarios/P_da_{price_mode}'
@@ -851,7 +859,7 @@ if __name__ == '__main__':
     axes[-1].set_xlabel("Hour")
     
     plt.savefig('./Stochastic_Approach/Scenarios/combined_scenario_density.png', dpi=300)
-    #plt.show()
+    plt.show()
         
     fig, axes = plt.subplots(len(K_list), 1, figsize=(12, 2.5 * len(K_list)), sharex=True, constrained_layout=True)
     for i, (k, P_da_list) in enumerate(zip(K_list, Reduced_P_da)):
@@ -867,4 +875,3 @@ if __name__ == '__main__':
     plt.close(fig)
         
  
-"""

@@ -28,7 +28,7 @@ sys.path.append(base_path)
 solver='gurobi'
 SOLVER=pyo.SolverFactory(solver)
 
-SOLVER.options['TimeLimit'] = 300
+SOLVER.options['TimeLimit'] = 7200
 #SOLVER.options['MIPGap'] = 1e-4
 
 assert SOLVER.available(), f"Solver {solver} is available."
@@ -62,7 +62,7 @@ E_0 = E_0_normal
 K_list = [1, 3, 6, 10, 15]
 cut_list = ['SB', 'L-sub']
 
-price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'cloudy'  # 'cloudy', 'normal', 'sunny'
 time_limit = '7200' # '3600', '7200', '10800' 
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
@@ -370,6 +370,8 @@ def evaluation_rolling_rolling(scenarios):
 
     print(f"\nRolling Horizon -> Rolling Horizon for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
+    
+    return q_da
 
 
 def evaluation_rolling_sddip(scenarios):
@@ -441,6 +443,8 @@ def evaluation_rolling_sddip(scenarios):
     
     print(f"\nRolling Horizon -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
+    
+    return q_da
 
 
 def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
@@ -521,6 +525,8 @@ def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
     print(f"\n{stage_num}-SP -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
+    return q_da
+    
         
 def evaluation_psddip_sddip(K, cut_mode, scenarios):
     
@@ -593,21 +599,118 @@ def evaluation_psddip_sddip(K, cut_mode, scenarios):
     print(f"\nPSDDiP K = {K}, time_lim = {time_limit}, cut = {cut_mode} -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
+    return q_da
+    
 
 scenarios = scenarios_for_test
 
 #%% Cut mode index: 'SB' -> 0, 'L-sub' -> 1
 
-evaluation_rolling_rolling(scenarios)
-evaluation_rolling_sddip(scenarios)  
-evaluation_SP_sddip(2, scenarios, scenarios_for_SP)
-evaluation_SP_sddip(3, scenarios, scenarios_for_SP)
-evaluation_SP_sddip(3, scenarios, scenarios_for_eval)
+q_da_r = evaluation_rolling_sddip(scenarios)
+q_da_s2 = evaluation_SP_sddip(2, scenarios, scenarios_for_SP)  
+q_da_s3 = evaluation_SP_sddip(3, scenarios, scenarios_for_SP)
+q_da_s_s = evaluation_psddip_sddip(1, 0, scenarios)
+q_da_s_l = evaluation_psddip_sddip(1, 1, scenarios)
+q_da_p = evaluation_psddip_sddip(6, 0, scenarios)
 
 
+"""
 for K in K_list:
     for cut_index in range(len(cut_list)):
         evaluation_psddip_sddip(K, cut_index, scenarios)
+"""
+
+q_da_p_s = evaluation_psddip_sddip(6, 0, scenarios)
+
+
+# Plotting solutions
+
+def plot_q_da_separate(q_da_list, xlabel="Hour", ylabel="Value",
+                       ylim=(-1000, 32000), figsize=(12, 6)):
+
+    n = len(q_da_list)
+    nrows, ncols = 2, 3  # for 6 plots
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, sharex=True, sharey=True)
+    axes = axes.flatten()
+
+    for ax, (name, q_da) in zip(axes, q_da_list):
+        y = np.asarray(q_da).reshape(-1)
+        if len(y) != 24:
+            print(f"Warning: {name} has length {len(y)} (expected 24).")
+        x = np.arange(len(y))
+
+        ax.plot(x, y, marker="o", linewidth=1.2)
+        ax.set_title(name, fontsize=10)
+        ax.set_ylim(*ylim)
+        ax.grid(True, alpha=0.3)
+
+    fig.supxlabel(xlabel)
+    fig.supylabel(ylabel)
+
+    plt.tight_layout()
+    plt.show()
+
+    return fig, axes
+
+def ensure_solution_dirs(base_dir="solutions", price_settings=("cloudy", "normal", "sunny")):
+    """
+    Create:
+      solutions/
+        cloudy/
+        normal/
+        sunny/
+    next to where you run this script.
+    """
+    os.makedirs(base_dir, exist_ok=True)
+    for ps in price_settings:
+        os.makedirs(os.path.join(base_dir, ps), exist_ok=True)
+
+def save_q_da_solutions(q_da_list, price_setting, base_dir="solutions", filename="q_da_list.npy"):
+    """
+    Saves to: solutions/{price_setting}/{filename}
+    Stores as dict: {name: np.array(24,)}
+    """
+    save_dir = os.path.join(base_dir, price_setting)
+    os.makedirs(save_dir, exist_ok=True)
+
+    q_da_dict = {name: np.asarray(q_da).reshape(-1) for name, q_da in q_da_list}
+    save_path = os.path.join(save_dir, filename)
+
+    np.save(save_path, q_da_dict, allow_pickle=True)
+    print(f"✅ Saved q_da solutions to: {save_path}")
+
+def load_q_da_solutions(price_setting, base_dir="solutions", filename="q_da_list.npy"):
+    """
+    Loads from: solutions/{price_setting}/{filename}
+    Returns dict: {name: np.array(24,)}
+    """
+    load_path = os.path.join(base_dir, price_setting, filename)
+    q_da_dict = np.load(load_path, allow_pickle=True).item()
+    return q_da_dict
+
+
+q_da_list = [
+    ("Rolling → SDDiP", q_da_r),
+    ("2-SP → SDDiP",    q_da_s2),
+    ("3-SP → SDDiP",    q_da_s3),
+    ("SDDiP (SB)",      q_da_s_s),   
+    ("SDDiP (L-sub)",   q_da_s_l),   
+    ("PSDDiP", q_da_p),  
+]
+
+
+ensure_solution_dirs(base_dir="solutions", price_settings=("cloudy", "normal", "sunny"))
+
+save_q_da_solutions(q_da_list, price_setting=price_setting, base_dir="solutions")
+
+plot_q_da_separate(q_da_list, ylim=(-1000, 32000))
+
+# 6) load later and plot anytime
+# q_da_dict_loaded = load_q_da_solutions("sunny", base_dir="solutions")
+# q_da_list_loaded = list(q_da_dict_loaded.items())
+# plot_q_da_separate(q_da_list_loaded, ylim=(-1000, 32000))
+
 
 
 # *Notify done via plot*
