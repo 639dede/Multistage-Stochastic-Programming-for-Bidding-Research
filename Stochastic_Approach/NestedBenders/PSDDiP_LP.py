@@ -35,7 +35,10 @@ SOLVER.options['TimeLimit'] = 300
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
-price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
+inspect = False
+
+
+price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
 
 # 1. Parameters & Computational settings
 
@@ -70,10 +73,6 @@ else:
 
 
 ## Load Price and Scenario csv files
-
-evaluation_num = 30 
-
-K_list = [1, 3, 6, 10, 15, evaluation_num]
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
@@ -178,8 +177,9 @@ Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
 T = 24
 hours = np.arange(T)
 
+K_list = [len(P_da_list) for P_da_list in Reduced_P_da]
 
-"""
+
 ## Plot clustered P_da profiles for each K
 
 for i, P_da_list in enumerate(Reduced_P_da):
@@ -260,7 +260,7 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     fig.savefig(os.path.join(outdir, f'P_rt_fan_K{k}.png'), dpi=300)
     plt.show()
     plt.close(fig)
-"""
+
 
 
 ## Parameters 
@@ -269,7 +269,7 @@ T = 24
 D = 1
 
 P_r = 80
-P_max = 270
+P_max = 200
 
 E_0 = E_0
 
@@ -279,12 +279,14 @@ B = C/3
 
 S_min = 0.1*S
 S_max = 0.9*S
-beta = P_max*10
+beta = 5*P_max
 
 v = 0.95
 
-gamma_over = P_max
-gamma_under = P_max
+gamma_over = 2*P_max
+gamma_under = 2*P_max
+
+omega = 0.05*S
 
 E_0_partial = E_0
 
@@ -295,6 +297,7 @@ Scenario_tree_evaluate = Reduced_scenario_trees[-1]
 
 K_eval = len(P_da_evaluate)
 
+K_list = [1, 3, 6, 10, 15, K_eval]
 
 dual_tolerance = 1e-3
 dual_tolerance_da = 1e-4
@@ -312,7 +315,6 @@ E_0_partial_max = max(E_0_partial)
 
 for t in range(len(E_0_partial)):
     E_0_sum += E_0_partial[t]
-
 
 
 # 2. Subproblems
@@ -465,10 +467,10 @@ class fw_rt_init(pyo.ConcreteModel):
         ## Real-Time Market rules(especially for t = 0)
         
         def rt_bidding_amount_rule_1(model):
-            return model.q_rt <= model.q_da[0] + B/9
+            return model.q_rt <= model.q_da[0] + omega
         
         def rt_bidding_amount_rule_2(model):
-            return model.q_rt >= model.q_da[0] - B/9
+            return model.q_rt >= model.q_da[0] - omega
         
         ## State variable trainsition
         
@@ -522,7 +524,7 @@ class fw_rt_init(pyo.ConcreteModel):
     def solve(self):
         
         self.build_model()
-        SOLVER.solve(self)
+        SOLVER.solve(self, tee=inspect)
         self.solved = True
 
     def get_state_solutions(self):
@@ -606,14 +608,14 @@ class fw_rt_init_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         ## Other
         
-        model.q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.q_da = pyo.Var(model.TIME, domain = pyo.Reals)
                         
         model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
         
-        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
-        model.T_Q = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.Reals)
+        model.T_Q = pyo.Var(model.TIME, domain = pyo.Reals)
         model.T_q = pyo.Var(domain = pyo.Reals)
-        model.T_E = pyo.Var(domain = pyo.NonNegativeReals)
+        model.T_E = pyo.Var(domain = pyo.Reals)
         
         model.f = pyo.Var(domain = pyo.Reals)
         
@@ -632,10 +634,10 @@ class fw_rt_init_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         ## Real-Time Market rules(especially for t = 0)
         
         def rt_bidding_amount_rule_1(model):
-            return model.q_rt <= model.q_da[0] + B/9
+            return model.q_rt <= model.q_da[0] + omega
         
         def rt_bidding_amount_rule_2(model):
-            return model.q_rt >= model.q_da[0] - B/9
+            return model.q_rt >= model.q_da[0] - omega
         
         ## State variable trainsition
         
@@ -693,7 +695,7 @@ class fw_rt_init_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
     def solve(self):
         self.build_model()
-        self.solver_results = SOLVER.solve(self, tee=False)
+        self.solver_results = SOLVER.solve(self, tee=inspect)
         if self.solver_results.solver.termination_condition == pyo.TerminationCondition.optimal:
             self.solved = True
         else:
@@ -759,7 +761,7 @@ class fw_rt(pyo.ConcreteModel):
         
         ## CTG fcn approx
         
-        model.theta = pyo.Var(bounds = (-1e8, 1e8), domain = pyo.Reals, initialize = 0.0)
+        model.theta = pyo.Var(domain = pyo.Reals, initialize = 0.0)
         
         ## Bidding for next and current stage
         
@@ -824,14 +826,11 @@ class fw_rt(pyo.ConcreteModel):
         
         ## General Constraints
         
-        def overbid_rule(model):
-            return model.T_o <= E_0_sum
-        
         def next_q_rt_rule_1(model):
-            return model.q_rt_next <= self.T_Q_prev[1] + B/9
+            return model.q_rt_next <= self.T_Q_prev[1] + omega
         
         def next_q_rt_rule_2(model):
-            return model.q_rt_next >= self.T_Q_prev[1] - B/9
+            return model.q_rt_next >= self.T_Q_prev[1] - omega
         
         def generation_rule(model):
             return model.g <= model.E_1
@@ -882,7 +881,6 @@ class fw_rt(pyo.ConcreteModel):
         model.State_q = pyo.Constraint(rule = State_q_rule)
         model.State_E = pyo.Constraint(rule = State_E_rule)
         
-        model.overbid = pyo.Constraint(rule = overbid_rule)
         model.next_q_rt_1 = pyo.Constraint(rule = next_q_rt_rule_1)
         model.next_q_rt = pyo.Constraint(rule = next_q_rt_rule_2)
         model.generation = pyo.Constraint(rule = generation_rule)
@@ -909,7 +907,7 @@ class fw_rt(pyo.ConcreteModel):
     def solve(self):
         
         self.build_model()
-        SOLVER.solve(self)
+        SOLVER.solve(self, tee=inspect)
         self.solved = True   
 
     def get_state_solutions(self):
@@ -967,6 +965,24 @@ class fw_rt(pyo.ConcreteModel):
         Im_profit = - gamma_over*pyo.value(self.phi_over) - gamma_under*pyo.value(self.phi_under)
 
         return Im_profit
+
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = pyo.value(self.q_rt)
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        S_solution = pyo.value(self.S)
+
+        return S_solution
 
 class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
@@ -1027,14 +1043,14 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.c = pyo.Var(bounds = (0, B), domain = pyo.Reals)
         model.d = pyo.Var(bounds = (0, B), domain = pyo.Reals)
         model.u = pyo.Var(domain = pyo.NonNegativeReals)
-        model.Q_c = pyo.Var(domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(domain = pyo.Reals)
         
-        model.E_1 = pyo.Var(domain = pyo.NonNegativeReals)
+        model.E_1 = pyo.Var(domain = pyo.Reals)
         
         ## State Vars
         
         model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
-        model.T_Q = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.T_Q = pyo.Var(model.TIME, domain = pyo.Reals)
         model.T_q = pyo.Var(domain = pyo.Reals)
         model.T_E = pyo.Var(domain = pyo.Reals)
 
@@ -1091,10 +1107,10 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         ## General Constraints
         
         def next_q_rt_rule_1(model):
-            return model.q_rt_next <= self.z_T_Q[1] + B/9
+            return model.q_rt_next <= self.z_T_Q[1] + omega
         
         def next_q_rt_rule_2(model):
-            return model.q_rt_next >= self.z_T_Q[1] - B/9
+            return model.q_rt_next >= self.z_T_Q[1] - omega
         
         def generation_rule(model):
             return model.g <= model.E_1
@@ -1157,7 +1173,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.generation = pyo.Constraint(rule = generation_rule)
         model.charge = pyo.Constraint(rule = charge_rule)
         model.electricity_supply = pyo.Constraint(rule = electricity_supply_rule)
-        
         model.dispatch = pyo.Constraint(rule = dispatch_rule)
         
         model.imbalance_over = pyo.Constraint(rule = imbalance_over_rule)
@@ -1182,7 +1197,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
     def solve(self):
         self.build_model()
-        self.solver_results = SOLVER.solve(self, tee=False)
+        self.solver_results = SOLVER.solve(self, tee=inspect)
         if self.solver_results.solver.termination_condition == pyo.TerminationCondition.optimal:
             self.solved = True
         else:
@@ -1264,6 +1279,7 @@ class fw_rt_last(pyo.ConcreteModel):
         ## State Vars
         
         model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
+        model.S_r = pyo.Var(domain = pyo.Reals)
 
         ## Imbalance Penerty Vars
         
@@ -1294,10 +1310,12 @@ class fw_rt_last(pyo.ConcreteModel):
         
         def SOC_recourse_rule_1(model):
             return model.S_r >= beta*(model.S - 0.5*S)
-        
+            #return model.S_r >= 0
+
         def SOC_recourse_rule_2(model):
             return model.S_r >= -beta*(model.S - 0.5*S)
-        
+            #return model.S_r >= 0
+
         ## General Constraints
         
         def generation_rule(model):
@@ -1327,6 +1345,7 @@ class fw_rt_last(pyo.ConcreteModel):
             return model.f == (
                 (model.u - model.Q_da)*self.P_rt 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
+                - model.S_r
                 )
         
         model.da_Q = pyo.Constraint(rule = da_Q_rule)
@@ -1351,7 +1370,7 @@ class fw_rt_last(pyo.ConcreteModel):
         
         def objective_rule(model):
             return (
-                model.f - model.S_r
+                model.f
             )
         
         model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
@@ -1359,7 +1378,7 @@ class fw_rt_last(pyo.ConcreteModel):
     def solve(self):
         
         self.build_model()
-        SOLVER.solve(self)
+        SOLVER.solve(self, tee=inspect)
         self.solved = True
 
     def get_solutions(self):
@@ -1393,6 +1412,42 @@ class fw_rt_last(pyo.ConcreteModel):
             self.solved = True
     
         return pyo.value(self.S)
+
+    def get_P_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        P_profit = (pyo.value(self.u) - pyo.value(self.Q_da))*self.P_rt
+
+        return P_profit
+
+    def get_Im_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        Im_profit = - gamma_over*pyo.value(self.phi_over) - gamma_under*pyo.value(self.phi_under)
+
+        return Im_profit
+
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = pyo.value(self.q_rt)
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        SOC_solution = pyo.value(self.S)
+
+        return SOC_solution
 
 class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
            
@@ -1448,6 +1503,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
         ## State Vars
         
         model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.NonNegativeReals)
+        model.S_r = pyo.Var(domain = pyo.Reals)
         
         ## Imbalance Penerty Vars
         
@@ -1492,9 +1548,11 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
         
         def SOC_recourse_rule_1(model):
             return model.S_r >= beta*(model.S - 0.5*S)
+            #return model.S_r >= 0
         
         def SOC_recourse_rule_2(model):
             return model.S_r >= -beta*(model.S - 0.5*S)
+            #return model.S_r >= 0
         
         ## General Constraints
         
@@ -1526,6 +1584,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
             return model.f == (
                 (model.u - model.Q_da)*self.P_rt 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
+                - model.S_r
                 )
         
         model.auxiliary_S = pyo.Constraint(rule = auxiliary_S)
@@ -1559,14 +1618,14 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
         
         def objective_rule(model):
             return (
-                model.f - model.S_r
+                model.f 
             )
         
         model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
 
     def solve(self):
         self.build_model()
-        self.solver_results = SOLVER.solve(self, tee=False)
+        self.solver_results = SOLVER.solve(self, tee=inspect)
         if self.solver_results.solver.termination_condition == pyo.TerminationCondition.optimal:
             self.solved = True
         else:
@@ -1594,7 +1653,6 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
             pi_T_Q.append(self.dual[self.auxiliary_T_Q[i]])
         psi.append(pi_T_Q)
         
-        psi.append(self.dual[self.auxiliary_T_o])
         psi.append(self.dual[self.auxiliary_T_q])
         psi.append(self.dual[self.auxiliary_T_E])
         
@@ -1668,10 +1726,10 @@ class rolling_da(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_rule_1(model, t):
-            return model.q_rt[t] <= model.q_da[t] + B/9
+            return model.q_rt[t] <= model.q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, t):
-            return model.q_rt[t] >= model.q_da[t] - B/9
+            return model.q_rt[t] >= model.q_da[t] - omega
     
         ## Operations rules
         
@@ -1814,10 +1872,10 @@ class rolling_rt_init(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_rule_1(model, t):
-            return model.q_rt[t] <= model.q_da[t] + B/9
+            return model.q_rt[t] <= self.q_da_prev[t] + omega
         
         def rt_bidding_amount_rule_2(model, t):
-            return model.q_rt[t] >= model.q_da[t] - B/9
+            return model.q_rt[t] >= self.q_da_prev[t] - omega
         
         ## Operations rules
         
@@ -2001,16 +2059,16 @@ class rolling_rt(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_next_rule_1(model):
-            return model.q_rt[self.stage+1] <= model.Q_da[self.stage+1] + B/9
+            return model.q_rt[self.stage+1] <= model.Q_da[self.stage+1] + omega
         
         def rt_bidding_amount_next_rule_2(model):
-            return model.q_rt[self.stage+1] >= model.Q_da[self.stage+1] - B/9
+            return model.q_rt[self.stage+1] >= model.Q_da[self.stage+1] - omega
         
         def rt_bidding_amount_rule_1(model, t):
-            return model.q_rt[t] <= model.Q_da[t] + B/9
+            return model.q_rt[t] <= model.Q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, t):
-            return model.q_rt[t] >= model.Q_da[t] - B/9
+            return model.q_rt[t] >= model.Q_da[t] - omega
         
         ## Operations rules
         
@@ -2363,10 +2421,10 @@ class two_stage_da(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_rule_1(model,k ,t):
-            return model.q_rt[k, t] <= model.q_da[t] + B/9
+            return model.q_rt[k, t] <= model.q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, k, t):
-            return model.q_rt[k, t] >= model.q_da[t] - B/9
+            return model.q_rt[k, t] >= model.q_da[t] - omega
         
         ## Operations rules
         
@@ -2486,6 +2544,24 @@ class three_stage_da(pyo.ConcreteModel):
                 
         self.T = T
 
+        self._Param_setting()
+
+    def _Param_setting(self):
+
+        for k in range(self.K):
+            
+            scenario_path_list = self.scenario_paths[k]
+            
+            for m in range(self.M):
+                
+                scenario_path = scenario_path_list[m]
+                
+                for t in range(self.T):
+                    
+                    self.delta_E_0_paths[k][m][t] = scenario_path[t][0]
+                    self.P_rt_paths[k][m][t] = scenario_path[t][1]
+                    self.delta_c_paths[k][m][t] = scenario_path[t][2]
+                    
     def build_model(self):
         
         model = self.model()
@@ -2546,10 +2622,10 @@ class three_stage_da(pyo.ConcreteModel):
             return model.q_rt[k, 0, 0] == model.q_rt[k, m, 0]
 
         def rt_bidding_amount_rule_1(model, k, m, t):
-            return model.q_rt[k, m, t] <= model.q_da[t]*E_0_partial[t] + B/9
+            return model.q_rt[k, m, t] <= model.q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, k, m, t):
-            return model.q_rt[k, m, t] >= model.q_da[t]*E_0_partial[t] - B/9
+            return model.q_rt[k, m, t] >= model.q_da[t] - omega
         
         ## Operations rules
 
@@ -2722,10 +2798,15 @@ class PSDDiPModel:
         DA_params_reduced = Reduced_P_da[0], 
         DA_prob = Reduced_Probs[0],
         ID_params_reduced = Reduced_scenario_trees[0],
+        DA_params_full = P_da_evaluate,
+        DA_prob_full = Probs_evaluate,
+        ID_params_full = Scenario_tree_evaluate,
         sample_num = 1000,
         alpha = 0.95, 
         tol = 0.005,
         breakstage_selection = 4,
+        stopping_counter_limit = 5,
+        approx_mode = False,
         ):
 
         ## STAGE = -1, 0, ..., STAGE - 1
@@ -2738,9 +2819,12 @@ class PSDDiPModel:
         self.DA_probs = DA_prob
         self.RT_params = ID_params_reduced
         
+        self.DA_params_full = DA_params_full
+        self.DA_probs_full = DA_prob_full
+        self.ID_params_full = ID_params_full
+        
         self.M = sample_num
-        self.N = evaluation_num
-                        
+                         
         self.alpha = alpha
         self.tol = tol
                 
@@ -2749,12 +2833,20 @@ class PSDDiPModel:
         self.iteration = 0
         
         self.K = len(self.DA_params)
+        self.K_eval = len(self.DA_params_full)   
+            
         self.N_t = len(self.RT_params[0][0])
-                            
+        
+        self.approx_mode = approx_mode
+                   
         self.start_time = time.time()
         self.running_time = 0
         
         self.gap = 1
+        self.conv_rate = 2e3
+        
+        self.stopping_counter = 0
+        self.stopping_counter_limit = stopping_counter_limit
                 
         self.LB = [-np.inf]
         self.UB = [np.inf]
@@ -2776,9 +2868,15 @@ class PSDDiPModel:
         self.f_E = [0 for _ in range(self.STAGE)]
         self.f_Im = [0 for _ in range(self.STAGE)]
         
+        self.S_last_list = []
+        
         self.psi_da = [     ## t = -1 -> Day-Ahead Stage (Multi-cut)
                 [] for _ in range(self.K)
             ] 
+        
+        self.psi_da_1 = [
+                [] for _ in range(self.K_eval)
+            ]
         
         self.psi = [  ## t = {0 -> -1}, ..., {T - 1 -> T - 2}
                 [
@@ -2911,7 +3009,56 @@ class PSDDiPModel:
             
         return scenarios
             
+    def sample_scenarios_1(self):
+        
+        scenarios = []
+        
+        for n in range(self.K_eval): 
             
+            k = self.find_cluster_index_for_evaluation(n)
+            
+            scenario = []
+            
+            scenario_params = self.RT_params[k]
+            
+            for stage_params in scenario_params:
+                param = random.choice(stage_params)  
+                scenario.append(param)
+                
+            scenarios.append(scenario)
+                     
+        return scenarios
+    
+    def sample_scenarios_for_stopping_1(self):
+        
+        scenarios = []
+        
+        for n in range(self.K_eval):
+            
+            k = self.find_cluster_index_for_evaluation(n)
+            
+            scenarios_k = []
+            
+            for _ in range(self.M):
+                scenario = [random.choice(stage_params)
+                            for stage_params in self.RT_params[k]]
+                
+                scenarios_k.append(scenario)
+                
+            scenarios.append(scenarios_k)
+            
+        return scenarios
+   
+   
+    def find_cluster_index_for_evaluation(self, n):
+    
+        actual_P_da = np.array(self.DA_params_full[n])
+        centers = np.array(self.DA_params)  
+        dists = np.linalg.norm(centers - actual_P_da, axis=1)
+        
+        return int(np.argmin(dists))
+   
+                  
     def forward_pass(self, scenarios):
         
         fw_da_subp = fw_da(self.DA_probs, self.psi_da)
@@ -2919,8 +3066,10 @@ class PSDDiPModel:
         
         self.forward_solutions_da.append(fw_da_state)
         
-        f = []
+        mu_hat = 0.0
         
+        S_last = []
+                
         for k, scenario in enumerate(scenarios):
             
             P_da = self.DA_params[k]
@@ -2948,11 +3097,12 @@ class PSDDiPModel:
             fw_rt_last_subp = fw_rt_last(state, P_da, scenario[self.STAGE-1])
 
             f_scenario += fw_rt_last_subp.get_settlement_fcn_value()
-                        
-            f.append(f_scenario)
-        
-        mu_hat = np.mean(f)
-        sigma_hat = np.std(f, ddof=1)  
+            last_SOC_value = fw_rt_last_subp.get_last_SOC_value()
+            S_last.append(last_SOC_value)
+                                    
+            mu_hat += f_scenario*self.DA_probs[k]
+                
+        self.S_last_list.append(S_last)
 
         z_alpha_half = 1.96  
         
@@ -3016,7 +3166,129 @@ class PSDDiPModel:
         self.LB.append(mu_hat) 
         
         return mu_hat
- 
+
+    def forward_pass_1(self, scenarios):
+        
+        fw_da_subp = fw_da(self.DA_probs, self.psi_da)
+        fw_da_state = fw_da_subp.get_state_solutions()
+        
+        self.forward_solutions_da.append(fw_da_state)
+        
+        f = []
+        
+        S_last = []
+        
+        for n, scenario in enumerate(scenarios):
+            
+            P_da = self.DA_params_full[n]
+            
+            k = self.find_cluster_index_for_evaluation(n)
+            
+            psi_ID_init = self.psi[k][0]
+            
+            fw_rt_init_subp = fw_rt_init(fw_da_state, psi_ID_init, P_da)
+            fw_rt_init_state = fw_rt_init_subp.get_state_solutions()
+            
+            self.forward_solutions[k][0].append(fw_rt_init_state) ## x(-1)
+            
+            state = fw_rt_init_state
+            
+            f_scenario = fw_rt_init_subp.get_settlement_fcn_value()
+            
+            for t in range(self.STAGE - 1): ## t = 0, ..., T-2
+                
+                psi_ID = self.psi[k][t+1]
+                
+                fw_rt_subp = fw_rt(t, state, psi_ID, P_da, scenario[t])
+                
+                state = fw_rt_subp.get_state_solutions()
+                
+                self.forward_solutions[k][t+1].append(state)
+                f_scenario += fw_rt_subp.get_settlement_fcn_value()
+            
+            ## t = T-1
+            
+            fw_rt_last_subp = fw_rt_last(state, P_da, scenario[self.STAGE-1])
+
+            f_scenario += fw_rt_last_subp.get_settlement_fcn_value()
+            last_SOC_value = fw_rt_last_subp.get_last_SOC_value()
+            S_last.append(last_SOC_value)
+                                    
+            f.append(f_scenario)
+                
+        self.S_last_list.append(S_last)
+        
+        mu_hat = np.mean(f)
+        sigma_hat = np.std(f, ddof=1)  
+
+        z_alpha_half = 1.96  
+        
+        #self.LB.append(mu_hat - z_alpha_half * (sigma_hat / np.sqrt(self.M))) 
+        self.LB.append(mu_hat) 
+        
+        return mu_hat
+      
+    def forward_pass_for_stopping_1(self, scenarios):
+        
+        fw_da_subp = fw_da(self.DA_probs, self.psi_da)
+        fw_da_state = fw_da_subp.get_state_solutions()
+        
+        self.forward_solutions_da.append(fw_da_state)
+        
+        mu_hat = 0.0
+        
+        for n, scenarios_n in enumerate(scenarios):
+            
+            f = []
+            
+            P_da = self.DA_params_full[n]
+            
+            k = self.find_cluster_index_for_evaluation(n)
+            
+            psi_ID_init = self.psi[k][0]
+            
+            fw_rt_init_subp = fw_rt_init(fw_da_state, psi_ID_init, P_da)
+            fw_rt_init_state = fw_rt_init_subp.get_state_solutions()
+            
+            self.forward_solutions[k][0].append(fw_rt_init_state) ## x(-1)
+            
+            f_init = fw_rt_init_subp.get_settlement_fcn_value()
+            
+            for scenario in scenarios_n:
+                
+                state = fw_rt_init_state
+                
+                f_scenario = f_init
+                
+                for t in range(self.STAGE - 1): ## t = 0, ..., T-2
+                    
+                    psi_ID = self.psi[k][t+1]
+                    fw_rt_subp = fw_rt(t, state, psi_ID, P_da, scenario[t])
+                    
+                    state = fw_rt_subp.get_state_solutions()
+                    
+                    self.forward_solutions[k][t+1].append(state)
+                    f_scenario += fw_rt_subp.get_settlement_fcn_value()
+                
+                ## t = T-1
+                
+                fw_rt_last_subp = fw_rt_last(state, P_da, scenario[self.STAGE-1])
+
+                f_scenario += fw_rt_last_subp.get_settlement_fcn_value()
+                            
+                f.append(f_scenario)
+            
+            mu_hat += np.mean(f)*self.DA_probs_full[n]
+            
+        #sigma_hat = np.std(f, ddof=1)  
+
+        #z_alpha_half = 1.96  
+        
+        #self.LB.append(mu_hat - z_alpha_half * (sigma_hat / np.sqrt(self.M))) 
+        self.LB.append(mu_hat) 
+        
+        return mu_hat
+
        
     # Backward Pass    
     def inner_product(self, t, pi, sol):
@@ -3116,16 +3388,117 @@ class PSDDiPModel:
         
         fw_da_for_UB = fw_da(self.DA_probs, self.psi_da)
         self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+  
+    def backward_pass_1(self):
+
+        for k, P_da in enumerate(self.DA_params):
+            
+            stage_params = self.RT_params[k]
+
+            with mp.Pool() as pool:
+
+                t_last        = self.STAGE - 1
+                prev_solution = self.forward_solutions[k][t_last][-1]
+                deltas_last   = stage_params[t_last]
+
+                last_args = [
+                    (j, prev_solution, P_da, deltas_last[j], 'B')
+                    for j in range(self.N_t)
+                ]
+                
+                last_results = pool.starmap(
+                    process_single_subproblem_last_stage,
+                    last_args
+                )
+
+                v_sum   = 0.0
+                pi_mean = [0, [0], 0, 0]
+                
+                for psi_sub, v in last_results:
+                    
+                    v_sum += v
+                    pi_mean[0]    += psi_sub[1]    / self.N_t
+                    pi_mean[1][0] += psi_sub[2][0] / self.N_t
+                    pi_mean[2]    += psi_sub[3]    / self.N_t
+                    pi_mean[3]    += psi_sub[4]    / self.N_t
+
+                v = v_sum/self.N_t - self.inner_product(t_last, pi_mean, prev_solution)
+
+                cut_coeff = [v] + pi_mean
+                self.psi[k][t_last].append(cut_coeff)
+
+                for t in range(self.STAGE - 2, -1, -1):
+                    prev_solution = self.forward_solutions[k][t][-1]
+                    psi_next      = self.psi[k][t+1]
+                    deltas        = stage_params[t]
+
+                    inner_args = [
+                        (j, t, prev_solution, psi_next, P_da, deltas[j], 'B')
+                        for j in range(self.N_t)
+                    ]
+                    inner_results = pool.starmap(
+                        process_single_subproblem_inner_stage,
+                        inner_args
+                    )
+
+                    v_sum   = 0.0
+                    pi_mean = [0, [0]*(self.STAGE - t), 0, 0]
+                    
+                    for psi_sub, v in inner_results:
+                        v_sum += v
+                        pi_mean[0] += psi_sub[1] / self.N_t
+                        
+                        for i in range(self.STAGE - t):
+                            pi_mean[1][i] += psi_sub[2][i] / self.N_t
+                        pi_mean[2] += psi_sub[3] / self.N_t
+                        pi_mean[3] += psi_sub[4] / self.N_t
+
+                    v = v_sum/self.N_t - self.inner_product(t, pi_mean, prev_solution)
+
+                    cut_coeff = [v] + pi_mean
+                    self.psi[k][t].append(cut_coeff)
+
+        prev_solution = self.forward_solutions_da[-1]
+
+        for n, P_da in enumerate(self.DA_params_full):
+            
+            k_nearest = self.find_cluster_index_for_evaluation(n)
+            
+            psi_ID = self.psi[k_nearest][0]
+            
+            fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
+                prev_solution, psi_ID, P_da
+                )
+            
+            psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+            
+            pi = [psi_sub[1]] 
+
+            v = psi_sub[0] - self.inner_product_da(pi, prev_solution)
+            
+            cut_coeff = [v] + [pi[0]] 
+            self.psi_da_1[n].append(cut_coeff)
+        
+        fw_da_for_UB = fw_da(self.DA_probs_full, self.psi_da_1)
+        self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
 
     # Main Loop
-    def stopping_criterion(self, tol = 1e-5):
+    def stopping_criterion(self):
         
         self.gap = (self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]
         
+        if self.iteration >= 5:
+            self.conv_rate = abs(self.UB[self.iteration] - self.UB[self.iteration -3])
+        
         self.running_time = time.time() - self.start_time
-                
+        
         if (
-            self.gap <= self.tol
+            self.gap <= self.tol 
+        ):
+            self.stopping_counter += 1
+          
+        if (
+            self.stopping_counter >= self.stopping_counter_limit
         ):
             return True
 
@@ -3140,38 +3513,79 @@ class PSDDiPModel:
     
         while True:
             
-            if not final_pass and self.stopping_criterion():
-                final_pass = True
+            if self.approx_mode:
                 
-                print("\n>>> Stopping criterion met. Performing final pass with M scenarios...")
-                
-            elif final_pass:
-                                
-                break
-                
-            self.iteration += 1
+                if not final_pass and self.stopping_criterion():
+                    final_pass = True
+                    
+                    print("\n>>> Stopping criterion met. Performing final pass with M scenarios...")
+                    
+                elif final_pass:
+                                    
+                    break
+                    
+                self.iteration += 1
 
-            if final_pass:
-                scenarios = self.sample_scenarios_for_stopping()
+                if final_pass:
+                    scenarios = self.sample_scenarios_for_stopping_1()
+                        
+                    self.forward_pass_for_stopping_1(scenarios)
+                        
+                else:
+                    scenarios = self.sample_scenarios_1()
+
+                    self.forward_pass_1(scenarios)
+
+                #print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
+
+                self.backward_pass_1()
+                
+                self.gap = (self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]
+                
+                if self.iteration >= self.breakstage_selection + 1:
                     
-                self.forward_pass_for_stopping(scenarios)
-                    
+                    self.cut_selection()
+                
+                #print(f"cut_num = {(len(self.psi[0][2]))}")
+                
+                #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
+
             else:
-                scenarios = self.sample_scenarios()
-
-                self.forward_pass(scenarios)
-
-            print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
-
-            self.backward_pass()
-            
-            if self.iteration >= self.breakstage_selection + 1:
                 
-                self.cut_selection()
-            
-            #print(f"cut_num = {(len(self.psi[0][2]))}")
-            
-            print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
+                if not final_pass and self.stopping_criterion():
+                    final_pass = True
+                    
+                    print("\n>>> Stopping criterion met. Performing final pass with M scenarios...")
+                    
+                elif final_pass:
+                                    
+                    break
+                    
+                self.iteration += 1
+
+                if final_pass:
+                    scenarios = self.sample_scenarios_for_stopping()
+                        
+                    self.forward_pass_for_stopping(scenarios)
+                        
+                else:
+                    scenarios = self.sample_scenarios()
+
+                    self.forward_pass(scenarios)
+
+                #print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
+
+                self.backward_pass()
+                
+                self.gap = (self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]
+                
+                if self.iteration >= self.breakstage_selection + 1:
+                    
+                    self.cut_selection()
+                
+                #print(f"cut_num = {(len(self.psi[0][2]))}")
+                
+                #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
 
         print(f"\nPSDDiPModel for price setting = {price_setting}")
         print(f"SDDiP complete. for T = {self.STAGE}, k = {self.K}")
@@ -3183,12 +3597,14 @@ class PSDDiPModel:
 
 if __name__ == "__main__":
 
-    ## 1. Sample scenario paths and save as .npy
+    """## 1. Sample scenario paths and save as .npy
     
     random.seed(42)
     np.random.seed(42)
 
-    evaluation_num = 50
+    evaluation_num = int(300/K_eval)
+    
+    approx_mode = False  
 
     def sample_scenario_paths(Scenario_tree, N):
         scenarios = []
@@ -3218,11 +3634,12 @@ if __name__ == "__main__":
     np.save(BASE_OUTDIR / "scenarios_SP.npy", np.asarray(scenarios_for_SP, dtype=object))
 
     print("✅ Scenario paths saved as .npy:")
-    print(BASE_OUTDIR)
+    print(BASE_OUTDIR)"""
     
     
     ## 2. Run full-PSDDiP to get psi_ID and save as npy
     
+    """
     def save_psddip_state(model, base_dir, price_setting):
         
         base_dir = Path(base_dir)
@@ -3266,7 +3683,7 @@ if __name__ == "__main__":
         print(f"✅ PSDDiP checkpoint loaded (iteration={model.iteration})")
     
     BASE_DIR = Path(__file__).resolve().parent
-    PSI_DIR  = BASE_DIR / "psi_full"
+    PSI_DIR  = BASE_DIR / "psi_full_LP"
     PSI_DIR.mkdir(exist_ok=True)
     
     psddip_multi_full = PSDDiPModel(
@@ -3274,10 +3691,14 @@ if __name__ == "__main__":
         DA_params_reduced=P_da_evaluate,
         DA_prob=Probs_evaluate,
         ID_params_reduced=Scenario_tree_evaluate,
+        DA_params_full=P_da_evaluate,
+        DA_prob_full=Probs_evaluate,
         sample_num=evaluation_num,
         alpha=0.95,
-        tol=5e-3,
+        tol=1e-4,
         breakstage_selection=10,
+        stopping_counter_limit=9,
+        approx_mode=approx_mode,
     )
 
     checkpoint_path = PSI_DIR / f"{price_setting}_state.npy"
@@ -3298,30 +3719,74 @@ if __name__ == "__main__":
         psddip_multi_full,
         PSI_DIR,
         price_setting
-    ) 
-    
-    
+    )""" 
+ 
+    """### Convergence of Final SOC Across Iterations (scenario-wise + statistics)
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # S_last_list_convergence: shape (N_iter, N_scenarios)
+    S_last_list_convergence = psddip_multi_full.S_last_list
+    S_arr = np.asarray(S_last_list_convergence)
+
+    N_iter, N_scenarios = S_arr.shape
+    iterations = np.arange(1, N_iter + 1)
+
+    # statistics across scenarios (per iteration)
+    mean_S = S_arr.mean(axis=1)
+    q10 = np.quantile(S_arr, 0.10, axis=1)
+    q90 = np.quantile(S_arr, 0.90, axis=1)
+
+    plt.figure(figsize=(10, 6))
+
+    # 1) scenario-wise trajectories (thin, transparent)
+    for s in range(N_scenarios):
+        plt.plot(iterations, S_arr[:, s], color="gray", alpha=0.25)
+
+    # 2) quantile band
+    plt.fill_between(iterations, q10, q90, color="tab:blue", alpha=0.25, label="10–90% quantile")
+
+    # 3) mean trajectory
+    plt.plot(iterations, mean_S, color="black", linewidth=2.5, label="Mean")
+
+    plt.xlabel("Iteration")
+    plt.ylabel("Final State of Charge (SOC)")
+    plt.title("Convergence of Final SOC Across Iterations")
+
+    plt.ylim(0, S)        # physical SOC bounds
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+    """
+ 
+ 
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
         
-    for k, K in enumerate([K for K in K_list if K <= 30]):
+    """for k, K in enumerate([K for K in K_list if K <= 30]):
         
         psddip_multi_da = PSDDiPModel(
             STAGE = T,
             DA_params_reduced=Reduced_P_da[k],
             DA_prob=Reduced_Probs[k],
             ID_params_reduced=Reduced_scenario_trees[k],
+            DA_params_full=P_da_evaluate,
+            DA_prob_full=Probs_evaluate,
             sample_num=int(500/K),
             alpha = 0.95,
-            tol=5e-3,
-            parallel_mode=1,
-            breakstage_selection=4,
+            tol=1e-4,
+            breakstage_selection=10,
+            stopping_counter_limit=4,
+            approx_mode=approx_mode,
         )
         
         psddip_multi_da.run_sddip()
         
         BASE_DIR = Path(__file__).resolve().parent           # NestedBenders
                 
-        PSI_DIR  = BASE_DIR / "psi_DA" / f"{price_setting}"
+        PSI_DIR  = BASE_DIR / "psi_DA_LP" / f"{price_setting}"
         PSI_DIR.mkdir(parents=True, exist_ok=True)
 
         psi_path = PSI_DIR / f"psi_DA_{K}.npy"
@@ -3332,8 +3797,9 @@ if __name__ == "__main__":
             allow_pickle=True
         )
 
-    print("✅ psd_DA saved as .npy:")
+    print("✅ psd_DA saved as .npy:")"""
     
+ 
     ## 4. Notify done via plot
     
     def notify_done_via_plot(title="✅ PSDDiP finished", subtitle="hyb-40 & hyb-80 complete"):

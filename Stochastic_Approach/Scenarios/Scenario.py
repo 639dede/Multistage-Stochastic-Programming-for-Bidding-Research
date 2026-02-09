@@ -182,7 +182,7 @@ delta_values_for_dist = filtered_df_Energy_for_dist['delta']
 
 std_E = delta_values_for_dist.std()  # std_E = 39.37
 
-std_E = 300
+std_E = 400
 
 lower_E, upper_E = 0.6, 1.4
 
@@ -213,6 +213,12 @@ def f_X(x):
 
 Q_c_x_values = np.linspace(-1.5, 1.5, 500)  
 Q_c_f_X_values = np.array([f_X(x) for x in Q_c_x_values])
+
+
+def sample_curtailment_error(p):
+    if np.random.rand() < p:
+        return np.random.uniform(-1.0, 1.0)
+    return 0.0
 
 
 # Price Distributions
@@ -548,33 +554,7 @@ class scenario():
                 P_da[i].append(sampled_day_ahead[0])
         
         return P_da
-    
-    def sample_delta_E(self):
-        
-        delta_samples = Energy_dist.rvs(self.T)
-        return delta_samples.tolist()
-    
-    def sample_Q_c(self):
-        
-        Q_c_samples = []
-        for _ in range(self.T):
-            if np.random.rand() < 1-p_c:
-                Q_c_samples.append(0)
-            else:
-                Q_c_sample = Q_c_truncnorm_dist.rvs()
-                Q_c_samples.append(Q_c_sample)
-        return Q_c_samples
-    
-    def sample_P_rt(self, P_da):
-        
-        P_rt_samples = []
-        for P in P_da:
-            sampled_rt = sample_real_time_price(
-                P, tgmm_model2_params, model2_bin_edges, num_samples=1
-            )
-            P_rt_samples.append(sampled_rt[0])
-        return P_rt_samples    
-    
+
     def sample_single_delta(self, t, P_da):
         
         ## sample one delta_E
@@ -584,13 +564,13 @@ class scenario():
         
         ## sample one delta_Q_c
         if P_da < 0:
-            if np.random.rand() < 1-p_c:
-                    delta_Q_c = 0
-            else:
-                    delta_Q_c = Q_c_truncnorm_dist.rvs()    
+            delta_Q_c = sample_curtailment_error(0.5)
         
+        elif P_da >= 0 and P_da < 20:
+            delta_Q_c = sample_curtailment_error(0.2)
+            
         else:
-            delta_Q_c = 0
+            delta_Q_c = 0.0
         
         ## sample one P_rt depending on P_da
         try:
@@ -622,13 +602,13 @@ class scenario():
             
             ## sample one delta_Q_c
             if P_da < 0:
-                if np.random.rand() < 1-p_c:
-                        delta_Q_c = 0
-                else:
-                        delta_Q_c = Q_c_truncnorm_dist.rvs()    
+                delta_Q_c = sample_curtailment_error(0.5)
             
+            elif P_da >= 0 and P_da < 20:
+                delta_Q_c = sample_curtailment_error(0.2)
+                
             else:
-                delta_Q_c = 0
+                delta_Q_c = 0.0
             
             ## sample one P_rt depending on E_0
             try:
@@ -714,8 +694,8 @@ if __name__ == '__main__':
         out[s1:e1+1] = seg1
         return out
 
-    E_0_cloudy = remap_daylight_window(base, start_shift=+2, end_shift=-2, scale=0)  # later start, earlier end
-    E_0_normal = remap_daylight_window(base, start_shift= +1, end_shift= 0, scale=0.9)  # baseline
+    E_0_cloudy = remap_daylight_window(base, start_shift=+1, end_shift=-2, scale=0.7)  # later start, earlier end
+    E_0_normal = remap_daylight_window(base, start_shift= +0, end_shift= +1, scale=1.15)  # baseline
     E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  # earlier start, later end
 
     # Save CSVs 

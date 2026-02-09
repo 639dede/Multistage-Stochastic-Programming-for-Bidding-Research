@@ -29,7 +29,7 @@ solver='gurobi'
 SOLVER=pyo.SolverFactory(solver)
 
 SOLVER.options['TimeLimit'] = 7200
-#SOLVER.options['MIPGap'] = 1e-4
+SOLVER.options['MIPGap'] = 1e-3
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
@@ -59,10 +59,20 @@ E_0 = E_0_normal
 
 ## 0. Load Price and Scenario csv files
 
+C = 21022.1
+S = C
+B = C/3
+
+S_min = 0.1*S
+S_max = 0.9*S
+
+P_r = 80
+P_max = 270
+
 K_list = [1, 3, 6, 10, 15]
 cut_list = ['SB', 'L-sub']
 
-price_setting = 'cloudy'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
 time_limit = '7200' # '3600', '7200', '10800' 
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
@@ -385,10 +395,14 @@ def evaluation_rolling_sddip(scenarios):
     f = []
     
     f_DA = [0]*T
-    f_P  = [0]*T
-    f_E  = [0]*T
-    f_Im = [0]*T
         
+    q_ID_list = [[0]*T for _ in range(K_eval)]
+    S_list = [[0.5*S]+[0]*T for _ in range(K_eval)]
+    
+    f_P  = [[0]*T for _ in range(K_eval)]
+    f_E  = [[0]*T for _ in range(K_eval)]
+    f_Im = [[0]*T for _ in range(K_eval)]
+    
     for n, scenarios_n in enumerate(scenarios):
                     
         P_da = P_da_test[n]
@@ -402,6 +416,8 @@ def evaluation_rolling_sddip(scenarios):
             f_DA[i] += f_DA_list[i]/K_eval
         
         fcn_value = rt_init_subp.get_settlement_fcn_value()
+        
+        j = True
             
         for scenario in scenarios_n:
             
@@ -413,9 +429,12 @@ def evaluation_rolling_sddip(scenarios):
                 
                 rt_subp = fw_rt(t, state, psi_ID[n][t+1], P_da, scenario[t])
                 
-                f_P[t] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-                f_E[t] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
-                f_Im[t] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+                if j:
+                    q_ID_list[n][t] = rt_subp.get_ID_solution()
+                    S_list[n][t+1] = rt_subp.get_S_solution()
+                    f_P[n][t] = rt_subp.get_P_profit()
+                    f_E[n][t] = rt_subp.get_E_profit()
+                    f_Im[n][t] = rt_subp.get_Im_profit()
                 
                 state = rt_subp.get_state_solutions()
                 
@@ -425,13 +444,18 @@ def evaluation_rolling_sddip(scenarios):
             
             rt_last_subp = fw_rt_last(state, P_da, scenario[T-1])
 
-            f_P[T-1] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-            f_E[T-1] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
-            f_Im[T-1] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+            if j:
+                q_ID_list[n][T-1] = rt_last_subp.get_ID_solution()
+                S_list[n][T] = rt_last_subp.get_S_solution()
+                f_P[n][T-1] += rt_last_subp.get_P_profit()
+                f_E[n][T-1] += rt_last_subp.get_E_profit()
+                f_Im[n][T-1] += rt_last_subp.get_Im_profit()
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
                         
             f.append(f_scenario)
+            
+            j = False
         
     mu_hat = np.mean(f)
     
@@ -444,7 +468,7 @@ def evaluation_rolling_sddip(scenarios):
     print(f"\nRolling Horizon -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
-    return q_da
+    return q_da, q_ID_list, S_list, f_P, f_E, f_Im
 
 
 def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
@@ -466,9 +490,13 @@ def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
     f = []
     
     f_DA = [0]*T
-    f_P  = [0]*T
-    f_E  = [0]*T
-    f_Im = [0]*T
+        
+    q_ID_list = [[0]*T for _ in range(K_eval)]
+    S_list = [[0.5*S]+[0]*T for _ in range(K_eval)]
+    
+    f_P  = [[0]*T for _ in range(K_eval)]
+    f_E  = [[0]*T for _ in range(K_eval)]
+    f_Im = [[0]*T for _ in range(K_eval)]
         
     for n, scenarios_n in enumerate(scenarios):
                     
@@ -483,6 +511,8 @@ def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
             f_DA[i] += f_DA_list[i]/K_eval
         
         fcn_value = rt_init_subp.get_settlement_fcn_value()
+        
+        j = True
             
         for scenario in scenarios_n:
             
@@ -494,9 +524,12 @@ def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
                 
                 rt_subp = fw_rt(t, state, psi_ID[n][t+1], P_da, scenario[t])
                 
-                f_P[t] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-                f_E[t] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
-                f_Im[t] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+                if j:
+                    q_ID_list[n][t] = rt_subp.get_ID_solution()
+                    S_list[n][t+1] = rt_subp.get_S_solution()
+                    f_P[n][t] = rt_subp.get_P_profit()
+                    f_E[n][t] = rt_subp.get_E_profit()
+                    f_Im[n][t] = rt_subp.get_Im_profit()
                 
                 state = rt_subp.get_state_solutions()
                 
@@ -506,13 +539,18 @@ def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
             
             rt_last_subp = fw_rt_last(state, P_da, scenario[T-1])
 
-            f_P[T-1] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-            f_E[T-1] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
-            f_Im[T-1] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+            if j:
+                q_ID_list[n][T-1] = rt_last_subp.get_ID_solution()
+                S_list[n][T] = rt_last_subp.get_S_solution()
+                f_P[n][T-1] += rt_last_subp.get_P_profit()
+                f_E[n][T-1] += rt_last_subp.get_E_profit()
+                f_Im[n][T-1] += rt_last_subp.get_Im_profit()
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
                         
             f.append(f_scenario)
+            
+            j = False
         
     mu_hat = np.mean(f)
     
@@ -525,7 +563,7 @@ def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
     print(f"\n{stage_num}-SP -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
-    return q_da
+    return q_da, q_ID_list, S_list, f_P, f_E, f_Im
     
         
 def evaluation_psddip_sddip(K, cut_mode, scenarios):
@@ -540,9 +578,13 @@ def evaluation_psddip_sddip(K, cut_mode, scenarios):
     f = []
     
     f_DA = [0]*T
-    f_P  = [0]*T
-    f_E  = [0]*T
-    f_Im = [0]*T
+        
+    q_ID_list = [[0]*T for _ in range(K_eval)]
+    S_list = [[0.5*S]+[0]*T for _ in range(K_eval)]
+    
+    f_P  = [[0]*T for _ in range(K_eval)]
+    f_E  = [[0]*T for _ in range(K_eval)]
+    f_Im = [[0]*T for _ in range(K_eval)]
     
     for n, scenarios_n in enumerate(scenarios):
                     
@@ -557,6 +599,8 @@ def evaluation_psddip_sddip(K, cut_mode, scenarios):
             f_DA[i] += f_DA_list[i]/K_eval
         
         fcn_value = rt_init_subp.get_settlement_fcn_value()
+        
+        j = True
             
         for scenario in scenarios_n:
             
@@ -568,9 +612,12 @@ def evaluation_psddip_sddip(K, cut_mode, scenarios):
                 
                 rt_subp = fw_rt(t, state, psi_ID[n][t+1], P_da, scenario[t])
                 
-                f_P[t] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-                f_E[t] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
-                f_Im[t] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+                if j:
+                    q_ID_list[n][t] = rt_subp.get_ID_solution()
+                    S_list[n][t+1] = rt_subp.get_S_solution()
+                    f_P[n][t] = rt_subp.get_P_profit()
+                    f_E[n][t] = rt_subp.get_E_profit()
+                    f_Im[n][t] = rt_subp.get_Im_profit()
                 
                 state = rt_subp.get_state_solutions()
                 
@@ -580,13 +627,18 @@ def evaluation_psddip_sddip(K, cut_mode, scenarios):
             
             rt_last_subp = fw_rt_last(state, P_da, scenario[T-1])
 
-            f_P[T-1] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-            f_E[T-1] += rt_subp.get_E_profit()/(K_eval*evaluation_num)
-            f_Im[T-1] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+            if j:
+                q_ID_list[n][T-1] = rt_last_subp.get_ID_solution()
+                S_list[n][T] = rt_last_subp.get_S_solution()
+                f_P[n][T-1] += rt_last_subp.get_P_profit()
+                f_E[n][T-1] += rt_last_subp.get_E_profit()
+                f_Im[n][T-1] += rt_last_subp.get_Im_profit()
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
                         
             f.append(f_scenario)
+            
+            j = False
         
     mu_hat = np.mean(f)
     
@@ -599,78 +651,73 @@ def evaluation_psddip_sddip(K, cut_mode, scenarios):
     print(f"\nPSDDiP K = {K}, time_lim = {time_limit}, cut = {cut_mode} -> SDDiP for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
     
-    return q_da
+    return q_da, q_ID_list, S_list, f_P, f_E, f_Im
     
 
 scenarios = scenarios_for_test
 
+
 #%% Cut mode index: 'SB' -> 0, 'L-sub' -> 1
 
-q_da_r = evaluation_rolling_sddip(scenarios)
-q_da_s2 = evaluation_SP_sddip(2, scenarios, scenarios_for_SP)  
-q_da_s3 = evaluation_SP_sddip(3, scenarios, scenarios_for_SP)
-q_da_s_s = evaluation_psddip_sddip(1, 0, scenarios)
-q_da_s_l = evaluation_psddip_sddip(1, 1, scenarios)
-q_da_p = evaluation_psddip_sddip(6, 0, scenarios)
+evaluation_rolling_rolling(scenarios)
+q_da_r, q_ID_r, S_r, f_P_r, f_E_r, f_Im_r = evaluation_rolling_sddip(scenarios)
+q_da_s2, q_ID_s2, S_s2, f_P_s2, f_E_s2, f_Im_s2 = evaluation_SP_sddip(2, scenarios, scenarios_for_SP)  
+q_da_s3, q_ID_s3, S_s3, f_P_s3, f_E_s3, f_Im_s3 = evaluation_SP_sddip(3, scenarios, scenarios_for_SP)
+q_da_p = [[] for _ in K_list]
+q_ID_p = [[] for _ in K_list]
+S_p    = [[] for _ in K_list]
+f_P_p  = [[] for _ in K_list]
+f_E_p  = [[] for _ in K_list]
+f_Im_p = [[] for _ in K_list]
 
 
-"""
-for K in K_list:
-    for cut_index in range(len(cut_list)):
-        evaluation_psddip_sddip(K, cut_index, scenarios)
-"""
+for k_idx, K in enumerate(K_list):
+    for c_idx, cut_index in enumerate(range(len(cut_list))):
 
-q_da_p_s = evaluation_psddip_sddip(6, 0, scenarios)
+        q_da, q_ID, S_sol, f_P, f_E, f_Im = evaluation_psddip_sddip(
+            K, cut_index, scenarios
+        )
+
+        q_da_p[k_idx].append(q_da)
+        q_ID_p[k_idx].append(q_ID)
+        S_p[k_idx].append(S_sol)
+        f_P_p[k_idx].append(f_P)
+        f_E_p[k_idx].append(f_E)
+        f_Im_p[k_idx].append(f_Im)
 
 
-# Plotting solutions
+## 5. Plotting solutions
 
-def plot_q_da_separate(q_da_list, xlabel="Hour", ylabel="Value",
-                       ylim=(-1000, 32000), figsize=(12, 6)):
+### 1) Helpers for DA solutions
 
-    n = len(q_da_list)
-    nrows, ncols = 2, 3  # for 6 plots
+def plot_q_da_single(name, q_da, xlabel="Hour", ylabel="Value",
+                     ylim=(-1000, 32000), figsize=(7, 4), pause=False):
+    y = np.asarray(q_da).reshape(-1)
+    if len(y) != 24:
+        print(f"Warning: {name} has length {len(y)} (expected 24).")
+    x = np.arange(len(y))
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, sharex=True, sharey=True)
-    axes = axes.flatten()
-
-    for ax, (name, q_da) in zip(axes, q_da_list):
-        y = np.asarray(q_da).reshape(-1)
-        if len(y) != 24:
-            print(f"Warning: {name} has length {len(y)} (expected 24).")
-        x = np.arange(len(y))
-
-        ax.plot(x, y, marker="o", linewidth=1.2)
-        ax.set_title(name, fontsize=10)
-        ax.set_ylim(*ylim)
-        ax.grid(True, alpha=0.3)
-
-    fig.supxlabel(xlabel)
-    fig.supylabel(ylabel)
-
+    plt.figure(figsize=figsize)
+    plt.plot(x, y, marker="o", linewidth=1.2)
+    plt.title(name, fontsize=11)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.ylim(*ylim)
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
 
-    return fig, axes
+    if pause:
+        input("Press Enter for next plot...")
 
 def ensure_solution_dirs(base_dir="solutions", price_settings=("cloudy", "normal", "sunny")):
-    """
-    Create:
-      solutions/
-        cloudy/
-        normal/
-        sunny/
-    next to where you run this script.
-    """
+    
     os.makedirs(base_dir, exist_ok=True)
     for ps in price_settings:
         os.makedirs(os.path.join(base_dir, ps), exist_ok=True)
 
 def save_q_da_solutions(q_da_list, price_setting, base_dir="solutions", filename="q_da_list.npy"):
-    """
-    Saves to: solutions/{price_setting}/{filename}
-    Stores as dict: {name: np.array(24,)}
-    """
+    
     save_dir = os.path.join(base_dir, price_setting)
     os.makedirs(save_dir, exist_ok=True)
 
@@ -681,36 +728,311 @@ def save_q_da_solutions(q_da_list, price_setting, base_dir="solutions", filename
     print(f"✅ Saved q_da solutions to: {save_path}")
 
 def load_q_da_solutions(price_setting, base_dir="solutions", filename="q_da_list.npy"):
-    """
-    Loads from: solutions/{price_setting}/{filename}
-    Returns dict: {name: np.array(24,)}
-    """
+
     load_path = os.path.join(base_dir, price_setting, filename)
     q_da_dict = np.load(load_path, allow_pickle=True).item()
     return q_da_dict
-
 
 q_da_list = [
     ("Rolling → SDDiP", q_da_r),
     ("2-SP → SDDiP",    q_da_s2),
     ("3-SP → SDDiP",    q_da_s3),
-    ("SDDiP (SB)",      q_da_s_s),   
-    ("SDDiP (L-sub)",   q_da_s_l),   
-    ("PSDDiP", q_da_p),  
 ]
+
+for k_idx, K in enumerate(K_list):
+    for c_idx, cut in enumerate(cut_list):
+        name = f"PSDDiP (K={K}, {cut})"
+        q_da_list.append((name, q_da_p[k_idx][c_idx]))
 
 
 ensure_solution_dirs(base_dir="solutions", price_settings=("cloudy", "normal", "sunny"))
 
 save_q_da_solutions(q_da_list, price_setting=price_setting, base_dir="solutions")
 
-plot_q_da_separate(q_da_list, ylim=(-1000, 32000))
 
-# 6) load later and plot anytime
+### 2) Helpers for ID solutions
+
+#### q_ID
+
+def ensure_solution_dirs_ID(base_dir="solutions_ID", price_settings=("cloudy", "normal", "sunny")):
+    os.makedirs(base_dir, exist_ok=True)
+    for ps in price_settings:
+        os.makedirs(os.path.join(base_dir, ps), exist_ok=True)
+
+def save_q_ID_solutions(q_ID_list, price_setting, base_dir="solutions_ID", filename="q_ID_list.npy"):
+    """
+    q_ID_list: list of (name, q_ID_matrix) pairs
+      - q_ID_matrix is expected shape (K_eval, T) or list-of-lists [[T]*K_eval]
+    Saves as dict[name] = np.ndarray of shape (K_eval, T)
+    """
+    save_dir = os.path.join(base_dir, price_setting)
+    os.makedirs(save_dir, exist_ok=True)
+
+    q_ID_dict = {name: np.asarray(q_ID).reshape(np.asarray(q_ID).shape[0], -1) for name, q_ID in q_ID_list}
+    save_path = os.path.join(save_dir, filename)
+
+    np.save(save_path, q_ID_dict, allow_pickle=True)
+    print(f"✅ Saved q_ID solutions to: {save_path}")
+
+def load_q_ID_solutions(price_setting, base_dir="solutions_ID", filename="q_ID_list.npy"):
+    load_path = os.path.join(base_dir, price_setting, filename)
+    q_ID_dict = np.load(load_path, allow_pickle=True).item()
+    return q_ID_dict
+
+def plot_q_ID_density_single(
+    name,
+    q_ID_matrix,
+    xlabel="Hour",
+    ylabel="q_ID",
+    ylim=None,
+    figsize=(8, 4),
+    alpha=0.25,
+    pause=False,
+    save_path=None,
+    show=True,
+    overlay_mean=False
+):
+    """
+    Density plot: one thin line per evaluation scenario.
+    q_ID_matrix: array-like (K_eval, T)
+    """
+    q_ID_arr = np.asarray(q_ID_matrix)
+    if q_ID_arr.ndim != 2:
+        raise ValueError(f"{name}: q_ID_matrix must be 2D (K_eval, T). Got shape {q_ID_arr.shape}")
+
+    K_eval, T = q_ID_arr.shape
+    hours = np.arange(T)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for k in range(K_eval):
+        ax.plot(hours, q_ID_arr[k, :], color="black", alpha=alpha)
+
+    if overlay_mean:
+        mean_line = q_ID_arr.mean(axis=0)
+        ax.plot(hours, mean_line, linewidth=2.0, label="mean")
+        ax.legend()
+
+    ax.set_title(name, fontsize=11)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    if save_path is not None:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    if pause:
+        input("Press Enter for next plot...")
+
+    return fig, ax
+
+q_ID_list = [
+    ("Rolling → SDDiP", q_ID_r),
+    ("2-SP → SDDiP",    q_ID_s2),
+    ("3-SP → SDDiP",    q_ID_s3),
+]
+
+for k_idx, K in enumerate(K_list):
+    for c_idx, cut in enumerate(cut_list):
+        name = f"PSDDiP (K={K}, {cut})"
+        q_ID_list.append((name, q_ID_p[k_idx][c_idx]))
+
+#### SoC values
+
+def ensure_solution_dirs_S(base_dir="solutions_S", price_settings=("cloudy", "normal", "sunny")):
+    os.makedirs(base_dir, exist_ok=True)
+    for ps in price_settings:
+        os.makedirs(os.path.join(base_dir, ps), exist_ok=True)
+
+def save_S_solutions(S_list_all, price_setting, base_dir="solutions_S", filename="S_list.npy"):
+    """
+    S_list_all: list of (name, S_matrix) pairs
+      - S_matrix expected shape (K_eval, T+1) or list-of-lists [[T+1]*K_eval]
+    Saves as dict[name] = np.ndarray of shape (K_eval, T+1)
+    """
+    save_dir = os.path.join(base_dir, price_setting)
+    os.makedirs(save_dir, exist_ok=True)
+
+    S_dict = {}
+    for name, S_mat in S_list_all:
+        arr = np.asarray(S_mat)
+        if arr.ndim != 2:
+            raise ValueError(f"{name}: S must be 2D (K_eval, T+1). Got shape {arr.shape}")
+        S_dict[name] = arr
+
+    save_path = os.path.join(save_dir, filename)
+    np.save(save_path, S_dict, allow_pickle=True)
+    print(f"✅ Saved S solutions to: {save_path}")
+
+def load_S_solutions(price_setting, base_dir="solutions_S", filename="S_list.npy"):
+    load_path = os.path.join(base_dir, price_setting, filename)
+    S_dict = np.load(load_path, allow_pickle=True).item()
+    return S_dict
+
+def plot_S_density_single(
+    name,
+    S_matrix,
+    xlabel="Hour",
+    ylabel="S",
+    ylim=None,
+    figsize=(8, 4),
+    alpha=0.25,
+    pause=False,
+    save_path=None,
+    show=True,
+    overlay_mean=False
+):
+    """
+    Density plot for S: one thin line per evaluation scenario.
+    IMPORTANT: S_matrix must be (K_eval, T+1).
+    """
+    S_arr = np.asarray(S_matrix)
+    if S_arr.ndim != 2:
+        raise ValueError(f"{name}: S_matrix must be 2D (K_eval, T+1). Got shape {S_arr.shape}")
+
+    K_eval, Tp1 = S_arr.shape  # Tp1 should be T+1
+    hours = np.arange(Tp1)     # 0..T (length T+1)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for k in range(K_eval):
+        ax.plot(hours, S_arr[k, :], color="black", alpha=alpha)
+
+    if overlay_mean:
+        mean_line = S_arr.mean(axis=0)
+        ax.plot(hours, mean_line, linewidth=2.0, label="mean")
+        ax.legend()
+
+    ax.set_title(name, fontsize=11)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    if save_path is not None:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    if pause:
+        input("Press Enter for next plot...")
+
+    return fig, ax
+
+S_list_all = [
+    ("Rolling → SDDiP", S_r),
+    ("2-SP → SDDiP",    S_s2),
+    ("3-SP → SDDiP",    S_s3),
+]
+
+for k_idx, K in enumerate(K_list):
+    for c_idx, cut in enumerate(cut_list):
+        name = f"PSDDiP (K={K}, {cut})"
+        S_list_all.append((name, S_p[k_idx][c_idx]))
+
+
+### 3) Save and plot for DA solutions
+
+plot_q_da_single("Rolling → SDDiP", q_da_r, pause=True)
+plot_q_da_single("2-SP → SDDiP",    q_da_s2, pause=True)
+plot_q_da_single("3-SP → SDDiP",    q_da_s3, pause=True)
+
+for k_idx, K in enumerate(K_list):
+    for c_idx, cut in enumerate(cut_list):
+        name = f"PSDDiP (K={K}, {cut})"
+        plot_q_da_single(name, q_da_p[k_idx][c_idx], pause=True)
+
+# load later and plot anytime
+
 # q_da_dict_loaded = load_q_da_solutions("sunny", base_dir="solutions")
 # q_da_list_loaded = list(q_da_dict_loaded.items())
 # plot_q_da_separate(q_da_list_loaded, ylim=(-1000, 32000))
 
+
+### 4) Save and plot for ID solutions
+
+ensure_solution_dirs_ID(base_dir="solutions_ID", price_settings=("cloudy", "normal", "sunny"))
+save_q_ID_solutions(q_ID_list, price_setting=price_setting, base_dir="solutions_ID")
+
+
+#### q_ID
+
+# (Optional) set y-limits if you want consistent visuals across runs
+# id_ylim = (-50, 50)
+id_ylim = None
+
+# baselines
+plot_q_ID_density_single("Rolling → SDDiP", q_ID_r, ylim=id_ylim, pause=True)
+plot_q_ID_density_single("2-SP → SDDiP",    q_ID_s2, ylim=id_ylim, pause=True)
+plot_q_ID_density_single("3-SP → SDDiP",    q_ID_s3, ylim=id_ylim, pause=True)
+
+# PSDDiP: loop over K and cuts
+for k_idx, K in enumerate(K_list):
+    for c_idx, cut in enumerate(cut_list):
+        name = f"PSDDiP (K={K}, {cut})"
+        plot_q_ID_density_single(name, q_ID_p[k_idx][c_idx], ylim=id_ylim, pause=True)
+
+# ----------------------------
+# (Optional) Load later & plot
+# ----------------------------
+# q_ID_dict_loaded = load_q_ID_solutions("sunny", base_dir="solutions_ID")
+# q_ID_list_loaded = list(q_ID_dict_loaded.items())
+# for name, mat in q_ID_list_loaded:
+#     plot_q_ID_density_single(name, mat, ylim=id_ylim, pause=False)
+
+
+#### Soc values
+
+
+# --------------
+# Save S solutions
+# --------------
+ensure_solution_dirs_S(base_dir="solutions_S", price_settings=("cloudy", "normal", "sunny"))
+save_S_solutions(S_list_all, price_setting=price_setting, base_dir="solutions_S")
+
+
+# ----------------------------
+# Plot S density one-by-one
+# ----------------------------
+
+# Optional consistent y-limits (example):
+# S_ylim = (0, S_max)  # define if you want
+S_ylim = None
+
+# baselines
+plot_S_density_single("Rolling → SDDiP", S_r,  ylim=S_ylim, pause=True)
+plot_S_density_single("2-SP → SDDiP",    S_s2, ylim=S_ylim, pause=True)
+plot_S_density_single("3-SP → SDDiP",    S_s3, ylim=S_ylim, pause=True)
+
+# PSDDiP: loop over K and cuts
+for k_idx, K in enumerate(K_list):
+    for c_idx, cut in enumerate(cut_list):
+        name = f"PSDDiP (K={K}, {cut})"
+        plot_S_density_single(name, S_p[k_idx][c_idx], ylim=S_ylim, pause=True)
+
+
+# ----------------------------
+# (Optional) Load later & plot
+# ----------------------------
+# S_dict_loaded = load_S_solutions("sunny", base_dir="solutions_S")
+# S_list_loaded = list(S_dict_loaded.items())
+# for name, mat in S_list_loaded:
+#     plot_S_density_single(name, mat, ylim=S_ylim, pause=False)
 
 
 # *Notify done via plot*

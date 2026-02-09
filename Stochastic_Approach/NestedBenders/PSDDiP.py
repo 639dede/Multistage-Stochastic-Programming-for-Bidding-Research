@@ -35,7 +35,8 @@ SOLVER.options['TimeLimit'] = 300
 
 assert SOLVER.available(), f"Solver {solver} is available."
 
-price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
+
 
 # 1. Parameters & Computational settings
 
@@ -171,7 +172,6 @@ T = 24
 hours = np.arange(T)
 
 
-"""
 ## Plot clustered P_da profiles for each K
 
 for i, P_da_list in enumerate(Reduced_P_da):
@@ -191,7 +191,7 @@ for i, P_da_list in enumerate(Reduced_P_da):
     plt.tight_layout()
     plt.show()
 
-
+"""
 ## Plot clustered P_rt profiles for each K
 
 hours = np.arange(24)
@@ -252,6 +252,7 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     fig.savefig(os.path.join(outdir, f'P_rt_fan_K{k}.png'), dpi=300)
     plt.show()
     plt.close(fig)
+
 """
 
 
@@ -1177,6 +1178,24 @@ class fw_rt(pyo.ConcreteModel):
 
         return Im_profit
 
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = pyo.value(self.q_rt)
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        S_solution = pyo.value(self.S)
+
+        return S_solution
+
 class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
 
     def __init__(self, stage, T_prev, psi, P_da, delta):
@@ -1956,6 +1975,51 @@ class fw_rt_last(pyo.ConcreteModel):
             self.solved = True
     
         return pyo.value(self.objective)
+    
+    def get_P_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        P_profit = (pyo.value(self.u) - pyo.value(self.Q_da))*self.P_rt
+
+        return P_profit
+
+    def get_E_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        E_profit = pyo.value(self.m_2) 
+
+        return E_profit
+
+    def get_Im_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        Im_profit = - gamma_over*pyo.value(self.phi_over) - gamma_under*pyo.value(self.phi_under)
+
+        return Im_profit
+
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = pyo.value(self.q_rt)
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        SOC_solution = pyo.value(self.S)
+
+        return SOC_solution
 
 class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
            
@@ -5102,7 +5166,7 @@ if __name__ == "__main__":
     random.seed(42)
     np.random.seed(42)
 
-    evaluation_num = 50
+    evaluation_num = int(200/K_eval) # Number of scenarios per K for evaluation and testing
 
     def sample_scenario_paths(Scenario_tree, N):
         scenarios = []
@@ -5136,6 +5200,7 @@ if __name__ == "__main__":
     
     
     ## 2. Run full-PSDDiP to get psi_ID and save as npy
+    
     """
     def save_psddip_state(model, base_dir, price_setting):
         
@@ -5222,7 +5287,7 @@ if __name__ == "__main__":
     
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
     
-      
+    """  
     for cut_mode in ['SB', 'L-sub']:
 
         time_interval = 7200
@@ -5271,7 +5336,7 @@ if __name__ == "__main__":
 
         print("✅ psd_DA saved as .npy:")
         
-    
+    """
     
     ## 4. Notify done via plot
     
