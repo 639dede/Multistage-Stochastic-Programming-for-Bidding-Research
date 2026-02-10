@@ -4,7 +4,7 @@ import chardet
 import matplotlib.pyplot as plt
 import os
 import warnings
-from scipy.stats import bernoulli, truncnorm
+from scipy.stats import bernoulli, uniform, truncnorm
 from sklearn.cluster import KMeans
 from pathlib import Path
 import sys
@@ -182,6 +182,7 @@ delta_values_for_dist = filtered_df_Energy_for_dist['delta']
 
 std_E = delta_values_for_dist.std()  # std_E = 39.37
 
+"""
 std_E = 400
 
 lower_E, upper_E = 0.6, 1.4
@@ -189,7 +190,10 @@ lower_E, upper_E = 0.6, 1.4
 a_E, b_E = (lower_E - 1) / std_E, (upper_E - 1) / std_E
 
 Energy_dist = truncnorm(a_E, b_E, loc=1, scale=std_E)
+"""
 
+lower_E, upper_E = 0.7, 1.3
+Energy_dist = uniform(loc=lower_E, scale=upper_E - lower_E)
 
 # Q_c distribution
 
@@ -555,40 +559,6 @@ class scenario():
         
         return P_da
 
-    def sample_single_delta(self, t, P_da):
-        
-        ## sample one delta_E
-        delta = []
-        
-        delta_E = Energy_dist.rvs(1).tolist()[0]
-        
-        ## sample one delta_Q_c
-        if P_da < 0:
-            delta_Q_c = sample_curtailment_error(0.5)
-        
-        elif P_da >= 0 and P_da < 20:
-            delta_Q_c = sample_curtailment_error(0.2)
-            
-        else:
-            delta_Q_c = 0.0
-        
-        ## sample one P_rt depending on P_da
-        try:
-            P_rt = sample_real_time_price(
-                P_da, tgmm_model2_params, model2_bin_edges, num_samples=1
-            )
-        except ValueError as e:
-            print(f"Error sampling P_rt for t={t}: {e}")        
-        
-        ## sample one delta depending on t = -1, ..., 23
-        if t == 23:
-            delta = [0, P_rt[0], delta_Q_c]
-
-        else:
-            delta = [delta_E, P_rt[0], delta_Q_c]
-        
-        return delta
-    
     def sample_multiple_delta(self, t, N_t, P_da):
         
         ## sample one delta_E
@@ -600,16 +570,6 @@ class scenario():
             
             delta_E = Energy_dist.rvs(1).tolist()[0]
             
-            ## sample one delta_Q_c
-            if P_da < 0:
-                delta_Q_c = sample_curtailment_error(0.5)
-            
-            elif P_da >= 0 and P_da < 20:
-                delta_Q_c = sample_curtailment_error(0.2)
-                
-            else:
-                delta_Q_c = 0.0
-            
             ## sample one P_rt depending on E_0
             try:
                 P_rt = sample_real_time_price(
@@ -617,6 +577,19 @@ class scenario():
                 )
             except ValueError as e:
                 print(f"Error sampling P_rt for t={t}: {e}")        
+            
+            ## sample one delta_Q_c
+            if P_da < 0 and P_rt[0] < -P_r + 40:
+                delta_Q_c = sample_curtailment_error(1.0)
+            
+            elif P_da < 0 and P_rt[0] >= -P_r + 40 and P_rt[0] < 0:
+                delta_Q_c = sample_curtailment_error(0.6)
+            
+            elif P_da < 0 and P_rt[0] >= 0 and P_rt[0] < 20:
+                delta_Q_c = sample_curtailment_error(0.2)
+                
+            else:
+                delta_Q_c = 0.0
             
             ## sample one delta depending on t = -1, ..., 23
             if t == 23:
@@ -630,18 +603,13 @@ class scenario():
         return deltas
     
     def generate_scenario_tree(self, P_da):
-        
+
         scenario = []
-            
-        for t in range(self.T): 
-            
-            branches = np.array(self.sample_multiple_delta(t, 6, P_da[t]))
-            kmeans = KMeans(n_clusters=self.N_t, random_state=0, n_init='auto')
-            kmeans.fit(branches)
-            
-            reduced_branches = kmeans.cluster_centers_.tolist()
-            scenario.append(reduced_branches)
-            
+
+        for t in range(self.T):
+            branches = self.sample_multiple_delta(t, self.N_t, P_da[t])
+            scenario.append(branches)
+
         return scenario
 
 
@@ -650,86 +618,84 @@ evaluation_num = 30
 
 K_list = [1, 3, 6, 10, 15, evaluation_num]
 
+# Save Energy forecast csv file
+
+base = np.asarray(E_0, dtype=float) 
+hours = np.arange(24)
+
+def remap_daylight_window(base, start_shift=0, end_shift=0, scale=1.0,
+                        min_width=4, cut_frac=0.01):
+
+    y = np.asarray(base, dtype=float)
+
+    cut = max(cut_frac * y.max(), 1e-9)
+    nz = np.where(y > cut)[0]
+    if nz.size == 0:
+        
+        x = np.linspace(-1, 1, 24)
+        y = (np.maximum(0, 1 - x**2)) * y.max()
+        nz = np.where(y > cut)[0]
+
+    s0, e0 = int(nz[0]), int(nz[-1])             
+    s1 = int(np.clip(s0 + start_shift, 0, 23))   
+    e1 = int(np.clip(e0 + end_shift,   0, 23))   
+
+    # keep a reasonable width
+    if e1 <= s1:
+        e1 = min(23, s1 + min_width)
+
+    # original daylight segment and normalized positions
+    seg0 = y[s0:e0+1]
+    t0 = np.linspace(0, 1, len(seg0))
+
+    # target positions in the new window
+    seg_len = e1 - s1 + 1
+    t1 = np.linspace(0, 1, seg_len)
+    seg1 = np.interp(t1, t0, seg0) * scale
+
+    out = np.zeros_like(y)
+    out[s1:e1+1] = seg1
+    return out
+
+E_0_cloudy = remap_daylight_window(base, start_shift=+1, end_shift=-2, scale=0.7)  # later start, earlier end
+E_0_normal = remap_daylight_window(base, start_shift= +0, end_shift= +1, scale=1.15)  # baseline
+E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  # earlier start, later end
+
+# Save CSVs 
+outdir = './Stochastic_Approach/Scenarios/Energy_forecast'
+os.makedirs(outdir, exist_ok=True)
+pd.DataFrame(E_0_cloudy).to_csv(os.path.join(outdir, 'E_0_cloudy.csv'), index=False, header=False)
+pd.DataFrame(E_0_normal).to_csv(os.path.join(outdir, 'E_0_normal.csv'), index=False, header=False)
+pd.DataFrame(E_0_sunny ).to_csv(os.path.join(outdir, 'E_0_sunny.csv' ), index=False, header=False)
+
+# Plot (0, 20000) as requested
+def plot_E_0(ax, y, title):
+    ax.plot(hours, y, linewidth=2.0)
+    ax.set_title(title)
+    ax.set_xlabel('Hour')
+    ax.set_ylabel('E₀')
+    ax.set_ylim(0, 20000)
+    ax.grid(True)
+
+fig, axs = plt.subplots(1, 3, figsize=(12, 3.2), sharey=True)
+plot_E_0(axs[0], E_0_cloudy, "Cloudy")
+plot_E_0(axs[1], E_0_normal, "Normal")
+plot_E_0(axs[2], E_0_sunny,  "Sunny")
+plt.tight_layout()
+plt.savefig('./Stochastic_Approach/Scenarios/E_0_profiles_cloudy_normal_sunny.png', dpi=300)
+plt.close()
+
+
+E_0 = E_0_sunny
 
 
 if __name__ == '__main__':
-    
-    
-    # Save Energy forecast csv file
-    
-    base = np.asarray(E_0, dtype=float) 
-    hours = np.arange(24)
-
-    def remap_daylight_window(base, start_shift=0, end_shift=0, scale=1.0,
-                            min_width=4, cut_frac=0.01):
-
-        y = np.asarray(base, dtype=float)
-
-        cut = max(cut_frac * y.max(), 1e-9)
-        nz = np.where(y > cut)[0]
-        if nz.size == 0:
-            
-            x = np.linspace(-1, 1, 24)
-            y = (np.maximum(0, 1 - x**2)) * y.max()
-            nz = np.where(y > cut)[0]
-
-        s0, e0 = int(nz[0]), int(nz[-1])             
-        s1 = int(np.clip(s0 + start_shift, 0, 23))   
-        e1 = int(np.clip(e0 + end_shift,   0, 23))   
-
-        # keep a reasonable width
-        if e1 <= s1:
-            e1 = min(23, s1 + min_width)
-
-        # original daylight segment and normalized positions
-        seg0 = y[s0:e0+1]
-        t0 = np.linspace(0, 1, len(seg0))
-
-        # target positions in the new window
-        seg_len = e1 - s1 + 1
-        t1 = np.linspace(0, 1, seg_len)
-        seg1 = np.interp(t1, t0, seg0) * scale
-
-        out = np.zeros_like(y)
-        out[s1:e1+1] = seg1
-        return out
-
-    E_0_cloudy = remap_daylight_window(base, start_shift=+1, end_shift=-2, scale=0.7)  # later start, earlier end
-    E_0_normal = remap_daylight_window(base, start_shift= +0, end_shift= +1, scale=1.15)  # baseline
-    E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  # earlier start, later end
-
-    # Save CSVs 
-    outdir = './Stochastic_Approach/Scenarios/Energy_forecast'
-    os.makedirs(outdir, exist_ok=True)
-    pd.DataFrame(E_0_cloudy).to_csv(os.path.join(outdir, 'E_0_cloudy.csv'), index=False, header=False)
-    pd.DataFrame(E_0_normal).to_csv(os.path.join(outdir, 'E_0_normal.csv'), index=False, header=False)
-    pd.DataFrame(E_0_sunny ).to_csv(os.path.join(outdir, 'E_0_sunny.csv' ), index=False, header=False)
-
-    # Plot (0, 20000) as requested
-    def plot_E_0(ax, y, title):
-        ax.plot(hours, y, linewidth=2.0)
-        ax.set_title(title)
-        ax.set_xlabel('Hour')
-        ax.set_ylabel('E₀')
-        ax.set_ylim(0, 20000)
-        ax.grid(True)
-
-    fig, axs = plt.subplots(1, 3, figsize=(12, 3.2), sharey=True)
-    plot_E_0(axs[0], E_0_cloudy, "Cloudy")
-    plot_E_0(axs[1], E_0_normal, "Normal")
-    plot_E_0(axs[2], E_0_sunny,  "Sunny")
-    plt.tight_layout()
-    plt.savefig('./Stochastic_Approach/Scenarios/E_0_profiles_cloudy_normal_sunny.png', dpi=300)
-    plt.close()
-    
-    
-    E_0 = E_0_sunny
 
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
         
     price_mode = 'sunny'  # 'cloudy', 'normal', 'sunny'
             
-    scenario_generator = scenario(6, E_0)
+    scenario_generator = scenario(10, E_0)
         
     sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(evaluation_num))
             

@@ -180,6 +180,7 @@ hours = np.arange(T)
 K_list = [len(P_da_list) for P_da_list in Reduced_P_da]
 
 
+
 ## Plot clustered P_da profiles for each K
 
 for i, P_da_list in enumerate(Reduced_P_da):
@@ -191,9 +192,7 @@ for i, P_da_list in enumerate(Reduced_P_da):
     ax.set_title(f"K = {K_list[i]}: Clustered Day-Ahead Price Profiles", fontsize=20)
     ax.set_xlabel("Hour", fontsize=20)
     ax.set_ylabel("Price (KRW)", fontsize=20)
-    
     ax.tick_params(axis='both', labelsize=20)
-    
     ax.grid(True)
     ax.set_ylim(-120, 200)
     plt.tight_layout()
@@ -203,42 +202,37 @@ for i, P_da_list in enumerate(Reduced_P_da):
 ## Plot clustered P_rt profiles for each K
 
 hours = np.arange(24)
-outdir = './Stochastic_Approach/Scenarios/P_rt_fan_byK'
-os.makedirs(outdir, exist_ok=True)
 
 for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
-    # --- collect all trajectories for this K into an array [n_paths, 24] ---
+
     paths = []
     for scenario in scenario_trees:
-        N_b = len(scenario[0])  # branches at hour 0
+        N_b = len(scenario[0])
         for b in range(N_b):
             traj = [scenario[t][b][1] for t in range(24)]
             paths.append(traj)
-    P = np.asarray(paths)  # shape: (n_paths, 24)
+
+    P = np.asarray(paths)
     if P.ndim != 2 or P.shape[1] != 24:
         raise ValueError(f"Unexpected shape for P (got {P.shape})")
 
-    # --- compute quantiles hour-by-hour ---
     q25 = np.percentile(P, 25, axis=0)
     q75 = np.percentile(P, 75, axis=0)
     mean = P.mean(axis=0)
 
-    # --- plot fan chart ---
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Central 50% band (green)
-    band_50 = ax.fill_between(hours, q25, q75, alpha=0.3, color="green", label='Central 50% (25–75%)')
+    ax.fill_between(hours, q25, q75, alpha=0.3, color="green",
+                    label='Central 50% (25–75%)')
 
-    # Sample paths in **black**
-    n_show = min(15, len(P))  # show up to 15 paths
+    n_show = min(15, len(P))
     rng_idx = np.linspace(0, len(P) - 1, n_show, dtype=int)
     for idx in rng_idx:
         ax.plot(hours, P[idx], color='black', alpha=0.2, linewidth=1.0)
 
-    # Mean line (orange dashed)
-    mean_line, = ax.plot(hours, mean, linewidth=1.8, linestyle='--', color='orange', label='Mean')
+    ax.plot(hours, mean, linewidth=1.8, linestyle='--',
+            color='orange', label='Mean')
 
-    # Axes, ticks, limits
     ax.set_title(f"K = {k}: Real-Time Price Scenarios", fontsize=20)
     ax.set_xlabel("Hour", fontsize=20)
     ax.set_ylabel("P_rt (KRW)", fontsize=20)
@@ -248,19 +242,83 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=20)
     ax.grid(True)
 
-    # Legend (only Central 50% + Mean)
-    ax.legend(
-        loc='upper right',
-        frameon=True,
-        fontsize=18,        # font size for labels like "Central 50%"
-        title_fontsize=18   # font size for "Legend"
-    )
-
+    ax.legend(loc='upper right', fontsize=18)
     plt.tight_layout()
-    fig.savefig(os.path.join(outdir, f'P_rt_fan_K{k}.png'), dpi=300)
     plt.show()
-    plt.close(fig)
 
+
+## Plot q_c and E_1 paths for each K
+
+def build_paths_from_trees(scenario_trees, component_idx):
+    paths = []
+    for scenario in scenario_trees:
+        N_b = len(scenario[0])
+        for b in range(N_b):
+            traj = [scenario[t][b][component_idx] for t in range(24)]
+            paths.append(traj)
+    return np.asarray(paths, dtype=float)
+
+
+def build_E1_paths_from_trees(scenario_trees, E_0_vec, deltaE_idx=0):
+    E_0_vec = np.asarray(E_0_vec, dtype=float)
+    paths = []
+
+    for scenario in scenario_trees:
+        N_b = len(scenario[0])
+        for b in range(N_b):
+            traj = []
+            for t in range(24):
+                delta_E = scenario[t][b][deltaE_idx]
+                if t == 23:
+                    delta_E = 1.0
+                traj.append(delta_E * E_0_vec[t])
+            paths.append(traj)
+
+    return np.asarray(paths, dtype=float)
+
+
+for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
+
+    # ---------- q_c ----------
+    qc_paths = build_paths_from_trees(scenario_trees, component_idx=2)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    n_show = min(30, len(qc_paths))
+    idxs = np.linspace(0, len(qc_paths) - 1, n_show, dtype=int)
+
+    for idx in idxs:
+        ax.plot(hours, qc_paths[idx], color="black", alpha=0.25, linewidth=1.0)
+
+    ax.set_title(f"K = {k}: q_c trajectories", fontsize=20)
+    ax.set_xlabel("Hour", fontsize=20)
+    ax.set_ylabel("q_c", fontsize=20)
+    ax.set_ylim(-1.0, 1.0)
+    ax.set_xlim(0, 23)
+    ax.set_xticks([0, 6, 12, 18, 23])
+    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=20)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+    # ---------- E_1 ----------
+    E1_paths = build_E1_paths_from_trees(scenario_trees, E_0_vec=E_0)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    n_show = min(30, len(E1_paths))
+    idxs = np.linspace(0, len(E1_paths) - 1, n_show, dtype=int)
+
+    for idx in idxs:
+        ax.plot(hours, E1_paths[idx], color="black", alpha=0.25, linewidth=1.0)
+
+    ax.set_title(f"K = {k}: E_1 trajectories (delta_E × E_0)", fontsize=20)
+    ax.set_xlabel("Hour", fontsize=20)
+    ax.set_ylabel("E_1", fontsize=20)
+    ax.set_xlim(0, 23)
+    ax.set_xticks([0, 6, 12, 18, 23])
+    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=20)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
 
 
 ## Parameters 
@@ -3597,7 +3655,7 @@ class PSDDiPModel:
 
 if __name__ == "__main__":
 
-    """## 1. Sample scenario paths and save as .npy
+    ## 1. Sample scenario paths and save as .npy
     
     random.seed(42)
     np.random.seed(42)
@@ -3634,7 +3692,7 @@ if __name__ == "__main__":
     np.save(BASE_OUTDIR / "scenarios_SP.npy", np.asarray(scenarios_for_SP, dtype=object))
 
     print("✅ Scenario paths saved as .npy:")
-    print(BASE_OUTDIR)"""
+    print(BASE_OUTDIR)
     
     
     ## 2. Run full-PSDDiP to get psi_ID and save as npy
@@ -3719,7 +3777,8 @@ if __name__ == "__main__":
         psddip_multi_full,
         PSI_DIR,
         price_setting
-    )""" 
+    )"""
+ 
  
     """### Convergence of Final SOC Across Iterations (scenario-wise + statistics)
 
@@ -3759,13 +3818,13 @@ if __name__ == "__main__":
     plt.legend()
 
     plt.tight_layout()
-    plt.show()
-    """
+    plt.show()"""
+    
  
  
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
-        
-    """for k, K in enumerate([K for K in K_list if K <= 30]):
+    """    
+    for k, K in enumerate([K for K in K_list if K <= 30]):
         
         psddip_multi_da = PSDDiPModel(
             STAGE = T,
@@ -3797,8 +3856,8 @@ if __name__ == "__main__":
             allow_pickle=True
         )
 
-    print("✅ psd_DA saved as .npy:")"""
-    
+    print("✅ psd_DA saved as .npy:")
+    """
  
     ## 4. Notify done via plot
     
