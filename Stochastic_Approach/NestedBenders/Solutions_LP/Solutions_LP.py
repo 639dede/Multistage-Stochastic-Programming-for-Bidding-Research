@@ -597,13 +597,13 @@ if __name__ == "__main__":
     # 1. Plotting solutions
     # ----------------------------
     
-    plot_all_from_file(
+    """plot_all_from_file(
         price_setting=price_setting,
         pause=False,
         da_ylim=(-1000, 32000),
         id_ylim=None,
         overlay_mean=False
-    )
+    )"""
 
     SELECTED = [
         #"Rolling → SDDiP",

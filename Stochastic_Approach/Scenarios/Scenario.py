@@ -221,7 +221,7 @@ Q_c_f_X_values = np.array([f_X(x) for x in Q_c_x_values])
 
 def sample_curtailment_error(p):
     if np.random.rand() < p:
-        return np.random.uniform(-1.0, 1.0)
+        return np.random.uniform(-0.5, 0.5)
     return 0.0
 
 
@@ -580,10 +580,10 @@ class scenario():
             
             ## sample one delta_Q_c
             if P_da < 0 and P_rt[0] < -P_r + 40:
-                delta_Q_c = sample_curtailment_error(1.0)
+                delta_Q_c = sample_curtailment_error(0.8)
             
             elif P_da < 0 and P_rt[0] >= -P_r + 40 and P_rt[0] < 0:
-                delta_Q_c = sample_curtailment_error(0.6)
+                delta_Q_c = sample_curtailment_error(0.5)
             
             elif P_da < 0 and P_rt[0] >= 0 and P_rt[0] < 20:
                 delta_Q_c = sample_curtailment_error(0.2)
@@ -695,7 +695,7 @@ if __name__ == '__main__':
         
     price_mode = 'sunny'  # 'cloudy', 'normal', 'sunny'
             
-    scenario_generator = scenario(10, E_0)
+    scenario_generator = scenario(3, E_0)
         
     sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(evaluation_num))
             
@@ -735,7 +735,7 @@ if __name__ == '__main__':
             np.savetxt(csv_path, rows, delimiter=',')
     
     
-    fig, axes = plt.subplots(len(K_list), 1, figsize=(10, 4 * len(K_list)), sharex=True)
+    """fig, axes = plt.subplots(len(K_list), 1, figsize=(10, 4 * len(K_list)), sharex=True)
     hours = np.arange(24)
 
     for i, (k, scenario_trees) in enumerate(zip(K_list, Reduced_scenario_trees)):
@@ -772,7 +772,7 @@ if __name__ == '__main__':
         ax.set_ylabel("Price")
         ax.grid(True)
         plt.tight_layout()
-        plt.show()
+        plt.show()"""
     
     
     save_dir = f'./Stochastic_Approach/Scenarios/P_da_{price_mode}'
@@ -782,7 +782,7 @@ if __name__ == '__main__':
         k = K_list[i]
         csv_path = os.path.join(save_dir, f"K{k}.csv")
         np.savetxt(csv_path, P_da_list, delimiter=',')
-    
+    """
     fig, axes = plt.subplots(len(K_list), 1, figsize=(12, 2.5 * len(K_list)), sharex=True, constrained_layout=True)
     hours = np.arange(24)
 
@@ -818,6 +818,6 @@ if __name__ == '__main__':
         ax.grid(True)
     axes[-1].set_xlabel("Hour")
     plt.savefig('./Stochastic_Approach/Scenarios/P_da_only_byK.png', dpi=300)
-    plt.close(fig)
+    plt.close(fig)"""
         
  

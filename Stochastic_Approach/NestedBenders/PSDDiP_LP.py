@@ -321,6 +321,8 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     plt.show()
 
 
+
+
 ## Parameters 
 
 T = 24
@@ -3755,7 +3757,7 @@ if __name__ == "__main__":
         alpha=0.95,
         tol=1e-4,
         breakstage_selection=10,
-        stopping_counter_limit=9,
+        stopping_counter_limit=10,
         approx_mode=approx_mode,
     )
 
@@ -3823,7 +3825,7 @@ if __name__ == "__main__":
  
  
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
-    """    
+    """ 
     for k, K in enumerate([K for K in K_list if K <= 30]):
         
         psddip_multi_da = PSDDiPModel(
@@ -3837,7 +3839,7 @@ if __name__ == "__main__":
             alpha = 0.95,
             tol=1e-4,
             breakstage_selection=10,
-            stopping_counter_limit=4,
+            stopping_counter_limit=6,
             approx_mode=approx_mode,
         )
         
@@ -3856,8 +3858,8 @@ if __name__ == "__main__":
             allow_pickle=True
         )
 
-    print("✅ psd_DA saved as .npy:")
-    """
+    print("✅ psd_DA saved as .npy:")"""
+    
  
     ## 4. Notify done via plot
     
