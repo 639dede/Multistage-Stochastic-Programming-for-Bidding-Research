@@ -1,18 +1,29 @@
 import os
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 
+# ============================================================
+# Config
+# ============================================================
 
-K_list = [1, 3, 6, 10, 15, 30]
+DEFAULT_PRICE = "normal"  # change as needed
 
-# ----------------------------
+
+# ============================================================
 # Load solutions (local folder)
-# ----------------------------
+# ============================================================
 
 HERE = os.path.dirname(os.path.abspath(__file__))  # .../NestedBenders/Solutions_LP
-DEFAULT_PRICE = "cloudy"  # change as needed
 
 def load_solutions_lp(price_setting=DEFAULT_PRICE, filename=None):
+    """
+    Loads: <HERE>/<price_setting>_solutions.npy
+    Expected saved structure (new):
+      sol["Rolling → SDDiP"], sol["2-SP → SDDiP"], sol["3-SP → SDDiP"]
+      sol["PSDDiP"]["approx"] and sol["PSDDiP"]["exact"]
+      sol["meta"]["K_list"]
+    """
     if filename is None:
         filename = f"{price_setting}_solutions.npy"
     path = os.path.join(HERE, filename)
@@ -20,15 +31,68 @@ def load_solutions_lp(price_setting=DEFAULT_PRICE, filename=None):
         raise FileNotFoundError(f"Missing solution file: {path}")
     return np.load(path, allow_pickle=True).item()
 
-# 1. Plot helpers
 
-# ----------------------------
-# Plot helpers (DA / q_ID / S)
-# ----------------------------
+# ============================================================
+# Helpers: mode routing (approx/exact) for PSDDiP
+# ============================================================
 
-def plot_q_da_single(name, q_da, xlabel="Hour", ylabel="Value",
+def _mode_key(approx_mode: bool) -> str:
+    return "approx" if approx_mode else "exact"
+
+def _get_psddip_block(sol: dict, approx_mode: bool) -> dict:
+    psd = sol.get("PSDDiP", {})
+    mk = _mode_key(approx_mode)
+    if mk not in psd:
+        raise KeyError(
+            f"Missing PSDDiP['{mk}'] in saved file. "
+            f"Available PSDDiP keys: {list(psd.keys())}"
+        )
+    return psd[mk]
+
+
+# ============================================================
+# Helpers: means and label parsing
+# ============================================================
+
+def _mean_curve(mat2d):
+    """mat2d: (K_eval, T) or (K_eval, T+1) -> mean over eval scenarios."""
+    arr = np.asarray(mat2d, dtype=float)
+    if arr.ndim != 2:
+        raise ValueError(f"Expected 2D array, got shape {arr.shape}")
+    return arr.mean(axis=0)
+
+def _parse_psddip_label(label: str):
+    """
+    Returns K (int) if label is PSDDiP(K=...), else None.
+    Accepts "PSDDiP (K=10)" or "PSDDiP(K=10)".
+    """
+    s = label.replace(" ", "")
+    if s.startswith("PSDDiP(K=") and s.endswith(")"):
+        return int(s[len("PSDDiP(K="):-1])
+    return None
+
+def _normalize_eval_label(label: str) -> str:
+    """
+    Normalize common variants to saved dict keys.
+    """
+    s = label.strip().lower().replace(" ", "")
+    s = s.replace("->", "→")
+    if "rolling" in s:
+        return "Rolling → SDDiP"
+    if s.startswith("2sp") or s.startswith("2-sp") or "2sp" in s:
+        return "2-SP → SDDiP"
+    if s.startswith("3sp") or s.startswith("3-sp") or "3sp" in s:
+        return "3-SP → SDDiP"
+    return label
+
+
+# ============================================================
+# Plot: single curve helpers (per algorithm)
+# ============================================================
+
+def plot_q_da_single(name, q_da, xlabel="Hour", ylabel="q_DA",
                      ylim=(-1000, 32000), figsize=(7, 4), pause=False):
-    y = np.asarray(q_da).reshape(-1)
+    y = np.asarray(q_da, dtype=float).reshape(-1)
     x = np.arange(len(y))
 
     plt.figure(figsize=figsize)
@@ -36,7 +100,8 @@ def plot_q_da_single(name, q_da, xlabel="Hour", ylabel="Value",
     plt.title(name, fontsize=11)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.ylim(*ylim)
+    if ylim is not None:
+        plt.ylim(*ylim)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
@@ -56,9 +121,9 @@ def plot_q_ID_density_single(
     pause=False,
     overlay_mean=False
 ):
-    q_ID_arr = np.asarray(q_ID_matrix)
+    q_ID_arr = np.asarray(q_ID_matrix, dtype=float)
     if q_ID_arr.ndim != 2:
-        raise ValueError(f"{name}: q_ID must be 2D (K_eval, T). Got shape {q_ID_arr.shape}")
+        raise ValueError(f"{name}: q_ID must be 2D (K_eval, T). Got {q_ID_arr.shape}")
 
     K_eval, T = q_ID_arr.shape
     hours = np.arange(T)
@@ -97,9 +162,9 @@ def plot_S_density_single(
     pause=False,
     overlay_mean=False
 ):
-    S_arr = np.asarray(S_matrix)
+    S_arr = np.asarray(S_matrix, dtype=float)
     if S_arr.ndim != 2:
-        raise ValueError(f"{name}: S must be 2D (K_eval, T+1). Got shape {S_arr.shape}")
+        raise ValueError(f"{name}: S must be 2D (K_eval, T+1). Got {S_arr.shape}")
 
     K_eval, Tp1 = S_arr.shape
     hours = np.arange(Tp1)
@@ -117,7 +182,6 @@ def plot_S_density_single(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
 
-    # default ylim: [0, S_cap] if not provided
     if ylim is None:
         ax.set_ylim(0, S_cap)
     else:
@@ -131,28 +195,162 @@ def plot_S_density_single(
         input("Press Enter for next plot...")
 
 
-# ----------------------------
-# Plot helpers (mean-profit curves)
-# ----------------------------
+# ============================================================
+# Plot: ALL algorithms in ONE figure (overlay)
+#   - q_DA: overlay directly
+#   - q_ID: overlay MEAN curves (recommended)
+#   - S:    overlay MEAN curves (recommended)
+# ============================================================
 
-def mean_over_scenarios(mat_2d):
-    """
-    mat_2d: shape (K_eval, T)
-    returns: shape (T,)
-    """
-    arr = np.asarray(mat_2d, dtype=float)
-    if arr.ndim != 2:
-        raise ValueError(f"Expected 2D (K_eval, T), got shape {arr.shape}")
-    return arr.mean(axis=0)
+def plot_overlay_q_da(sol, price_setting, approx_mode=True, K_pick=30,
+                      ylim=(-1000, 32000), figsize=(9, 4.5)):
+    mode_tag = _mode_key(approx_mode)
+    x = np.arange(24)  # assumes T=24 for q_DA
 
-def _get_series_from_label(sol, label, field):
+    plt.figure(figsize=figsize)
+
+    # baselines
+    for nm in ["Rolling → SDDiP", "2-SP → SDDiP", "3-SP → SDDiP"]:
+        y = np.asarray(sol[nm]["q_da"], dtype=float).reshape(-1)
+        plt.plot(x, y, linewidth=2, label=nm)
+
+    # PSDDiP
+    psd = _get_psddip_block(sol, approx_mode)
+    K_list = list(sol["meta"]["K_list"])
+
+    if K_pick is None:
+        for k_idx, K in enumerate(K_list):
+            y = np.asarray(psd["q_da"][k_idx], dtype=float).reshape(-1)
+            plt.plot(x, y, linewidth=2, label=f"PSDDiP-{mode_tag} (K={K})")
+    else:
+        if K_pick not in K_list:
+            raise ValueError(f"K_pick={K_pick} not in saved K_list={K_list}")
+        k_idx = K_list.index(K_pick)
+        y = np.asarray(psd["q_da"][k_idx], dtype=float).reshape(-1)
+        plt.plot(x, y, linewidth=2, label=f"PSDDiP-{mode_tag} (K={K_pick})")
+
+    plt.title(f"q_DA overlay ({price_setting}, {mode_tag})")
+    plt.xlabel("Hour")
+    plt.ylabel("q_DA")
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_overlay_q_ID_mean(sol, price_setting, approx_mode=True, K_pick=30,
+                           ylim=None, figsize=(9, 4.5)):
+    mode_tag = _mode_key(approx_mode)
+    x = np.arange(24)  # assumes T=24
+
+    plt.figure(figsize=figsize)
+
+    # baselines
+    for nm in ["Rolling → SDDiP", "2-SP → SDDiP", "3-SP → SDDiP"]:
+        y = _mean_curve(sol[nm]["q_ID"])
+        plt.plot(x, y, linewidth=2, label=f"{nm} (mean)")
+
+    # PSDDiP
+    psd = _get_psddip_block(sol, approx_mode)
+    K_list = list(sol["meta"]["K_list"])
+
+    if K_pick is None:
+        for k_idx, K in enumerate(K_list):
+            y = _mean_curve(psd["q_ID"][k_idx])
+            plt.plot(x, y, linewidth=2, label=f"PSDDiP-{mode_tag} (K={K}) mean")
+    else:
+        if K_pick not in K_list:
+            raise ValueError(f"K_pick={K_pick} not in saved K_list={K_list}")
+        k_idx = K_list.index(K_pick)
+        y = _mean_curve(psd["q_ID"][k_idx])
+        plt.plot(x, y, linewidth=2, label=f"PSDDiP-{mode_tag} (K={K_pick}) mean")
+
+    plt.title(f"q_ID mean overlay ({price_setting}, {mode_tag})")
+    plt.xlabel("Hour")
+    plt.ylabel("q_ID (mean over eval scenarios)")
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_overlay_S_mean(sol, price_setting, approx_mode=True, K_pick=30,
+                        S_cap=21022.1, ylim=None, figsize=(9, 4.5)):
+    mode_tag = _mode_key(approx_mode)
+
+    # infer length T+1 from baseline
+    S_arr0 = np.asarray(sol["Rolling → SDDiP"]["S"], dtype=float)
+    if S_arr0.ndim != 2:
+        raise ValueError(f"Baseline Rolling → SDDiP S must be 2D; got {S_arr0.shape}")
+    Tp1 = S_arr0.shape[1]
+    x = np.arange(Tp1)
+
+    plt.figure(figsize=figsize)
+
+    # baselines
+    for nm in ["Rolling → SDDiP", "2-SP → SDDiP", "3-SP → SDDiP"]:
+        y = _mean_curve(sol[nm]["S"])
+        plt.plot(x, y, linewidth=2, label=f"{nm} (mean)")
+
+    # PSDDiP
+    psd = _get_psddip_block(sol, approx_mode)
+    K_list = list(sol["meta"]["K_list"])
+
+    if K_pick is None:
+        for k_idx, K in enumerate(K_list):
+            y = _mean_curve(psd["S"][k_idx])
+            plt.plot(x, y, linewidth=2, label=f"PSDDiP-{mode_tag} (K={K}) mean")
+    else:
+        if K_pick not in K_list:
+            raise ValueError(f"K_pick={K_pick} not in saved K_list={K_list}")
+        k_idx = K_list.index(K_pick)
+        y = _mean_curve(psd["S"][k_idx])
+        plt.plot(x, y, linewidth=2, label=f"PSDDiP-{mode_tag} (K={K_pick}) mean")
+
+    plt.title(f"SoC S mean overlay ({price_setting}, {mode_tag})")
+    plt.xlabel("Hour")
+    plt.ylabel("S (mean over eval scenarios)")
+
+    if ylim is not None:
+        plt.ylim(*ylim)
+    else:
+        plt.ylim(0, S_cap)
+
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_overlays_all(price_setting="sunny", approx_mode=True, K_pick=30,
+                      da_ylim=(-1000, 32000), qid_ylim=None,
+                      S_cap=21022.1, S_ylim=None):
+    """
+    What you asked:
+      - q_DA at once (all algorithms overlaid)
+      - q_ID at once (mean curve over eval scenarios, overlaid)
+      - SoC S at once (mean curve over eval scenarios, overlaid)
+    """
+    sol = load_solutions_lp(price_setting=price_setting)
+    plot_overlay_q_da(sol, price_setting, approx_mode=approx_mode, K_pick=K_pick, ylim=da_ylim)
+    plot_overlay_q_ID_mean(sol, price_setting, approx_mode=approx_mode, K_pick=K_pick, ylim=qid_ylim)
+    plot_overlay_S_mean(sol, price_setting, approx_mode=approx_mode, K_pick=K_pick, S_cap=S_cap, ylim=S_ylim)
+
+
+# ============================================================
+# Profit curve plots (selected labels) with approx_mode
+# ============================================================
+
+def _get_series_from_label(sol, label, field, approx_mode: bool):
     """
     field: "f_P" or "f_Im"
     label:
-      - "Rolling → SDDiP"
-      - "2-SP → SDDiP"
-      - "3-SP → SDDiP"
-      - "PSDDiP (K=10)" or "PSDDiP(K=10)"
+      - baselines: "Rolling → SDDiP", "2-SP → SDDiP", "3-SP → SDDiP"
+      - psddip:    "PSDDiP (K=10)"
     returns: 1D mean series length T
     """
     label_clean = label.replace(" ", "")
@@ -161,38 +359,33 @@ def _get_series_from_label(sol, label, field):
     if label in sol:
         data = sol[label].get(field, None)
         if data is None:
-            raise KeyError(f"{label} has no field '{field}' in saved file.")
-        data_arr = np.asarray(data)
-        if data_arr.ndim == 2:
-            return mean_over_scenarios(data_arr)
-        return data_arr.reshape(-1)
+            raise KeyError(f"{label} has no field '{field}'.")
+        arr = np.asarray(data, dtype=float)
+        return _mean_curve(arr) if arr.ndim == 2 else arr.reshape(-1)
 
-    # PSDDiP by K
+    # PSDDiP by K (mode)
     if label_clean.startswith("PSDDiP(K=") and label_clean.endswith(")"):
-        K_str = label_clean[len("PSDDiP(K="):-1]
-        K = int(K_str)
-
+        K = int(label_clean[len("PSDDiP(K="):-1])
         K_list = sol["meta"]["K_list"]
         if K not in K_list:
             raise ValueError(f"K={K} not found. Available K_list: {K_list}")
-
         k_idx = K_list.index(K)
-        data = sol["PSDDiP"].get(field, None)
-        if data is None:
-            raise KeyError(f"PSDDiP has no field '{field}' in saved file.")
 
-        mat = data[k_idx]  # (K_eval, T)
-        return mean_over_scenarios(mat)
+        psd = _get_psddip_block(sol, approx_mode)
+        data_list = psd.get(field, None)
+        if data_list is None:
+            raise KeyError(f"PSDDiP[{_mode_key(approx_mode)}] has no field '{field}'.")
+        mat = data_list[k_idx]
+        return _mean_curve(mat)
 
-    raise ValueError(
-        f"Unknown label '{label}'. Use baselines like 'Rolling → SDDiP', '2-SP → SDDiP', "
-        f"or 'PSDDiP (K=...)'."
-    )
+    raise ValueError(f"Unknown label '{label}'.")
+
 
 def plot_profit_mean_selected(
     price_setting="normal",
-    field="f_P",                    # "f_P" or "f_Im"
-    labels=None,                    # list of curve labels
+    approx_mode=True,
+    field="f_P",
+    labels=None,
     title=None,
     xlabel="Hour",
     ylabel=None,
@@ -200,13 +393,13 @@ def plot_profit_mean_selected(
     figsize=(9, 4.5)
 ):
     if labels is None or len(labels) == 0:
-        raise ValueError("labels must be a non-empty list.")
+        raise ValueError("labels must be non-empty.")
 
     sol = load_solutions_lp(price_setting=price_setting)
 
     curves = []
     for lab in labels:
-        y = _get_series_from_label(sol, lab, field=field)
+        y = _get_series_from_label(sol, lab, field=field, approx_mode=approx_mode)
         curves.append((lab, np.asarray(y).reshape(-1)))
 
     T = len(curves[0][1])
@@ -218,8 +411,9 @@ def plot_profit_mean_selected(
             raise ValueError(f"Length mismatch for '{lab}': got {len(y)}, expected {T}")
         plt.plot(x, y, linewidth=2, label=lab)
 
+    mode_tag = _mode_key(approx_mode)
     if title is None:
-        title = f"{field} mean over scenarios ({price_setting})"
+        title = f"{field} mean ({price_setting}, {mode_tag})"
     if ylabel is None:
         ylabel = field
 
@@ -236,78 +430,13 @@ def plot_profit_mean_selected(
     plt.show()
 
 
-# ----------------------------
-# Main plotting routine
-# ----------------------------
-
-def plot_all_from_file(price_setting="normal", pause=False,
-                       da_ylim=(-1000, 32000), id_ylim=None, overlay_mean=False):
-    sol = load_solutions_lp(price_setting=price_setting)
-
-    K_list = sol["meta"]["K_list"]
-
-    # You must set SOC capacity here (or load it from elsewhere)
-    # If your Evaluation_LP.py uses S=C etc., just copy the same scalar here:
-    S_cap = 21022.1  # <-- CHANGE if needed (must match your model)
-
-    # Baselines
-    base_names = ["Rolling → SDDiP", "2-SP → SDDiP", "3-SP → SDDiP"]
-
-    # ---- DA ----
-    for nm in base_names:
-        plot_q_da_single(nm, sol[nm]["q_da"], ylim=da_ylim, pause=pause)
-
-    for k_idx, K in enumerate(K_list):
-        plot_q_da_single(f"PSDDiP (K={K})", sol["PSDDiP"]["q_da"][k_idx], ylim=da_ylim, pause=pause)
-
-    # ---- q_ID density ----
-    for nm in base_names:
-        plot_q_ID_density_single(nm, sol[nm]["q_ID"], ylim=id_ylim, pause=pause, overlay_mean=overlay_mean)
-
-    for k_idx, K in enumerate(K_list):
-        plot_q_ID_density_single(
-            f"PSDDiP (K={K})",
-            sol["PSDDiP"]["q_ID"][k_idx],
-            ylim=id_ylim,
-            pause=pause,
-            overlay_mean=overlay_mean
-        )
-
-    # ---- S density ----
-    for nm in base_names:
-        plot_S_density_single(nm, sol[nm]["S"], S_cap=S_cap, pause=pause, overlay_mean=overlay_mean)
-
-    for k_idx, K in enumerate(K_list):
-        plot_S_density_single(
-            f"PSDDiP (K={K})",
-            sol["PSDDiP"]["S"][k_idx],
-            S_cap=S_cap,
-            pause=pause,
-            overlay_mean=overlay_mean
-        )
-
-def _normalize_eval_label(label: str) -> str:
-    """
-    Allow user inputs like:
-      "2SP -> SDDiP" / "2-SP → SDDiP" / "2-SP -> SDDiP"
-    and normalize to the exact dict keys:
-      "Rolling → SDDiP", "2-SP → SDDiP", "3-SP → SDDiP"
-    """
-    s = label.strip().lower().replace(" ", "")
-    s = s.replace("->", "→")  # unify arrow
-
-    if "rolling" in s:
-        return "Rolling → SDDiP"
-    if s.startswith("2sp") or s.startswith("2-sp") or "2sp" in s:
-        return "2-SP → SDDiP"
-    if s.startswith("3sp") or s.startswith("3-sp") or "3sp" in s:
-        return "3-SP → SDDiP"
-
-    # if user already passed exact key
-    return label
+# ============================================================
+# Evaluation vs K plot with approx_mode
+# ============================================================
 
 def plot_evaluation_vs_K(
     price_setting="normal",
+    approx_mode=True,
     baselines=None,
     approx_ks=None,
     title=None,
@@ -319,36 +448,18 @@ def plot_evaluation_vs_K(
     linewidth=1.8,
     legend=True
 ):
-    """
-    1) Plot selected baseline evaluations as horizontal lines with fixed colors:
-       - baseline #1: red
-       - baseline #2: blue
-       - baseline #3: green
-    2) Plot PSDDiP evaluations vs K in BLACK.
-    3) X-axis uses EVEN SPACING for chosen K ticks (categorical positions),
-       while tick labels show actual K values (e.g., 1,3,6,10,15,30).
-    4) Y-axis range fixed to [0, 8e6].
-
-    baselines: list of baseline names, e.g. ["2SP -> SDDiP", "3SP -> SDDiP"]
-    approx_ks: list of K's to include. If None, include all in file's K_list.
-              If you want even spacing including 30, pass approx_ks=[1,3,6,10,15,30].
-    """
     sol = load_solutions_lp(price_setting=price_setting)
+    mode_tag = _mode_key(approx_mode)
 
-    # --- PSDDiP curve data ---
+    psd = _get_psddip_block(sol, approx_mode)
     K_list_all = list(sol["meta"]["K_list"])
-    eval_p_all = list(sol["PSDDiP"]["eval"])
+    eval_p_all = list(psd["eval"])
 
-    if len(K_list_all) != len(eval_p_all):
-        raise ValueError(f"Mismatch: len(K_list)={len(K_list_all)} vs len(eval_p)={len(eval_p_all)}")
-
-    # choose which K's to show
     if approx_ks is None:
         K_show = K_list_all
     else:
         K_show = list(approx_ks)
 
-    # pull evals in the same order as K_show
     eval_show = []
     for K in K_show:
         if K not in K_list_all:
@@ -356,74 +467,43 @@ def plot_evaluation_vs_K(
         idx = K_list_all.index(K)
         eval_show.append(eval_p_all[idx])
 
-    # EVEN-SPACED x positions (categorical)
     x_pos = np.arange(len(K_show))
-
-    # --- Plot ---
     plt.figure(figsize=figsize)
 
-    # Fixed baseline colors by input order
     baseline_colors = ["red", "blue", "green"]
-
     if baselines is None:
         baselines = []
 
-    for i, b in enumerate(baselines[:3]):  # support up to 3 colored baselines
+    for i, b in enumerate(baselines[:3]):
         key = _normalize_eval_label(b)
         if key not in sol:
-            raise KeyError(
-                f"Baseline '{b}' normalized to '{key}', but not found in file. "
-                f"Available baselines: {[k for k in sol.keys() if '→' in k]}"
-            )
+            raise KeyError(f"Baseline '{b}' -> '{key}' not found.")
         yb = sol[key].get("eval", None)
         if yb is None:
-            raise KeyError(f"Baseline '{key}' exists but has no 'eval' field in saved file.")
+            raise KeyError(f"Baseline '{key}' has no 'eval'.")
+        plt.axhline(y=yb, linewidth=2.2, color=baseline_colors[i], label=f"{key}")
 
-        color = baseline_colors[i]
-        plt.axhline(
-            y=yb,
-            linewidth=2.2,
-            linestyle="-",
-            color=color,
-            label=f"{key} (eval={yb:.4g})"
-        )
-
-    # PSDDiP curve (BLACK)
     plt.plot(
         x_pos,
         eval_show,
         color="black",
         linewidth=linewidth,
         marker=(marker if show_points else None),
-        label="PSDDiP"
+        label=f"PSDDiP-{mode_tag}"
     )
 
-    # Title / labels
     if title is None:
-        base_txt = ", ".join([_normalize_eval_label(b) for b in baselines]) if baselines else "None"
-        title = f"Evaluation vs K ({price_setting}) | baselines: {base_txt}"
+        title = f"Evaluation vs K ({price_setting}, {mode_tag})"
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
 
-    # X ticks: even spacing but show actual K values
     plt.xticks(x_pos, [str(k) for k in K_show])
-
-    # Y range: 0 ~ 8e6
-    all_vals = []
-
-    # PSDDiP values
-    all_vals.extend(eval_show)
-
-    # Baseline values
+    all_vals = list(eval_show)
     for b in baselines:
-        key = _normalize_eval_label(b)
-        all_vals.append(sol[key]["eval"])
-
-    y_min = min(all_vals)
-    y_max = max(all_vals)
-
-    pad = 0.05 * (y_max - y_min)  # 5% padding
+        all_vals.append(sol[_normalize_eval_label(b)]["eval"])
+    y_min, y_max = min(all_vals), max(all_vals)
+    pad = 0.05 * (y_max - y_min) if y_max > y_min else 1.0
     plt.ylim(y_min - pad, y_max + pad)
 
     plt.grid(True, alpha=0.3)
@@ -433,35 +513,21 @@ def plot_evaluation_vs_K(
     plt.show()
 
 
-# 2. Value printing helpers
+# ============================================================
+# Printing: evaluation values with approx_mode
+# ============================================================
 
-def _parse_psddip_label(label: str):
-    """
-    Returns K (int) if label is PSDDiP (K=...), else None.
-    Accepts "PSDDiP (K=10)" or "PSDDiP(K=10)" with spaces.
-    """
-    s = label.replace(" ", "")
-    if s.startswith("PSDDiP(K=") and s.endswith(")"):
-        return int(s[len("PSDDiP(K="):-1])
-    return None
-
-def get_eval_values(sol, baselines, approx_ks=None):
-    """
-    Returns:
-      baseline_eval: list of (baseline_key, eval_value)
-      psddip_eval:   list of (K, eval_value)
-    """
-    # baselines
+def get_eval_values(sol, baselines, approx_mode=True, approx_ks=None):
     baseline_eval = []
     for b in (baselines or []):
         key = _normalize_eval_label(b)
         if key not in sol:
-            raise KeyError(f"Baseline '{b}' -> '{key}' not found in saved file.")
+            raise KeyError(f"Baseline '{b}' -> '{key}' not found.")
         baseline_eval.append((key, float(sol[key]["eval"])))
 
-    # PSDDiP
+    psd = _get_psddip_block(sol, approx_mode)
     K_all = list(sol["meta"]["K_list"])
-    eval_all = list(sol["PSDDiP"]["eval"])
+    eval_all = list(psd["eval"])
 
     if approx_ks is None:
         K_show = K_all
@@ -477,72 +543,14 @@ def get_eval_values(sol, baselines, approx_ks=None):
 
     return baseline_eval, psddip_eval
 
-def get_solution_means(sol, labels, fields=("q_ID", "S", "f_P", "f_Im")):
-    """
-    For each label, compute mean-over-scenarios curve for requested fields
-    (only for 2D fields). For q_da (1D) just return directly if requested.
 
-    Returns dict:
-      out[label][field] = 1D numpy array
-    """
-    out = {}
-
-    for label in labels:
-        out[label] = {}
-        K = _parse_psddip_label(label)
-
-        # ----- Baselines -----
-        if (K is None) and (label in sol):
-            for field in fields:
-                data = sol[label].get(field, None)
-                if data is None:
-                    continue
-                arr = np.asarray(data, dtype=float)
-
-                # q_ID, f_P, f_Im expected (K_eval, T), S expected (K_eval, T+1)
-                if arr.ndim == 2:
-                    out[label][field] = arr.mean(axis=0)
-                else:
-                    out[label][field] = arr.reshape(-1)
-
-            # optional q_da too (1D)
-            if "q_da" in sol[label]:
-                out[label]["q_da"] = np.asarray(sol[label]["q_da"], dtype=float).reshape(-1)
-
-            continue
-
-        # ----- PSDDiP by K -----
-        if K is not None:
-            K_list = sol["meta"]["K_list"]
-            if K not in K_list:
-                raise ValueError(f"{label}: K={K} not found in file. Available: {K_list}")
-            k_idx = K_list.index(K)
-
-            for field in fields:
-                data_list = sol["PSDDiP"].get(field, None)
-                if data_list is None:
-                    continue
-                arr = np.asarray(data_list[k_idx], dtype=float)
-                if arr.ndim == 2:
-                    out[label][field] = arr.mean(axis=0)
-                else:
-                    out[label][field] = arr.reshape(-1)
-
-            # optional q_da (1D)
-            out[label]["q_da"] = np.asarray(sol["PSDDiP"]["q_da"][k_idx], dtype=float).reshape(-1)
-
-            continue
-
-        raise ValueError(f"Unknown label '{label}' (not baseline key and not PSDDiP(K=...)).")
-
-    return out
-
-def print_eval_table(price_setting, baselines, approx_ks=None):
+def print_eval_table(price_setting, baselines, approx_mode=True, approx_ks=None):
     sol = load_solutions_lp(price_setting=price_setting)
-    baseline_eval, psddip_eval = get_eval_values(sol, baselines, approx_ks=approx_ks)
+    mode_tag = _mode_key(approx_mode)
+    baseline_eval, psddip_eval = get_eval_values(sol, baselines, approx_mode=approx_mode, approx_ks=approx_ks)
 
     print("\n==============================")
-    print(f"Evaluation values | price={price_setting}")
+    print(f"Evaluation values | price={price_setting} | mode={mode_tag}")
     print("==============================")
 
     if baseline_eval:
@@ -550,123 +558,76 @@ def print_eval_table(price_setting, baselines, approx_ks=None):
         for name, val in baseline_eval:
             print(f"{name:18s} : {val:.6f}")
 
-    print("\n[PSDDiP]")
+    print(f"\n[PSDDiP-{mode_tag}]")
     for K, val in psddip_eval:
         print(f"K={K:<3d} : {val:.6f}")
 
-def print_solution_means(price_setting, labels, fields=("q_da","q_ID","S","f_P","f_Im"), decimals=4):
-    sol = load_solutions_lp(price_setting=price_setting)
-    means = get_solution_means(sol, labels, fields=tuple(f for f in fields if f != "q_da"))
 
-    print("\n=======================================")
-    print(f"Mean solution curves | price={price_setting}")
-    print("=======================================")
-    print("(Each curve printed as a Python list for copy/paste.)")
-
-    for label in labels:
-        print("\n---------------------------------------")
-        print(f"[{label}]")
-
-        # q_da (1D)
-        if "q_da" in fields:
-            if _parse_psddip_label(label) is None:
-                q_da = np.asarray(sol[label]["q_da"], dtype=float).reshape(-1)
-            else:
-                K = _parse_psddip_label(label)
-                k_idx = sol["meta"]["K_list"].index(K)
-                q_da = np.asarray(sol["PSDDiP"]["q_da"][k_idx], dtype=float).reshape(-1)
-
-            print("q_da =")
-            print(np.round(q_da, decimals).tolist())
-
-        # mean-over-scenarios fields
-        for field in fields:
-            if field == "q_da":
-                continue
-            if field in means[label]:
-                print(f"\n{field} mean =")
-                print(np.round(means[label][field], decimals).tolist())
-
+# ============================================================
+# Main
+# ============================================================
 
 if __name__ == "__main__":
-    
-    
-    price_setting = "sunny"  # change as needed
-    
-    # ----------------------------
-    # 1. Plotting solutions
-    # ----------------------------
-    
-    """plot_all_from_file(
-        price_setting=price_setting,
-        pause=False,
-        da_ylim=(-1000, 32000),
-        id_ylim=None,
-        overlay_mean=False
-    )"""
 
+    price_setting = "sunny"     # change as needed
+    approx_mode = False          # True=approx, False=exact
+    K_pick = 50                 # PSDDiP curve to compare. Use None to plot ALL K curves.
+
+    # ----------------------------
+    # 1) Overlay plots you asked for
+    #    q_DA at once, q_ID at once, SoC at once
+    # ----------------------------
+    plot_overlays_all(
+        price_setting=price_setting,
+        approx_mode=approx_mode,
+        K_pick=K_pick,
+        da_ylim=(-1000, 32000),
+        qid_ylim=None,
+        S_cap=21022.1,
+        S_ylim=None
+    )
+
+    # ----------------------------
+    # 2) Profit mean curve comparisons (selected labels)
+    # ----------------------------
     SELECTED = [
-        #"Rolling → SDDiP",
         "2-SP → SDDiP",
         "3-SP → SDDiP",
-        #"PSDDiP (K=1)",
-        "PSDDiP (K=30)",
+        f"PSDDiP (K={K_pick})",
     ]
 
-
-    # ----------------------------
-    # 2. Plotting profit mean curves
-    # ----------------------------
-
-    # 1) Mean f_P curves (power profit)
     plot_profit_mean_selected(
         price_setting=price_setting,
+        approx_mode=approx_mode,
         field="f_P",
         labels=SELECTED,
-        title=f"Mean f_P comparison ({price_setting})"
+        title=f"Mean f_P comparison ({price_setting}, {_mode_key(approx_mode)})"
     )
 
-    # 2) Mean f_Im curves (imbalance profit)  <-- your "f_ID"
     plot_profit_mean_selected(
         price_setting=price_setting,
+        approx_mode=approx_mode,
         field="f_Im",
         labels=SELECTED,
-        title=f"Mean f_Im comparison ({price_setting})"
+        title=f"Mean f_Im comparison ({price_setting}, {_mode_key(approx_mode)})"
     )
-    
-    # Example:
-    #  - Baselines: 2SP and 3SP as horizontal lines
-    #  - PSDDiP: all K in the saved file (K_list)
-    
+
+    # ----------------------------
+    # 3) Evaluation vs K
+    # ----------------------------
     plot_evaluation_vs_K(
         price_setting=price_setting,
-        baselines=["Rolling → SDDiP", "2SP → SDDiP", "3SP → SDDiP"],   # red, blue
-        approx_ks=K_list,              # even spacing with these labels
+        approx_mode=approx_mode,
+        baselines=["Rolling → SDDiP", "2SP → SDDiP", "3SP → SDDiP"],
+        approx_ks=None
     )
-    
-    # ----------------------------
-    # 3. Printing actual values
-    # ----------------------------
 
-    # (A) Evaluation values
+    # ----------------------------
+    # 4) Print evaluation table
+    # ----------------------------
     print_eval_table(
         price_setting=price_setting,
+        approx_mode=approx_mode,
         baselines=["Rolling → SDDiP", "2SP → SDDiP", "3SP → SDDiP"],
-        approx_ks=K_list
+        approx_ks=None
     )
-
-    # (B) Mean curves (copy/paste)
-    SELECTED = [
-        "Rolling → SDDiP",
-        "2-SP → SDDiP",
-        "3-SP → SDDiP",
-        "PSDDiP (K=1)",
-        "PSDDiP (K=30)",
-    ]
-    """
-    print_solution_means(
-        price_setting=price_setting,
-        labels=SELECTED,
-        fields=("q_da","q_ID","S","f_P","f_Im"),
-        decimals=4
-    )"""

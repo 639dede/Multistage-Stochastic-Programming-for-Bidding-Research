@@ -221,7 +221,7 @@ Q_c_f_X_values = np.array([f_X(x) for x in Q_c_x_values])
 
 def sample_curtailment_error(p):
     if np.random.rand() < p:
-        return np.random.uniform(-0.5, 0.5)
+        return np.random.uniform(-1.0, 0.0)
     return 0.0
 
 
@@ -533,7 +533,6 @@ P_rt_daily = real_time_prices_daily[61:92]
 
 # Generate Scenario
 
-
 class scenario():
     
     def __init__(self, N_t, E_0):
@@ -579,11 +578,17 @@ class scenario():
                 print(f"Error sampling P_rt for t={t}: {e}")        
             
             ## sample one delta_Q_c
-            if P_da < 0 and P_rt[0] < -P_r + 40:
+            if P_da < 0 and P_rt[0] < -P_r + 20:
+                delta_Q_c = sample_curtailment_error(1.0)
+                
+            elif P_da < 0 and P_rt[0] >= -P_r + 20 and P_rt[0] < -P_r + 40:
                 delta_Q_c = sample_curtailment_error(0.8)
             
-            elif P_da < 0 and P_rt[0] >= -P_r + 40 and P_rt[0] < 0:
-                delta_Q_c = sample_curtailment_error(0.5)
+            elif P_da < 0 and P_rt[0] >= -P_r + 40 and P_rt[0] < -P_r + 60:
+                delta_Q_c = sample_curtailment_error(0.6)
+            
+            elif P_da < 0 and P_rt[0] >= -P_r + 60 and P_rt[0] < -P_r + 80:
+                delta_Q_c = sample_curtailment_error(0.4)
             
             elif P_da < 0 and P_rt[0] >= 0 and P_rt[0] < 20:
                 delta_Q_c = sample_curtailment_error(0.2)
@@ -613,10 +618,9 @@ class scenario():
         return scenario
 
 
+evaluation_num = 50
 
-evaluation_num = 30
-
-K_list = [1, 3, 6, 10, 15, evaluation_num]
+K_list = [1, 5, 10, 20, 30, evaluation_num]
 
 # Save Energy forecast csv file
 

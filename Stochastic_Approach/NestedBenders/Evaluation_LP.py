@@ -6,6 +6,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import pyomo.environ as pyo
+from pyomo.opt import TerminationCondition, SolverStatus
 import random
 import time
 import math
@@ -35,6 +36,20 @@ assert SOLVER.available(), f"Solver {solver} is available."
 
 
 price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
+
+from NestedBenders.PSDDiP_LP import (
+    fw_da,
+    fw_rt_init,
+    fw_rt,
+    fw_rt_last,
+    rolling_da,
+    rolling_rt_init,
+    rolling_rt,
+    rolling_rt_last,
+    two_stage_da,
+    three_stage_da,
+    K_list,
+    )
 
 # 1. Parameters & Computational settings
 
@@ -79,8 +94,6 @@ S_max = 0.9*S
 
 P_r = 80
 P_max = 200
-
-K_list = [1, 3, 6, 10, 15, 30]
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
@@ -260,13 +273,19 @@ scenarios_for_SP = np.load(
 
 PSI_DA_DIR = BASE_DIR / "psi_DA_LP" / price_setting
 
-psi_DA_list = []
+psi_DA_exact_list = []
+psi_DA_approx_list = []
 
 for K in K_list:
-    psi_DA_path = PSI_DA_DIR / f"psi_DA_{K}.npy"
-    if not psi_DA_path.exists():
-        raise FileNotFoundError(f"Missing psi_DA file: {psi_DA_path}")
-    psi_DA_list.append(np.load(psi_DA_path, allow_pickle=True).tolist())
+    psi_DA_exact_path = PSI_DA_DIR / 'exact' / f"psi_DA_{K}.npy"
+    if not psi_DA_exact_path.exists():
+        raise FileNotFoundError(f"Missing psi_DA_exact file: {psi_DA_exact_path}")
+    psi_DA_exact_list.append(np.load(psi_DA_exact_path, allow_pickle=True).tolist())
+    
+    psi_DA_approx_path = PSI_DA_DIR / 'approx' / f"psi_DA_{K}.npy"
+    if not psi_DA_approx_path.exists():
+        raise FileNotFoundError(f"Missing psi_DA_approx file: {psi_DA_approx_path}")
+    psi_DA_approx_list.append(np.load(psi_DA_approx_path, allow_pickle=True).tolist())
 
 
 ## 3. Load ECTG functions for ID stages
@@ -284,93 +303,168 @@ psi_ID = state["psi_ID"]        # this is the list you saved as model.psi
 
 ## 4. Evaluate
 
-from NestedBenders.PSDDiP_LP import (
-    fw_da,
-    fw_rt_init,
-    fw_rt,
-    fw_rt_last,
-    rolling_da,
-    rolling_rt_init,
-    rolling_rt,
-    rolling_rt_last,
-    two_stage_da,
-    three_stage_da
-    )
-
-
 # Evaluation
 
+_BAD_TC = {
+    TerminationCondition.infeasible,
+    TerminationCondition.infeasibleOrUnbounded,
+    TerminationCondition.unbounded,
+    TerminationCondition.noSolution,
+    TerminationCondition.solverFailure,
+    TerminationCondition.internalSolverError,
+    TerminationCondition.error,
+}
+
+_GOOD_TC = {
+    TerminationCondition.optimal,
+    TerminationCondition.locallyOptimal,
+    TerminationCondition.feasible,
+    TerminationCondition.maxTimeLimit,   # only if a feasible incumbent exists (we will probe)
+    TerminationCondition.maxIterations,
+}
+
+def _has_loaded_values(model_obj) -> bool:
+    """
+    Probe whether at least some primal values exist.
+    The most reliable probe is to evaluate the objective expression.
+    If it triggers 'uninitialized', we treat as failure.
+    """
+    try:
+        obj = model_obj.objective
+        _ = pyo.value(obj)  # will raise if any referenced var has no value
+        return True
+    except Exception:
+        return False
+
+def solve_safely(model_obj, *, tee=False):
+    """
+    Returns (ok: bool, info: solver results or exception or string).
+    ok=True means:
+      - solver status/termination look acceptable, AND
+      - we can evaluate objective (values exist)
+    """
+    try:
+        results = SOLVER.solve(model_obj, tee=tee)
+
+        st = getattr(results.solver, "status", None)
+        tc = getattr(results.solver, "termination_condition", None)
+
+        # hard reject bad statuses
+        if st not in (SolverStatus.ok, SolverStatus.warning):
+            return False, f"bad solver status: {st}"
+
+        # hard reject bad termination conditions
+        if tc in _BAD_TC:
+            return False, f"bad termination condition: {tc}"
+
+        # accept only known good-ish TCs
+        if tc not in _GOOD_TC:
+            return False, f"unknown termination condition: {tc}"
+
+        # crucial: must actually have variable values loaded
+        if not _has_loaded_values(model_obj):
+            return False, f"no primal values loaded (tc={tc}, status={st})"
+
+        return True, results
+
+    except Exception as e:
+        return False, e
 
 def evaluation_rolling_rolling(scenarios):
     
     da_subp = rolling_da(exp_P_da, exp_P_rt_glob)
-    
+
     da_state = da_subp.get_state_solutions()
-                
     q_da = da_state[0]
-                        
+
     f = []
-    
+
     f_DA = [0]*T
     f_P  = [0]*T
     f_E  = [0]*T
     f_Im = [0]*T
-    
+
     for n, scenarios_n in enumerate(scenarios):
-                    
-        P_da = P_da_eval[n]  
-                    
+
+        P_da = P_da_eval[n]
         exp_P_rt = exp_P_rt_given_P_da(n, Scenario_tree_eval)
-                    
+
+        # ---- rt_init safely ----
         rt_init_subp = rolling_rt_init(da_state, P_da, exp_P_rt)
-        rt_init_state = rt_init_subp.get_state_solutions()       
-        
+
+        ok_init, res_init = solve_safely(rt_init_subp)
+        if not ok_init:
+            # If rt_init fails, ALL scenario paths under this n are invalid -> append 0 for each path
+            for _ in scenarios_n:
+                f.append(0.0)
+            #print(f"[WARN] rolling_rt_init failed at n={n}. Added 0 for {len(scenarios_n)} paths.")
+            continue
+
+        rt_init_state = rt_init_subp.get_state_solutions()
+
+        # DA profit collection (only if init solved)
         f_DA_list = rt_init_subp.get_DA_profit()
-        
         for i in range(T):
             f_DA[i] += f_DA_list[i]/K_eval
-        
-        fcn_value = rt_init_subp.get_settlement_fcn_value()
-        
-        for scenario in scenarios_n:
-            
+
+        fcn_value_init = rt_init_subp.get_settlement_fcn_value()
+
+        # ---- loop each scenario path ----
+        for s_idx, scenario in enumerate(scenarios_n):
+
             state = rt_init_state
-            
-            f_scenario = fcn_value
-            
-            for t in range(T - 1): ## t = 0, ..., T-2
-                                    
+            f_scenario = fcn_value_init
+            failed_path = False
+
+            for t in range(T - 1):
                 rt_subp = rolling_rt(t, state, P_da, exp_P_rt, scenario[t])
-                
-                f_P[t] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-                f_Im[t] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
-                
+
+                ok_rt, _ = solve_safely(rt_subp)
+                if not ok_rt:
+                    failed_path = True
+                    break
+
+                # PROFIT READS MUST ALSO BE SAFE
+                try:
+                    f_P[t]  += rt_subp.get_P_profit()  /(K_eval*evaluation_num)
+                    f_Im[t] += rt_subp.get_Im_profit() /(K_eval*evaluation_num)
+                except Exception:
+                    failed_path = True
+                    break
+
                 state = rt_subp.get_state_solutions()
-                
                 f_scenario += rt_subp.get_settlement_fcn_value()
-            
-            ## t = T-1
-            
+
+            if failed_path:
+                f.append(0.0)
+                continue
+
+            # last stage
             rt_last_subp = rolling_rt_last(state, P_da, scenario[T-1])
 
-            f_P[T-1] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
-            f_Im[T-1] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+            ok_last, _ = solve_safely(rt_last_subp)
+            if not ok_last:
+                f.append(0.0)
+                continue
+
+            try:
+                f_P[T-1]  += rt_last_subp.get_P_profit()  /(K_eval*evaluation_num)
+                f_Im[T-1] += rt_last_subp.get_Im_profit() /(K_eval*evaluation_num)
+            except Exception:
+                f.append(0.0)
+                continue
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
-                        
             f.append(f_scenario)
-        
-    mu_hat = np.mean(f)
-    
-    sigma_hat = np.std(f, ddof=1)  
 
-    z_alpha_half = 1.96  
-    
-    eval = mu_hat 
+    mu_hat = np.mean(f) if len(f) > 0 else 0.0
+    sigma_hat = np.std(f, ddof=1) if len(f) > 1 else 0.0
+
+    eval = mu_hat
 
     print(f"\nRolling Horizon -> Rolling Horizon for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
-    
+
     return q_da, eval
 
 
@@ -550,11 +644,19 @@ def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
     return q_da, q_ID_list, S_list, f_P, f_Im, eval
     
         
-def evaluation_psddip_sddip(K, scenarios):
+def evaluation_psddip_sddip(K, scenarios, approx_mode):
     
     k_idx = K_list.index(K)
-        
-    da_subp = fw_da(Reduced_Probs[k_idx], psi_DA_list[k_idx])
+    
+    if approx_mode:
+        psi_DA_list = psi_DA_approx_list
+        DA_probs = Probs_eval
+    
+    else:
+        psi_DA_list = psi_DA_exact_list
+        DA_probs = Reduced_Probs[k_idx]
+
+    da_subp = fw_da(DA_probs, psi_DA_list[k_idx])
     da_state = da_subp.get_state_solutions()
     
     q_da = da_state[0]
@@ -644,30 +746,51 @@ evaluation_rolling_rolling(scenarios)
 q_da_r, q_ID_r, S_r, f_P_r, f_Im_r, eval_r = evaluation_rolling_sddip(scenarios)
 q_da_s2, q_ID_s2, S_s2, f_P_s2, f_Im_s2, eval_s2 = evaluation_SP_sddip(2, scenarios, scenarios_for_SP)  
 q_da_s3, q_ID_s3, S_s3, f_P_s3, f_Im_s3, eval_s3 = evaluation_SP_sddip(3, scenarios, scenarios_for_SP)
-q_da_p = []
-q_ID_p = []
-S_p    = []
-f_P_p  = []
-f_E_p  = []
-f_Im_p = []
-eval_p = []
+q_da_p_approx = []
+q_ID_p_approx = []
+S_p_approx    = []
+f_P_p_approx  = []
+f_E_p_approx  = []
+f_Im_p_approx = []
+eval_p_approx = []
+q_da_p_exact = []
+q_ID_p_exact = []
+S_p_exact    = []
+f_P_p_exact  = []
+f_E_p_exact  = []
+f_Im_p_exact = []
+eval_p_exact = []
 
 
 for k_idx, K in enumerate(K_list):
 
     q_da, q_ID, S_sol, f_P, f_Im, eval = evaluation_psddip_sddip(
-        K, scenarios
+        K, scenarios, approx_mode=True
     )
 
-    q_da_p.append(q_da)
-    q_ID_p.append(q_ID)
-    S_p.append(S_sol)
-    f_P_p.append(f_P)
-    f_Im_p.append(f_Im)
-    eval_p.append(eval)
+    q_da_p_approx.append(q_da)
+    q_ID_p_approx.append(q_ID)
+    S_p_approx.append(S_sol)
+    f_P_p_approx.append(f_P)
+    f_Im_p_approx.append(f_Im)
+    eval_p_approx.append(eval)
+
+for k_idx, K in enumerate(K_list):
+
+    q_da, q_ID, S_sol, f_P, f_Im, eval = evaluation_psddip_sddip(
+        K, scenarios, approx_mode=False
+    )
+
+    q_da_p_exact.append(q_da)
+    q_ID_p_exact.append(q_ID)
+    S_p_exact.append(S_sol)
+    f_P_p_exact.append(f_P)
+    f_Im_p_exact.append(f_Im)
+    eval_p_exact.append(eval)
 
 
 ## 5. Save solutions
+
 
 def save_solutions_lp(
     price_setting,
@@ -675,7 +798,8 @@ def save_solutions_lp(
     q_da_r, q_ID_r, S_r, f_P_r, f_Im_r, eval_r,
     q_da_s2, q_ID_s2, S_s2, f_P_s2, f_Im_s2, eval_s2,
     q_da_s3, q_ID_s3, S_s3, f_P_s3, f_Im_s3, eval_s3,
-    q_da_p, q_ID_p, S_p, f_P_p, f_Im_p, eval_p,
+    q_da_p_approx, q_ID_p_approx, S_p_approx, f_P_p_approx, f_Im_p_approx, eval_p_approx,
+    q_da_p_exact, q_ID_p_exact, S_p_exact, f_P_p_exact, f_Im_p_exact, eval_p_exact,
     filename=None
 ):
     """
@@ -700,14 +824,24 @@ def save_solutions_lp(
         "2-SP → SDDiP":    {"q_da": q_da_s2, "q_ID": q_ID_s2, "S": S_s2, "f_P": f_P_s2, "f_Im": f_Im_s2, "eval": eval_s2},
         "3-SP → SDDiP":    {"q_da": q_da_s3, "q_ID": q_ID_s3, "S": S_s3, "f_P": f_P_s3, "f_Im": f_Im_s3, "eval": eval_s3},
 
-        # PSDDiP (LP) by K
+        # PSDDiP (LP) by K (both approx + exact)
         "PSDDiP": {
-            "q_da": q_da_p,   # list over K: each is length-24
-            "q_ID": q_ID_p,   # list over K: each is (K_eval,T)
-            "S":    S_p,      # list over K: each is (K_eval,T+1)
-            "f_P":  f_P_p,
-            "f_Im": f_Im_p,
-            "eval": eval_p,
+            "approx": {
+                "q_da": q_da_p_approx,
+                "q_ID": q_ID_p_approx,
+                "S":    S_p_approx,
+                "f_P":  f_P_p_approx,
+                "f_Im": f_Im_p_approx,
+                "eval": eval_p_approx,
+            },
+            "exact": {
+                "q_da": q_da_p_exact,
+                "q_ID": q_ID_p_exact,
+                "S":    S_p_exact,
+                "f_P":  f_P_p_exact,
+                "f_Im": f_Im_p_exact,
+                "eval": eval_p_exact,
+            },
         },
     }
 
@@ -715,14 +849,21 @@ def save_solutions_lp(
     np.save(save_path, payload, allow_pickle=True)
     print(f"✅ Saved LP solutions to: {save_path}")
 
-
 # ---- call it once after evaluation is finished ----
 
 save_solutions_lp(
     price_setting=price_setting,
     K_list=K_list,
+
     q_da_r=q_da_r, q_ID_r=q_ID_r, S_r=S_r, f_P_r=f_P_r, f_Im_r=f_Im_r, eval_r=eval_r,
     q_da_s2=q_da_s2, q_ID_s2=q_ID_s2, S_s2=S_s2, f_P_s2=f_P_s2, f_Im_s2=f_Im_s2, eval_s2=eval_s2,
     q_da_s3=q_da_s3, q_ID_s3=q_ID_s3, S_s3=S_s3, f_P_s3=f_P_s3, f_Im_s3=f_Im_s3, eval_s3=eval_s3,
-    q_da_p=q_da_p, q_ID_p=q_ID_p, S_p=S_p, f_P_p=f_P_p, f_Im_p=f_Im_p, eval_p=eval_p
+
+    q_da_p_approx=q_da_p_approx, q_ID_p_approx=q_ID_p_approx, S_p_approx=S_p_approx,
+    f_P_p_approx=f_P_p_approx, f_Im_p_approx=f_Im_p_approx, eval_p_approx=eval_p_approx,
+
+    q_da_p_exact=q_da_p_exact, q_ID_p_exact=q_ID_p_exact, S_p_exact=S_p_exact,
+    f_P_p_exact=f_P_p_exact, f_Im_p_exact=f_Im_p_exact, eval_p_exact=eval_p_exact,
+
+    filename=f"{price_setting}_solutions.npy"
 )
