@@ -38,7 +38,7 @@ assert SOLVER.available(), f"Solver {solver} is available."
 inspect = False
 
 
-price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'cloudy'  # 'cloudy', 'normal', 'sunny'
 
 # 1. Parameters & Computational settings
 
@@ -2604,6 +2604,902 @@ class two_stage_da(pyo.ConcreteModel):
         
         return State_var    
 
+class two_stage_rt_init(pyo.ConcreteModel):
+       
+    def __init__(self, da_state, P_da, ID_params, exp_P_rt):
+        
+        super().__init__()
+
+        self.solved = False
+        
+        self.q_da_prev = da_state[0]
+        
+        self.P_da = P_da
+        self.ID_params = ID_params
+        self.exp_P_rt = exp_P_rt
+        
+        self.N_t = len(self.ID_params[0])
+        
+        self.delta_E_sample = [0 for _ in range(self.N_t)]
+        self.P_rt_sample = [0 for _ in range(self.N_t)]
+        self.delta_c_sample = [0 for _ in range(self.N_t)]
+        
+        for j, ID_param in enumerate(self.ID_params):
+            
+            self.delta_E_sample[j] = ID_param[j][0]
+            self.P_rt_sample[j] = ID_param[j][1]
+            self.delta_c_sample[j] = ID_param[j][2]
+        
+        self.T = T
+    
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.IDNODE = pyo.RangeSet(0, self.N_t-1)
+        
+        model.TIME = pyo.RangeSet(0, T-1)
+        model.BIDTIME = pyo.RangeSet(1, T-1)
+        model.TIME_ESS = pyo.RangeSet(-1, T-1)
+
+        # Vars
+
+        # Intraday bidding variables
+
+        model.q_rt = pyo.Var(model.IDNODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        
+        # Intraday operation variables
+        
+        model.S = pyo.Var(
+            model.IDNODE, model.TIME_ESS, bounds = (S_min, S_max), domain = pyo.NonNegativeReals
+        )
+        
+        model.g = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(model.IDNODE, model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(model.IDNODE, model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+
+        ## Imbalance Penerty Vars
+        
+        model.phi_over = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.phi_under = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        
+        ## settlement fcn Vars
+        
+        model.f_DA = pyo.Var(model.TIME, domain = pyo.Reals)
+        model.f_RT = pyo.Var(model.IDNODE, model.TIME, domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## RT bidding & market rules
+        
+        def rt_bidding_amount_rule_1(model, j, t):
+            return self.q_da_prev[t] + model.q_rt[j, t] <= E_0_partial[t] + B
+        
+        def rt_bidding_amount_rule_2(model, j, t):
+            return self.q_da_prev[t] + model.q_rt[j, t] >= 0
+        
+        ## Operations rules
+        
+        def dispatch_init_rule(model, j):
+            return model.Q_c[j, 0] == (self.q_da_prev[0] + model.q_rt[j, 0])*(1 + self.delta_c_sample[j])
+                
+        def dispatch_rule(model, j, t):
+            return model.Q_c[j, t] == self.q_da_prev[t] + model.q_rt[j, t]
+        
+        def SOC_init_rule(model, j):
+            return model.S[j, -1] == 0.5*S
+        
+        def SOC_last_rule(model, j):
+            return model.S[j, self.T-1] == 0.5*S
+        
+        def SOC_balance_rule(model, j, t):
+            return model.S[j, t] == model.S[j, t-1] + v*model.c[j, t] - (1/v)*model.d[j, t]
+        
+        def generation_rule(model, j, t):
+            return model.g[j, t] <= E_0_partial[t]
+        
+        def charge_rule(model, j, t):
+            return model.c[j, t] <= model.g[j, t]
+        
+        def electricity_supply_rule(model, j, t):
+            return model.u[j, t] == model.g[j, t] + model.d[j, t] - model.c[j, t]
+
+        ## Imbalance Penalty
+        
+        def imbalance_over_rule(model, j, t):
+            return model.u[j, t] - model.Q_c[j, t] <= model.phi_over[j, t]
+        
+        def imbalance_under_rule(model, j, t):
+            return model.Q_c[j, t] - model.u[j, t] <= model.phi_under[j, t]
+        
+        ## settlement fcn
+        
+        def da_settlement_fcn_rule(model, t):
+            return model.f_DA[t] == self.P_da[t]*self.q_da_prev[t] 
+        
+        def rt_settlement_init_rule(model, j):
+            return model.f_RT[j, 0] == (
+                model.q_rt[j, 0]*self.P_rt_sample[j] 
+                - gamma_over*model.phi_over[j, 0] 
+                - gamma_under*model.phi_under[j, 0]
+                )
+        
+        def rt_settlement_fcn_rule(model, j, t):
+            return model.f_RT[j, t] == (
+                model.q_rt[j, t]*self.exp_P_rt[t] 
+                - gamma_over*model.phi_over[j, t] 
+                - gamma_under*model.phi_under[j, t]
+                )
+        
+        model.rt_bidding_amount_1 = pyo.Constraint(model.IDNODE, model.TIME, rule = rt_bidding_amount_rule_1)
+        model.rt_bidding_amount_2 = pyo.Constraint(model.IDNODE, model.TIME, rule = rt_bidding_amount_rule_2)
+        model.dispatch_init = pyo.Constraint(model.IDNODE, rule = dispatch_init_rule)
+        model.dispatch = pyo.Constraint(model.IDNODE, model.BIDTIME, rule = dispatch_rule)
+        model.SOC_init = pyo.Constraint(model.IDNODE, rule = SOC_init_rule)
+        model.SOC_last = pyo.Constraint(model.IDNODE, rule = SOC_last_rule)
+        model.SOC_balance = pyo.Constraint(model.IDNODE, model.TIME, rule = SOC_balance_rule)
+        model.generation = pyo.Constraint(model.IDNODE, model.TIME, rule = generation_rule)
+        model.charge = pyo.Constraint(model.IDNODE, model.TIME, rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(model.IDNODE, model.TIME, rule = electricity_supply_rule)
+        model.imbalance_over = pyo.Constraint(model.IDNODE, model.TIME, rule = imbalance_over_rule)
+        model.imbalance_under = pyo.Constraint(model.IDNODE, model.TIME, rule = imbalance_under_rule)
+        model.da_settlement_fcn = pyo.Constraint(model.TIME, rule = da_settlement_fcn_rule)
+        model.rt_settlement_init = pyo.Constraint(model.IDNODE, rule = rt_settlement_init_rule)
+        model.rt_settlement_fcn = pyo.Constraint(model.IDNODE, model.BIDTIME, rule = rt_settlement_fcn_rule)
+        
+        # Objective
+        
+        def objective_rule(model):
+            return sum(
+                model.f_DA[t] + sum(model.f_RT[j, t] for j in model.IDNODE)*(1/self.N_t)
+                for t in model.TIME
+            )
+            
+        model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
+        
+    def solve(self):
+        self.build_model()
+        results = SOLVER.solve(self)
+        self.solved = True
+        return results
+    
+    def get_state_solutions(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+            
+        State_var = []
+        
+        State_var.append(pyo.value(self.S[0, -1]))
+        State_var.append([pyo.value(self.q_da_prev[t]) for t in range(self.T)])
+        State_var.append(pyo.value(self.q_rt[0]))
+        State_var.append(0)
+        
+        return State_var    
+
+    def get_settlement_fcn_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        fcn_value = sum(
+            pyo.value(self.f_DA[t]) 
+            for t in range(self.T)
+            )
+        
+        return fcn_value
+
+    def get_DA_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        DA_profit = [self.P_da[t]*pyo.value(self.q_da_prev[t]) for t in range(self.T)]
+
+        return DA_profit
+
+class two_stage_rt(pyo.ConcreteModel):
+       
+    def __init__(self, stage, state, P_da, ID_params, exp_P_rt, delta):
+        
+        super().__init__()
+
+        self.solved = False
+        
+        self.stage = stage
+        
+        self.S_prev = state[0]
+        self.Q_prev = state[1]
+        self.q_rt_prev = state[2]
+        self.E_prev = state[3]
+        
+        self.P_da = P_da
+        self.ID_params = ID_params
+        self.exp_P_rt = exp_P_rt
+                
+        self.delta_E_0 = delta[0]
+        self.P_rt = delta[1]
+        self.delta_c = delta[2]
+        
+        self.N_t = len(self.ID_params[0])
+        
+        self.delta_E_sample = [0 for _ in range(self.N_t)]
+        self.P_rt_sample = [0 for _ in range(self.N_t)]
+        self.delta_c_sample = [0 for _ in range(self.N_t)]
+        
+        for j, ID_param in enumerate(self.ID_params):
+            
+            self.delta_E_sample[j] = ID_param[j][0]
+            self.P_rt_sample[j] = ID_param[j][1]
+            self.delta_c_sample[j] = ID_param[j][2]
+        
+        self.T = T
+
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.IDNODE = pyo.RangeSet(0, self.N_t-1)
+        
+        model.TIME = pyo.RangeSet(self.stage, T-1)
+        model.BIDTIME = pyo.RangeSet(self.stage+1, T-1)
+        model.BIDTIME_INIT = pyo.RangeSet(self.stage+2, T-1)
+        model.BIDTIME_NEXT = pyo.RangeSet(self.stage+3, T-1)
+        model.TIME_ESS = pyo.RangeSet(self.stage-1, T-1)
+
+        # Vars
+
+        # Intraday bidding variables
+
+        model.Q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        model.q_rt = pyo.Var(model.IDNODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+
+        # Intraday operation variables
+        
+        model.S = pyo.Var(
+            model.IDNODE,model.TIME_ESS, bounds = (S_min, S_max), domain = pyo.NonNegativeReals, initialize = 0.0
+        )
+        
+        model.g = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(model.IDNODE, model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(model.IDNODE, model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+
+        ## Imbalance Penerty Vars
+        
+        model.phi_over = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.phi_under = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        
+        ## settlement fcn Vars
+        
+        model.f_RT = pyo.Var(model.IDNODE, model.TIME, domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## DA awarded amounts
+        
+        def da_awarded_amount_rule(model, t):
+            return model.Q_da[t] == self.Q_prev[t]
+        
+        ## Non-anticipativity constraints
+        
+        def rt_bidding_amount_non_anticipative_rule(model, j):
+            return model.q_rt[j, self.stage+1] == model.q_rt[0, self.stage+1]    
+        
+        def charge_amount_non_anticipative_rule(model, j):
+            return model.c[j, self.stage] == model.c[0, self.stage]
+        
+        def discharge_amount_non_anticipative_rule(model, j):
+            return model.d[j, self.stage] == model.d[0, self.stage]
+        
+        def generation_amount_non_anticipative_rule(model, j):
+            return model.g[j, self.stage] == model.g[0, self.stage]
+        
+        def imbalance_over_non_anticipative_rule(model, j):
+            return model.phi_over[j, self.stage] == model.phi_over[0, self.stage]
+        
+        def imbalance_under_non_anticipative_rule(model, j):
+            return model.phi_under[j, self.stage] == model.phi_under[0, self.stage]
+            
+        ## RT bidding & market rules
+        
+        def rt_bidding_amount_init_rule_1(model, j):
+            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] <= self.delta_E_0*E_0_partial[self.stage+1] + B
+        
+        def rt_bidding_amount_init_rule_2(model, j):
+            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] >= 0
+        
+        def rt_bidding_amount_next_rule_1(model, j):
+            return model.Q_da[self.stage+2] + model.q_rt[j, self.stage+1] <= self.delta_E_sample[j]*E_0_partial[self.stage+1] + B
+        
+        def rt_bidding_amount_next_rule_2(model, j):
+            return model.Q_da[self.stage+2] + model.q_rt[j, self.stage+1] >= 0
+        
+        def rt_bidding_amount_rule_1(model, j, t):
+            return  model.Q_da[t] + model.q_rt[j, t] <= E_0_partial[t] + B
+        
+        def rt_bidding_amount_rule_2(model, j, t):
+            return model.Q_da[t] + model.q_rt[j, t] >= 0
+        
+        ## Operations rules
+        
+        def dispatch_stage_rule(model, j):
+            return model.Q_c[j, self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+        
+        def dispatch_init_rule(model, j):
+            return model.Q_c[j, self.stage+1] == (1 + self.delta_c_sample[j])*(model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1])
+        
+        def dispatch_rule(model, j, t):
+            return model.Q_c[j, t] == model.Q_da[t] + model.q_rt[j, t]
+        
+        def SOC_init_rule(model, j):
+            return model.S[j, self.stage-1] == self.S_prev
+        
+        def SOC_last_rule(model, j):
+            return model.S[j, self.T-1] == 0.5*S
+        
+        def SOC_balance_rule(model, j, t):
+            return model.S[j, t] == model.S[j, t-1] + v*model.c[j, t] - (1/v)*model.d[j, t]
+        
+        def generation_stage_rule(model, j):
+            return model.g[j, self.stage] <= self.E_prev
+        
+        def generation_init_rule(model, j):
+            return model.g[j, self.stage+1] <= self.delta_E_0*E_0_partial[self.stage+1]
+        
+        def generation_next_rule(model, j):
+            return model.g[j, self.stage+2] <= self.delta_E_sample[j]*E_0_partial[self.stage+2]
+        
+        def generation_rule(model, j, t):
+            return model.g[j, t] <= E_0_partial[t]
+        
+        def charge_rule(model, j, t):
+            return model.c[j, t] <= model.g[j, t]
+        
+        def electricity_supply_rule(model, j, t):
+            return model.u[j, t] == model.g[j, t] + model.d[j, t] - model.c[j, t]
+        
+        ## Imbalance Penalty
+        
+        def imbalance_over_rule(model, j, t):
+            return model.u[j, t] - model.Q_c[j, t] <= model.phi_over[j, t]
+        
+        def imbalance_under_rule(model, j, t):
+            return model.Q_c[j, t] - model.u[j, t] <= model.phi_under[j, t]
+        
+        ## settlement fcn
+        
+        def rt_settlement_fcn_stage_rule(model, j):
+            return model.f_RT[j, self.stage] == (
+                self.q_rt_prev*self.P_rt 
+                - gamma_over*model.phi_over[j, self.stage] 
+                - gamma_under*model.phi_under[j, self.stage]
+                )
+        
+        def rt_settlement_fcn_init_rule(model, j):
+            return model.f_RT[j, self.stage+1] == (
+                model.q_rt[j, self.stage+1]*self.P_rt_sample 
+                - gamma_over*model.phi_over[j, self.stage+1] 
+                - gamma_under*model.phi_under[j, self.stage+1]
+                )
+        
+        def rt_settlement_fcn_rule(model, j, t):
+            return model.f_RT[j, t] == (
+                model.q_rt[j, t]*self.exp_P_rt[t] 
+                - gamma_over*model.phi_over[j, t] 
+                - gamma_under*model.phi_under[j, t]
+                )
+        
+        model.da_awarded_amount = pyo.Constraint(model.TIME, rule = da_awarded_amount_rule)
+        
+        model.rt_bidding_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_non_anticipative_rule)
+        model.charge_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = charge_amount_non_anticipative_rule)
+        model.discharge_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = discharge_amount_non_anticipative_rule)
+        model.generation_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = generation_amount_non_anticipative_rule)
+        model.imbalance_over_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_over_non_anticipative_rule)
+        model.imbalance_under_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_under_non_anticipative_rule)
+        
+        model.rt_bidding_amount_init_1 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_1)
+        model.rt_bidding_amount_init_2 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_2)
+        model.rt_bidding_amount_next = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_next_rule_1)
+        model.rt_bidding_amount_next_2 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_next_rule_2)
+        model.rt_bidding_amount_1 = pyo.Constraint(model.IDNODE, model.BIDTIME_NEXT, rule = rt_bidding_amount_rule_1)
+        model.rt_bidding_amount_2 = pyo.Constraint(model.IDNODE, model.BIDTIME_NEXT, rule = rt_bidding_amount_rule_2)
+        model.dispatch_stage = pyo.Constraint(model.IDNODE, rule = dispatch_stage_rule)
+        model.dispatch_init = pyo.Constraint(model.IDNODE, rule = dispatch_init_rule)
+        model.dispatch = pyo.Constraint(model.IDNODE, model.BIDTIME_INIT, rule = dispatch_rule)
+        model.SOC_init = pyo.Constraint(model.IDNODE,rule = SOC_init_rule)
+        model.SOC_last = pyo.Constraint(model.IDNODE,rule = SOC_last_rule)
+        model.SOC_balance = pyo.Constraint(model.IDNODE, model.TIME, rule = SOC_balance_rule)
+        model.generation_stage = pyo.Constraint(model.IDNODE, rule = generation_stage_rule)
+        model.generation_init = pyo.Constraint(model.IDNODE, rule = generation_init_rule)
+        model.generation_next = pyo.Constraint(model.IDNODE, rule = generation_next_rule)
+        model.generation = pyo.Constraint(model.IDNODE, model.BIDTIME_NEXT, rule = generation_rule)
+        model.charge = pyo.Constraint(model.IDNODE, model.TIME, rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(model.IDNODE, model.TIME, rule = electricity_supply_rule)
+        model.imbalance_over = pyo.Constraint(model.IDNODE, model.TIME, rule = imbalance_over_rule)
+        model.imbalance_under = pyo.Constraint(model.IDNODE, model.TIME, rule = imbalance_under_rule)
+        model.rt_settlement_stage_fcn = pyo.Constraint(model.IDNODE, rule = rt_settlement_fcn_stage_rule)
+        model.rt_settlement_init = pyo.Constraint(model.IDNODE, rule = rt_settlement_fcn_init_rule)
+        model.rt_settlement_fcn = pyo.Constraint(model.IDNODE, model.BIDTIME_INIT, rule = rt_settlement_fcn_rule)
+        
+        # Objective
+        
+        def objective_rule(model):
+            return sum(
+                sum(model.f_RT[j, t] for j in model.IDNODE)*(1/self.N_t)
+                for t in model.TIME
+            )
+            
+        model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
+
+    def solve(self):
+        self.build_model()
+        results = SOLVER.solve(self)
+        self.solved = True
+        return results  
+    
+    def get_state_solutions(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+            
+        State_var = []
+        
+        State_var.append(pyo.value(self.S[0, self.stage]))
+        State_var.append(self.Q_prev)
+        State_var.append(pyo.value(self.q_rt[0, self.stage+1]))
+        State_var.append(self.delta_E_0*E_0_partial[self.stage+1])
+        
+        return State_var    
+
+    def get_settlement_fcn_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        fcn_value = pyo.value(self.f_RT[0, self.stage])
+        
+        return fcn_value
+
+    def get_P_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        P_profit = self.q_rt_prev*self.P_rt
+
+        return P_profit
+
+    def get_Im_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        Im_profit = - gamma_over*pyo.value(self.phi_over[0, self.stage]) - gamma_under*pyo.value(self.phi_under[0, self.stage])
+
+        return Im_profit
+
+class two_stage_rt_beforelast(pyo.ConcreteModel):
+       
+    def __init__(self, stage, state, P_da, ID_params, exp_P_rt, delta):
+        
+        super().__init__()
+
+        self.solved = False
+        
+        self.stage = stage
+        
+        self.S_prev = state[0]
+        self.Q_prev = state[1]
+        self.q_rt_prev = state[2]
+        self.E_prev = state[3]
+        
+        self.P_da = P_da
+        self.ID_params = ID_params
+        self.exp_P_rt = exp_P_rt
+                
+        self.delta_E_0 = delta[0]
+        self.P_rt = delta[1]
+        self.delta_c = delta[2]
+        
+        self.N_t = len(self.ID_params[0])
+        
+        self.delta_E_sample = [0 for _ in range(self.N_t)]
+        self.P_rt_sample = [0 for _ in range(self.N_t)]
+        self.delta_c_sample = [0 for _ in range(self.N_t)]
+        
+        for j, ID_param in enumerate(self.ID_params):
+            
+            self.delta_E_sample[j] = ID_param[j][0]
+            self.P_rt_sample[j] = ID_param[j][1]
+            self.delta_c_sample[j] = ID_param[j][2]
+        
+        self.T = T
+
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.IDNODE = pyo.RangeSet(0, self.N_t-1)
+        
+        model.TIME = pyo.RangeSet(self.stage, T-1)
+        model.BIDTIME = pyo.RangeSet(self.stage+1, T-1)
+        model.TIME_ESS = pyo.RangeSet(self.stage-1, T-1)
+
+        # Vars
+
+        # Intraday bidding variables
+
+        model.Q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        model.q_rt = pyo.Var(model.IDNODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+
+        # Intraday operation variables
+        
+        model.S = pyo.Var(
+            model.IDNODE,model.TIME_ESS, bounds = (S_min, S_max), domain = pyo.NonNegativeReals, initialize = 0.0
+        )
+        
+        model.g = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(model.IDNODE, model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(model.IDNODE, model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+
+        ## Imbalance Penerty Vars
+        
+        model.phi_over = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        model.phi_under = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
+        
+        ## settlement fcn Vars
+        
+        model.f_RT = pyo.Var(model.IDNODE, model.TIME, domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## DA awarded amounts
+        
+        def da_awarded_amount_rule(model, t):
+            return model.Q_da[t] == self.Q_prev[t]
+        
+        ## Non-anticipativity constraints
+        
+        def rt_bidding_amount_non_anticipative_rule(model, j):
+            return model.q_rt[j, self.stage+1] == model.q_rt[0, self.stage+1]    
+        
+        def charge_amount_non_anticipative_rule(model, j):
+            return model.c[j, self.stage] == model.c[0, self.stage]
+        
+        def discharge_amount_non_anticipative_rule(model, j):
+            return model.d[j, self.stage] == model.d[0, self.stage]
+        
+        def generation_amount_non_anticipative_rule(model, j):
+            return model.g[j, self.stage] == model.g[0, self.stage]
+        
+        def imbalance_over_non_anticipative_rule(model, j):
+            return model.phi_over[j, self.stage] == model.phi_over[0, self.stage]
+        
+        def imbalance_under_non_anticipative_rule(model, j):
+            return model.phi_under[j, self.stage] == model.phi_under[0, self.stage]
+            
+        ## RT bidding & market rules
+        
+        def rt_bidding_amount_init_rule_1(model, j):
+            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] <= self.delta_E_0*E_0_partial[self.stage+1] + B
+        
+        def rt_bidding_amount_init_rule_2(model, j):
+            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] >= 0
+        
+        ## Operations rules
+        
+        def dispatch_stage_rule(model, j):
+            return model.Q_c[j, self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+        
+        def dispatch_init_rule(model, j):
+            return model.Q_c[j, self.stage+1] == (1 + self.delta_c_sample[j])*(model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1])
+        
+        def SOC_init_rule(model, j):
+            return model.S[j, self.stage-1] == self.S_prev
+        
+        def SOC_last_rule(model, j):
+            return model.S[j, self.T-1] == 0.5*S
+        
+        def SOC_balance_rule(model, j, t):
+            return model.S[j, t] == model.S[j, t-1] + v*model.c[j, t] - (1/v)*model.d[j, t]
+        
+        def generation_stage_rule(model, j):
+            return model.g[j, self.stage] <= self.E_prev
+        
+        def generation_init_rule(model, j):
+            return model.g[j, self.stage+1] <= self.delta_E_0*E_0_partial[self.stage+1]
+        
+        def charge_rule(model, j, t):
+            return model.c[j, t] <= model.g[j, t]
+        
+        def electricity_supply_rule(model, j, t):
+            return model.u[j, t] == model.g[j, t] + model.d[j, t] - model.c[j, t]
+        
+        ## Imbalance Penalty
+        
+        def imbalance_over_rule(model, j, t):
+            return model.u[j, t] - model.Q_c[j, t] <= model.phi_over[j, t]
+        
+        def imbalance_under_rule(model, j, t):
+            return model.Q_c[j, t] - model.u[j, t] <= model.phi_under[j, t]
+        
+        ## settlement fcn
+        
+        def rt_settlement_fcn_stage_rule(model, j):
+            return model.f_RT[j, self.stage] == (
+                self.q_rt_prev*self.P_rt 
+                - gamma_over*model.phi_over[j, self.stage] 
+                - gamma_under*model.phi_under[j, self.stage]
+                )
+        
+        def rt_settlement_fcn_init_rule(model, j):
+            return model.f_RT[j, self.stage+1] == (
+                model.q_rt[j, self.stage+1]*self.P_rt_sample 
+                - gamma_over*model.phi_over[j, self.stage+1] 
+                - gamma_under*model.phi_under[j, self.stage+1]
+                )
+        
+        model.da_awarded_amount = pyo.Constraint(model.TIME, rule = da_awarded_amount_rule)
+        
+        model.rt_bidding_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_non_anticipative_rule)
+        model.charge_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = charge_amount_non_anticipative_rule)
+        model.discharge_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = discharge_amount_non_anticipative_rule)
+        model.generation_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = generation_amount_non_anticipative_rule)
+        model.imbalance_over_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_over_non_anticipative_rule)
+        model.imbalance_under_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_under_non_anticipative_rule)
+        
+        model.rt_bidding_amount_init_1 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_1)
+        model.rt_bidding_amount_init_2 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_2)
+        model.dispatch_stage = pyo.Constraint(model.IDNODE, rule = dispatch_stage_rule)
+        model.dispatch_init = pyo.Constraint(model.IDNODE, rule = dispatch_init_rule)
+        model.SOC_init = pyo.Constraint(model.IDNODE,rule = SOC_init_rule)
+        model.SOC_last = pyo.Constraint(model.IDNODE,rule = SOC_last_rule)
+        model.SOC_balance = pyo.Constraint(model.IDNODE, model.TIME, rule = SOC_balance_rule)
+        model.generation_stage = pyo.Constraint(model.IDNODE, rule = generation_stage_rule)
+        model.generation_init = pyo.Constraint(model.IDNODE, rule = generation_init_rule)
+        model.charge = pyo.Constraint(model.IDNODE, model.TIME, rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(model.IDNODE, model.TIME, rule = electricity_supply_rule)
+        model.imbalance_over = pyo.Constraint(model.IDNODE, model.TIME, rule = imbalance_over_rule)
+        model.imbalance_under = pyo.Constraint(model.IDNODE, model.TIME, rule = imbalance_under_rule)
+        model.rt_settlement_stage_fcn = pyo.Constraint(model.IDNODE, rule = rt_settlement_fcn_stage_rule)
+        model.rt_settlement_init = pyo.Constraint(model.IDNODE, rule = rt_settlement_fcn_init_rule)
+        
+        # Objective
+        
+        def objective_rule(model):
+            return sum(
+                sum(model.f_RT[j, t] for j in model.IDNODE)*(1/self.N_t)
+                for t in model.TIME
+            )
+            
+        model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
+
+    def solve(self):
+        self.build_model()
+        results = SOLVER.solve(self)
+        self.solved = True
+        return results  
+    
+    def get_state_solutions(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+            
+        State_var = []
+        
+        State_var.append(pyo.value(self.S[0, self.stage]))
+        State_var.append(self.Q_prev)
+        State_var.append(pyo.value(self.q_rt[0, self.stage+1]))
+        State_var.append(self.delta_E_0*E_0_partial[self.stage+1])
+        
+        return State_var    
+
+    def get_settlement_fcn_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        fcn_value = pyo.value(self.f_RT[0, self.stage])
+        
+        return fcn_value
+
+    def get_P_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        P_profit = self.q_rt_prev*self.P_rt
+
+        return P_profit
+
+    def get_Im_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        Im_profit = - gamma_over*pyo.value(self.phi_over[0, self.stage]) - gamma_under*pyo.value(self.phi_under[0, self.stage])
+
+        return Im_profit
+
+class two_stage_rt_last(pyo.ConcreteModel):
+       
+    def __init__(self, state, P_da, delta):
+        
+        super().__init__()
+
+        self.solved = False
+        
+        self.stage = T-1
+        
+        self.S_prev = state[0]
+        self.Q_prev = state[1]
+        self.q_rt_prev = state[2]
+        self.E_prev = state[3]
+        
+        self.P_da = P_da
+        
+        self.P_abs = [0 for _ in range(T)]
+        
+        self.delta_E_0 = delta[0]
+        self.P_rt = delta[1]
+        self.delta_c = delta[2]
+        
+        self.T = T
+
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.TIME = pyo.RangeSet(self.stage, T-1)
+        model.TIME_ESS = pyo.RangeSet(self.stage-1, T-1)
+
+        # Vars
+        
+        # Day Ahead variables
+
+        model.Q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        # Intraday operation variables
+        
+        model.S = pyo.Var(
+            model.TIME_ESS, bounds = (S_min, S_max), domain = pyo.NonNegativeReals, initialize = 0.0
+        )
+        
+        model.g = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.c = pyo.Var(model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.d = pyo.Var(model.TIME, bounds = (0, B), domain = pyo.Reals)
+        model.u = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.Q_c = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+
+        ## Imbalance Penerty Vars
+        
+        model.phi_over = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        model.phi_under = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        ## settlement fcn Vars
+        
+        model.f_RT = pyo.Var(model.TIME, domain = pyo.Reals)
+        
+        # Constraints
+        
+        ## DA awarded amounts
+        
+        def da_awarded_amount_rule(model, t):
+            return model.Q_da[t] == self.Q_prev[t]
+        
+        ## Operations rules
+        
+        def dispatch_stage_rule(model):
+            return model.Q_c[self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+        
+        def SOC_init_rule(model):
+            return model.S[self.stage-1] == self.S_prev
+        
+        def SOC_last_rule(model):
+            return model.S[self.stage] == 0.5*S
+        
+        def SOC_balance_rule(model, t):
+            return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
+        
+        def generation_stage_rule(model):
+            return model.g[self.stage] <= self.E_prev
+        
+        def charge_rule(model, t):
+            return model.c[t] <= model.g[t]
+        
+        def electricity_supply_rule(model, t):
+            return model.u[t] == model.g[t] + model.d[t] - model.c[t]
+        
+        ## Imbalance Penalty
+        
+        def imbalance_over_rule(model, t):
+            return model.u[t] - model.Q_c[t] <= model.phi_over[t]
+        
+        def imbalance_under_rule(model, t):
+            return model.Q_c[t] - model.u[t] <= model.phi_under[t]
+        
+        ## settlement fcn
+        
+        def rt_settlement_fcn_stage_rule(model):
+            return model.f_RT[self.stage] == (
+                self.q_rt_prev*self.P_rt 
+                - gamma_over*model.phi_over[self.stage] 
+                - gamma_under*model.phi_under[self.stage]
+                )
+
+        model.da_awarded_amount = pyo.Constraint(model.TIME, rule = da_awarded_amount_rule)
+        model.dispatch_stage = pyo.Constraint(rule = dispatch_stage_rule)
+        model.SOC_init = pyo.Constraint(rule = SOC_init_rule)
+        model.SOC_last = pyo.Constraint(rule = SOC_last_rule)
+        model.SOC_balance = pyo.Constraint(model.TIME, rule = SOC_balance_rule)
+        model.generation_stage = pyo.Constraint(rule = generation_stage_rule)
+        model.charge = pyo.Constraint(model.TIME, rule = charge_rule)
+        model.electricity_supply = pyo.Constraint(model.TIME, rule = electricity_supply_rule)
+        model.imbalance_over = pyo.Constraint(model.TIME, rule = imbalance_over_rule)
+        model.imbalance_under = pyo.Constraint(model.TIME, rule = imbalance_under_rule)
+        model.rt_settlement_stage_fcn = pyo.Constraint(rule = rt_settlement_fcn_stage_rule)
+        
+        # Objective
+        
+        def objective_rule(model):
+            return sum(
+                model.f_RT[t] 
+                for t in model.TIME
+            )
+            
+        model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
+
+    def solve(self):
+        self.build_model()
+        results = SOLVER.solve(self)
+        self.solved = True
+        return results
+
+    def get_settlement_fcn_value(self):
+        
+        if not self.solved:
+            self.solve()
+            self.solved = True
+
+        fcn_value = pyo.value(self.f_RT[self.stage])
+        
+        return fcn_value
+
+    def get_P_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        P_profit = self.q_rt_prev*self.P_rt
+
+        return P_profit
+
+    def get_Im_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        Im_profit = - gamma_over*pyo.value(self.phi_over[self.stage]) - gamma_under*pyo.value(self.phi_under[self.stage])
+
+        return Im_profit
+
+   
+   
 ## 4) 3-stage stochastic programming model
 
 class three_stage_da(pyo.ConcreteModel):
@@ -3287,64 +4183,66 @@ class PSDDiPModel:
         return mu_hat
 
     def forward_pass_1(self, scenarios):
-        
+
         fw_da_subp = fw_da(self.DA_probs_full, self.psi_da_1)
         fw_da_state = fw_da_subp.get_state_solutions()
-        
+
         self.forward_solutions_da.append(fw_da_state)
-        
+
         f = []
-        
         S_last = []
-        
+
+        saved_k = set()  # <-- NEW: track which clusters already saved states
+
         for n, scenario in enumerate(scenarios):
-            
+
             P_da = self.DA_params_full[n]
-            
             k = self.find_cluster_index_for_evaluation(n)
-                        
+
+            save_states = (k not in saved_k)  # <-- NEW
+
             psi_ID_init = self.psi[k][0]
-            
+
             fw_rt_init_subp = fw_rt_init(fw_da_state, psi_ID_init, P_da)
             fw_rt_init_state = fw_rt_init_subp.get_state_solutions()
-            
-            self.forward_solutions[k][0].append(fw_rt_init_state) ## x(-1)
-            
+
+            if save_states:
+                self.forward_solutions[k][0].append(fw_rt_init_state)  # x(-1)
+
             state = fw_rt_init_state
-            
             f_scenario = fw_rt_init_subp.get_settlement_fcn_value()
-            
-            for t in range(self.STAGE - 1): ## t = 0, ..., T-2
-                
-                psi_ID = self.psi[k][t+1]
-                
+
+            for t in range(self.STAGE - 1):  # t = 0, ..., T-2
+
+                psi_ID = self.psi[k][t + 1]
                 fw_rt_subp = fw_rt(t, state, psi_ID, P_da, scenario[t])
-                
+
                 state = fw_rt_subp.get_state_solutions()
-                
-                self.forward_solutions[k][t+1].append(state)
+
+                if save_states:
+                    self.forward_solutions[k][t + 1].append(state)
+
                 f_scenario += fw_rt_subp.get_settlement_fcn_value()
-            
-            ## t = T-1
-            
-            fw_rt_last_subp = fw_rt_last(state, P_da, scenario[self.STAGE-1])
+
+            # t = T-1
+            fw_rt_last_subp = fw_rt_last(state, P_da, scenario[self.STAGE - 1])
 
             f_scenario += fw_rt_last_subp.get_settlement_fcn_value()
             last_SOC_value = fw_rt_last_subp.get_last_SOC_value()
             S_last.append(last_SOC_value)
-                                    
-            f.append(f_scenario)
-                
-        self.S_last_list.append(S_last)
-        
-        mu_hat = np.mean(f)
-        sigma_hat = np.std(f, ddof=1)  
 
-        z_alpha_half = 1.96  
-        
-        #self.LB.append(mu_hat - z_alpha_half * (sigma_hat / np.sqrt(self.M))) 
-        self.LB.append(mu_hat) 
-        
+            f.append(f_scenario)
+
+            if save_states:
+                saved_k.add(k)  # <-- NEW: mark cluster saved after first encounter
+
+        self.S_last_list.append(S_last)
+
+        mu_hat = np.mean(f)
+        sigma_hat = np.std(f, ddof=1)
+        z_alpha_half = 1.96
+
+        self.LB.append(mu_hat)
         return mu_hat
       
     def forward_pass_for_stopping_1(self, scenarios):
@@ -3655,20 +4553,20 @@ class PSDDiPModel:
 
                     self.forward_pass_1(scenarios)
 
-                #print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
+                print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
 
                 self.backward_pass_1()
                 
                 self.gap = (self.UB[self.iteration] - self.LB[self.iteration])/self.UB[self.iteration]
                 
-                """if self.iteration >= self.breakstage_selection + 1:
+                if self.iteration >= self.breakstage_selection + 1:
                     
-                    self.cut_selection()"""
+                    self.cut_selection()
                 
                 #print(f"cut_num = {(len(self.psi[0][2]))}")
                 
-                #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
-                #print(f"  Running time for iter = {self.iteration} : {self.running_time:.2f} seconds\n")
+                print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
+                print(f"  Running time for iter = {self.iteration} : {self.running_time:.2f} seconds\n")
 
             else:
                 
@@ -3722,7 +4620,7 @@ if __name__ == "__main__":
     random.seed(42)
     np.random.seed(42)
 
-    evaluation_num = int(200/K_eval)
+    evaluation_num = int(50/K_eval)
     
     def sample_scenario_paths(Scenario_tree, N):
         scenarios = []
@@ -3756,8 +4654,8 @@ if __name__ == "__main__":
     
     
     ## 2. Run full-PSDDiP to get psi_ID and save as npy
-    """
-    def save_psddip_state(model, base_dir, price_setting):
+    
+    """def save_psddip_state(model, base_dir, price_setting):
         
         base_dir = Path(base_dir)
         base_dir.mkdir(exist_ok=True)
@@ -3890,7 +4788,7 @@ if __name__ == "__main__":
                 sample_num = evaluation_num
             
             else:
-                sample_num = int(500/K)
+                sample_num = int(200/K)
             
             psddip_multi_da = PSDDiPModel(
                 STAGE = T,
@@ -3907,8 +4805,7 @@ if __name__ == "__main__":
                 approx_mode=approx_mode,
             )
             
-            if not approx_mode:
-                psddip_multi_da.run_sddip()
+            psddip_multi_da.run_sddip()
             
             BASE_DIR = Path(__file__).resolve().parent       
                     

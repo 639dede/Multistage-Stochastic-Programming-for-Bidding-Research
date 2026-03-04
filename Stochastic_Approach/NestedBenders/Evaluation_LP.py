@@ -35,7 +35,7 @@ SOLVER.options['MIPGap'] = 1e-3
 assert SOLVER.available(), f"Solver {solver} is available."
 
 
-price_setting = 'sunny'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'cloudy'  # 'cloudy', 'normal', 'sunny'
 
 from NestedBenders.PSDDiP_LP import (
     fw_da,
@@ -305,166 +305,76 @@ psi_ID = state["psi_ID"]        # this is the list you saved as model.psi
 
 # Evaluation
 
-_BAD_TC = {
-    TerminationCondition.infeasible,
-    TerminationCondition.infeasibleOrUnbounded,
-    TerminationCondition.unbounded,
-    TerminationCondition.noSolution,
-    TerminationCondition.solverFailure,
-    TerminationCondition.internalSolverError,
-    TerminationCondition.error,
-}
-
-_GOOD_TC = {
-    TerminationCondition.optimal,
-    TerminationCondition.locallyOptimal,
-    TerminationCondition.feasible,
-    TerminationCondition.maxTimeLimit,   # only if a feasible incumbent exists (we will probe)
-    TerminationCondition.maxIterations,
-}
-
-def _has_loaded_values(model_obj) -> bool:
-    """
-    Probe whether at least some primal values exist.
-    The most reliable probe is to evaluate the objective expression.
-    If it triggers 'uninitialized', we treat as failure.
-    """
-    try:
-        obj = model_obj.objective
-        _ = pyo.value(obj)  # will raise if any referenced var has no value
-        return True
-    except Exception:
-        return False
-
-def solve_safely(model_obj, *, tee=False):
-    """
-    Returns (ok: bool, info: solver results or exception or string).
-    ok=True means:
-      - solver status/termination look acceptable, AND
-      - we can evaluate objective (values exist)
-    """
-    try:
-        results = SOLVER.solve(model_obj, tee=tee)
-
-        st = getattr(results.solver, "status", None)
-        tc = getattr(results.solver, "termination_condition", None)
-
-        # hard reject bad statuses
-        if st not in (SolverStatus.ok, SolverStatus.warning):
-            return False, f"bad solver status: {st}"
-
-        # hard reject bad termination conditions
-        if tc in _BAD_TC:
-            return False, f"bad termination condition: {tc}"
-
-        # accept only known good-ish TCs
-        if tc not in _GOOD_TC:
-            return False, f"unknown termination condition: {tc}"
-
-        # crucial: must actually have variable values loaded
-        if not _has_loaded_values(model_obj):
-            return False, f"no primal values loaded (tc={tc}, status={st})"
-
-        return True, results
-
-    except Exception as e:
-        return False, e
-
 def evaluation_rolling_rolling(scenarios):
     
     da_subp = rolling_da(exp_P_da, exp_P_rt_glob)
-
+    
     da_state = da_subp.get_state_solutions()
+                
     q_da = da_state[0]
-
+                        
     f = []
-
+    
     f_DA = [0]*T
     f_P  = [0]*T
     f_E  = [0]*T
     f_Im = [0]*T
-
+    
     for n, scenarios_n in enumerate(scenarios):
-
-        P_da = P_da_eval[n]
+                    
+        P_da = P_da_eval[n]  
+                    
         exp_P_rt = exp_P_rt_given_P_da(n, Scenario_tree_eval)
-
-        # ---- rt_init safely ----
+                    
         rt_init_subp = rolling_rt_init(da_state, P_da, exp_P_rt)
-
-        ok_init, res_init = solve_safely(rt_init_subp)
-        if not ok_init:
-            # If rt_init fails, ALL scenario paths under this n are invalid -> append 0 for each path
-            for _ in scenarios_n:
-                f.append(0.0)
-            #print(f"[WARN] rolling_rt_init failed at n={n}. Added 0 for {len(scenarios_n)} paths.")
-            continue
-
-        rt_init_state = rt_init_subp.get_state_solutions()
-
-        # DA profit collection (only if init solved)
+        rt_init_state = rt_init_subp.get_state_solutions()       
+        
         f_DA_list = rt_init_subp.get_DA_profit()
+        
         for i in range(T):
             f_DA[i] += f_DA_list[i]/K_eval
-
-        fcn_value_init = rt_init_subp.get_settlement_fcn_value()
-
-        # ---- loop each scenario path ----
-        for s_idx, scenario in enumerate(scenarios_n):
-
+        
+        fcn_value = rt_init_subp.get_settlement_fcn_value()
+        
+        for scenario in scenarios_n:
+            
             state = rt_init_state
-            f_scenario = fcn_value_init
-            failed_path = False
-
-            for t in range(T - 1):
+            
+            f_scenario = fcn_value
+            
+            for t in range(T - 1): ## t = 0, ..., T-2
+                                    
                 rt_subp = rolling_rt(t, state, P_da, exp_P_rt, scenario[t])
-
-                ok_rt, _ = solve_safely(rt_subp)
-                if not ok_rt:
-                    failed_path = True
-                    break
-
-                # PROFIT READS MUST ALSO BE SAFE
-                try:
-                    f_P[t]  += rt_subp.get_P_profit()  /(K_eval*evaluation_num)
-                    f_Im[t] += rt_subp.get_Im_profit() /(K_eval*evaluation_num)
-                except Exception:
-                    failed_path = True
-                    break
-
+                
+                f_P[t] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
+                f_Im[t] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+                
                 state = rt_subp.get_state_solutions()
+                
                 f_scenario += rt_subp.get_settlement_fcn_value()
-
-            if failed_path:
-                f.append(0.0)
-                continue
-
-            # last stage
+            
+            ## t = T-1
+            
             rt_last_subp = rolling_rt_last(state, P_da, scenario[T-1])
 
-            ok_last, _ = solve_safely(rt_last_subp)
-            if not ok_last:
-                f.append(0.0)
-                continue
-
-            try:
-                f_P[T-1]  += rt_last_subp.get_P_profit()  /(K_eval*evaluation_num)
-                f_Im[T-1] += rt_last_subp.get_Im_profit() /(K_eval*evaluation_num)
-            except Exception:
-                f.append(0.0)
-                continue
+            f_P[T-1] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
+            f_Im[T-1] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
+                        
             f.append(f_scenario)
+        
+    mu_hat = np.mean(f)
+    
+    sigma_hat = np.std(f, ddof=1)  
 
-    mu_hat = np.mean(f) if len(f) > 0 else 0.0
-    sigma_hat = np.std(f, ddof=1) if len(f) > 1 else 0.0
-
-    eval = mu_hat
+    z_alpha_half = 1.96  
+    
+    eval = mu_hat 
 
     print(f"\nRolling Horizon -> Rolling Horizon for price setting = {price_setting}")
     print(f"Evaluation : {eval}")
-
+    
     return q_da, eval
 
 
