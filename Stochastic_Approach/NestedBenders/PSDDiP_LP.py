@@ -37,8 +37,7 @@ assert SOLVER.available(), f"Solver {solver} is available."
 
 inspect = False
 
-
-price_setting = 'cloudy'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
 
 # 1. Parameters & Computational settings
 
@@ -78,6 +77,9 @@ E_0 = E_0_normal
 
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
+
+
+bin_num = 50
 
 
 def load_clustered_P_da(directory_path):
@@ -169,10 +171,10 @@ def load_scenario_trees(base_dir):
     return Reduced_scenario_trees
 
 
-cluster_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/P_da_{price_setting}'
+cluster_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/P_da_{bin_num}'
 Reduced_P_da, Reduced_Probs = load_clustered_P_da(cluster_dir)
 
-clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_{price_setting}'
+clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_{bin_num}'
 Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
 
 
@@ -182,8 +184,8 @@ hours = np.arange(T)
 K_list = [len(P_da_list) for P_da_list in Reduced_P_da]
 
 
-"""
-## Plot clustered P_da profiles for each K
+
+"""## Plot clustered P_da profiles for each K
 
 for i, P_da_list in enumerate(Reduced_P_da):
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -335,7 +337,7 @@ P_max = 200
 
 E_0 = E_0
 
-C = 20000
+C = 15000
 S = C
 B = C/3
 
@@ -348,7 +350,7 @@ v = 0.95
 gamma_over = 2*P_max
 gamma_under = 2*P_max
 
-omega = 0.2*S
+omega = 0.1*S
 
 E_0_partial = E_0
 
@@ -384,6 +386,84 @@ for t in range(len(E_0_partial)):
 ### stage = DA
 
 class fw_da(pyo.ConcreteModel): 
+    
+    def __init__(self, psi):
+        
+        super().__init__()
+
+        self.solved = False
+                
+        self.psi = psi
+        
+        self.K = len(self.psi)
+        
+        self.T = T
+
+    def build_model(self):
+        
+        model = self.model()
+        
+        model.TIME = pyo.RangeSet(0, T-1)
+                        
+        model.PSIRANGE = pyo.RangeSet(0, len(self.psi)-1)
+        
+        # Vars
+                            
+        model.theta = pyo.Var(domain = pyo.Reals)
+        
+        model.q = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
+        
+        # Constraints
+        
+        def da_bidding_amount_rule(model, t):
+            return model.q[t] <= E_0_partial[t] + B
+        
+        def value_fcn_approx_rule(model, l):
+            
+            v, pi_q = self.psi[l]
+            
+            return model.theta <= (
+                v
+                +sum(pi_q[t]*model.q[t] for t in range(T)) 
+                )
+
+        model.da_bidding_amount = pyo.Constraint(model.TIME, rule=da_bidding_amount_rule)
+        model.value_fcn_approx = pyo.Constraint(model.PSIRANGE, rule=value_fcn_approx_rule)
+
+        # Obj Fcn
+        
+        def objective_rule(model):
+            return (
+                model.theta
+            )
+        
+        model.objective = pyo.Objective(rule = objective_rule, sense=pyo.maximize)
+
+    def solve(self):
+        
+        self.build_model()
+        SOLVER.solve(self)
+        self.solved = True
+
+    def get_state_solutions(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True
+        State_var = []
+        
+        State_var.append([pyo.value(self.q[t]) for t in range(self.T)])
+        
+        return State_var 
+
+    def get_objective_value(self):
+       
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        return pyo.value(self.objective)        
+
+class fw_da_multicut(pyo.ConcreteModel): 
     
     def __init__(self, probs, psi):
         
@@ -427,6 +507,9 @@ class fw_da(pyo.ConcreteModel):
         
         def da_bidding_amount_rule(model, t):
             return model.q[t] <= E_0_partial[t] + B
+        
+        def da_overbid_rule(model):
+            return sum(model.q[t] for t in range(self.T)) <= E_0_sum
         
         def value_fcn_approx_rule(model, k, l):
             
@@ -474,6 +557,7 @@ class fw_da(pyo.ConcreteModel):
         return pyo.value(self.objective)        
 
 
+
 ### stage = -1
 
 class fw_rt_init(pyo.ConcreteModel): 
@@ -504,9 +588,7 @@ class fw_rt_init(pyo.ConcreteModel):
         
         model.q_da = pyo.Var(model.TIME, domain = pyo.Reals)
                 
-        model.q_rt = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals)
-        
-        model.q = pyo.Var(domain = pyo.NonNegativeReals)
+        model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
         
         model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.Reals)
         model.T_Q = pyo.Var(model.TIME, domain = pyo.Reals)
@@ -525,10 +607,10 @@ class fw_rt_init(pyo.ConcreteModel):
         ## Real-Time Market rules(especially for t = 0)
         
         def rt_bidding_amount_rule_1(model):
-            return model.q == model.q_rt + model.q_da[0]
+            return model.q_rt <= model.q_da[0] + omega
         
         def rt_bidding_amount_rule_2(model):
-            return model.q <= B
+            return model.q_rt >= model.q_da[0] - omega
         
         ## State variable trainsition
         
@@ -668,9 +750,7 @@ class fw_rt_init_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         
         model.q_da = pyo.Var(model.TIME, domain = pyo.Reals)
                         
-        model.q_rt = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals)
-        
-        model.q = pyo.Var(domain = pyo.NonNegativeReals)
+        model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
         
         model.S = pyo.Var(bounds = (S_min, S_max), domain = pyo.Reals)
         model.T_Q = pyo.Var(model.TIME, domain = pyo.Reals)
@@ -694,10 +774,10 @@ class fw_rt_init_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         ## Real-Time Market rules(especially for t = 0)
         
         def rt_bidding_amount_rule_1(model):
-            return model.q == model.q_rt + model.q_da[0]
+            return model.q_rt <= model.q_da[0] + omega
         
         def rt_bidding_amount_rule_2(model):
-            return model.q <= B
+            return model.q_rt >= model.q_da[0] - omega
         
         ## State variable trainsition
         
@@ -826,10 +906,8 @@ class fw_rt(pyo.ConcreteModel):
         ## Bidding for next and current stage
         
         model.Q_da = pyo.Var(domain = pyo.Reals, initialize = 0.0)
-        model.Q_da_next = pyo.Var(domain = pyo.Reals, initialize = 0.0)
-        model.q_rt = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals, initialize = 0.0)
-        model.q_rt_next = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals, initialize = 0.0)
-        model.q_next = pyo.Var(domain = pyo.NonNegativeReals, initialize = 0.0)
+        model.q_rt = pyo.Var(domain = pyo.Reals, initialize = 0.0)
+        model.q_rt_next = pyo.Var(domain = pyo.NonNegativeReals, initialize = 0.0)
         
         ## Real-Time operation 
         
@@ -866,9 +944,6 @@ class fw_rt(pyo.ConcreteModel):
         def da_Q_rule(model):
             return model.Q_da == self.T_Q_prev[0]
         
-        def da_Q_rule_next(model):
-            return model.Q_da_next == self.T_Q_prev[1]
-        
         def rt_q_rule(model):
             return model.q_rt == self.T_q_prev
         
@@ -892,10 +967,10 @@ class fw_rt(pyo.ConcreteModel):
         ## General Constraints
         
         def next_q_rt_rule_1(model):
-            return model.q_next == model.Q_da_next + model.q_rt_next
+            return model.q_rt_next <= self.T_Q_prev[1] + omega
         
         def next_q_rt_rule_2(model):
-            return model.q_next <= self.delta_E_0*E_0_partial[self.stage + 1] + B
+            return model.q_rt_next >= self.T_Q_prev[1] - omega
         
         def generation_rule(model):
             return model.g <= model.E_1
@@ -907,7 +982,7 @@ class fw_rt(pyo.ConcreteModel):
             return model.u == model.g + model.d - model.c
         
         def dispatch_rule(model):
-            return model.Q_c == (1 + self.delta_c)*(model.Q_da + model.q_rt)
+            return model.Q_c == (1 + self.delta_c)*model.q_rt
         
         ### Imbalance Penalty
         
@@ -932,13 +1007,12 @@ class fw_rt(pyo.ConcreteModel):
         
         def settlement_fcn_rule(model):
             return model.f == (
-                model.q_rt*self.P_rt 
+                (model.q_rt - model.Q_da)*self.P_rt 
                 - gamma_over*model.phi_over 
                 - gamma_under*model.phi_under
                 )
         
         model.da_Q = pyo.Constraint(rule = da_Q_rule)
-        model.da_Q_next = pyo.Constraint(rule = da_Q_rule_next)
         model.rt_q = pyo.Constraint(rule = rt_q_rule)
         model.rt_E = pyo.Constraint(rule = rt_E_rule)
         
@@ -948,7 +1022,7 @@ class fw_rt(pyo.ConcreteModel):
         model.State_E = pyo.Constraint(rule = State_E_rule)
         
         model.next_q_rt_1 = pyo.Constraint(rule = next_q_rt_rule_1)
-        model.next_q_rt_2 = pyo.Constraint(rule = next_q_rt_rule_2)
+        model.next_q_rt = pyo.Constraint(rule = next_q_rt_rule_2)
         model.generation = pyo.Constraint(rule = generation_rule)
         model.charge = pyo.Constraint(rule = charge_rule)
         model.electricity_supply = pyo.Constraint(rule = electricity_supply_rule)
@@ -1019,7 +1093,7 @@ class fw_rt(pyo.ConcreteModel):
             self.solve()
             self.solved = True        
 
-        P_profit = (pyo.value(self.q_rt))*self.P_rt
+        P_profit = (pyo.value(self.u) - pyo.value(self.Q_da))*self.P_rt
 
         return P_profit
 
@@ -1100,10 +1174,8 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         ## Bidding for next and current stage
         
         model.Q_da = pyo.Var(domain = pyo.Reals)
-        model.Q_da_next = pyo.Var(domain = pyo.Reals)
-        model.q_rt = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals)
-        model.q_rt_next = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals)
-        model.q_next = pyo.Var(domain = pyo.NonNegativeReals)
+        model.q_rt = pyo.Var(domain = pyo.Reals)
+        model.q_rt_next = pyo.Var(domain = pyo.NonNegativeReals)
                 
         ## Real-Time operation 
         
@@ -1152,9 +1224,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         def da_Q_rule(model):
             return model.Q_da == model.z_T_Q[0]
         
-        def da_Q_rule_next(model):
-            return model.Q_da_next == model.z_T_Q[1]
-        
         def rt_q_rule(model):
             return model.q_rt == model.z_T_q
         
@@ -1178,10 +1247,10 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         ## General Constraints
         
         def next_q_rt_rule_1(model):
-            return model.q_next == model.Q_da_next + model.q_rt_next
+            return model.q_rt_next <= self.z_T_Q[1] + omega
         
         def next_q_rt_rule_2(model):
-            return model.q_next <= self.delta_E_0*E_0_partial[self.stage + 1] + B
+            return model.q_rt_next >= self.z_T_Q[1] - omega
         
         def generation_rule(model):
             return model.g <= model.E_1
@@ -1193,7 +1262,7 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
             return model.u == model.g + model.d - model.c
         
         def dispatch_rule(model):
-            return model.Q_c == (1 + self.delta_c)*(model.Q_da + model.q_rt)
+            return model.Q_c == (1 + self.delta_c)*model.q_rt
         
         
         ### Imbalance Penalty
@@ -1213,14 +1282,13 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
                 + self.psi[l][1]*model.S 
                 + sum(self.psi[l][2][t]*model.T_Q[t] for t in range(T - 1 - self.stage)) 
                 + self.psi[l][3]*model.T_q 
-                + self.psi[l][4]*model.T_E
-                )
+                + self.psi[l][4]*model.T_E)
         
         ## Settlement fcn
         
         def settlement_fcn_rule(model):
             return model.f == (
-                model.q_rt*self.P_rt 
+                (model.q_rt - model.Q_da)*self.P_rt 
                 - gamma_over*model.phi_over 
                 - gamma_under*model.phi_under
                 )
@@ -1232,7 +1300,6 @@ class fw_rt_LP_relax(pyo.ConcreteModel): ## (Backward - Benders' Cut)
         model.auxiliary_T_E = pyo.Constraint(rule = auxiliary_T_E)
         
         model.da_Q = pyo.Constraint(rule = da_Q_rule)
-        model.da_Q_next = pyo.Constraint(rule = da_Q_rule_next)
         model.rt_q = pyo.Constraint(rule = rt_q_rule)
         model.rt_E = pyo.Constraint(rule = rt_E_rule)
         
@@ -1337,7 +1404,7 @@ class fw_rt_last(pyo.ConcreteModel):
         ## Bidding for next and current stage
         
         model.Q_da = pyo.Var(domain = pyo.NonNegativeReals)
-        model.q_rt = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
         
         ## Real-Time operation 
         
@@ -1383,11 +1450,9 @@ class fw_rt_last(pyo.ConcreteModel):
         
         def SOC_recourse_rule_1(model):
             return model.S_r >= beta*(model.S - 0.5*S)
-            #return model.S_r >= 0
 
         def SOC_recourse_rule_2(model):
             return model.S_r >= -beta*(model.S - 0.5*S)
-            #return model.S_r >= 0
 
         ## General Constraints
         
@@ -1402,7 +1467,7 @@ class fw_rt_last(pyo.ConcreteModel):
         
         
         def dispatch_rule(model):
-            return model.Q_c == (1 + self.delta_c)*(model.Q_da + model.q_rt)
+            return model.Q_c == (1 + self.delta_c)*model.q_rt
         
         ### Imbalance Penalty
         
@@ -1416,7 +1481,7 @@ class fw_rt_last(pyo.ConcreteModel):
         
         def settlement_fcn_rule(model):
             return model.f == (
-                model.q_rt*self.P_rt 
+                (model.q_rt - model.Q_da)*self.P_rt 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
                 - model.S_r
                 )
@@ -1491,7 +1556,7 @@ class fw_rt_last(pyo.ConcreteModel):
             self.solve()
             self.solved = True        
 
-        P_profit = (pyo.value(self.q_rt))*self.P_rt
+        P_profit = (pyo.value(self.u) - pyo.value(self.Q_da))*self.P_rt
 
         return P_profit
 
@@ -1561,7 +1626,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
         ## Bidding for next and current stage
         
         model.Q_da = pyo.Var(domain = pyo.NonNegativeReals)
-        model.q_rt = pyo.Var(bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(domain = pyo.NonNegativeReals)
                 
         ## Real-Time operation 
         
@@ -1640,7 +1705,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
         
         
         def dispatch_rule(model):
-            return model.Q_c == (1 + self.delta_c)*(model.Q_da + model.q_rt)
+            return model.Q_c == (1 + self.delta_c)*model.q_rt
     
     
         ### Imbalance Penalty
@@ -1655,7 +1720,7 @@ class fw_rt_last_LP_relax(pyo.ConcreteModel): ## (Backward)
         
         def settlement_fcn_rule(model):
             return model.f == (
-                model.q_rt*self.P_rt 
+                (model.q_rt - model.Q_da)*self.P_rt 
                 - gamma_over*model.phi_over - gamma_under*model.phi_under
                 - model.S_r
                 )
@@ -1762,7 +1827,7 @@ class rolling_da(pyo.ConcreteModel):
 
         # Intraday bidding variables
         
-        model.q_rt = pyo.Var(model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         
         # Intraday operation variables
         
@@ -1796,15 +1861,15 @@ class rolling_da(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_rule_1(model, t):
-            return model.q_da[t] + model.q_rt[t] <= E_0_partial[t] + B
+            return model.q_rt[t] <= model.q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, t):
-            return model.q_da[t] + model.q_rt[t] >= 0
+            return model.q_rt[t] >= model.q_da[t] - omega
     
         ## Operations rules
         
         def dispatch_rule(model, t):
-            return model.Q_c[t] == model.q_da[t] + model.q_rt[t]
+            return model.Q_c[t] == model.q_rt[t]
         
         def SOC_init_rule(model):
             return model.S[-1] == 0.5*S
@@ -1839,7 +1904,7 @@ class rolling_da(pyo.ConcreteModel):
         
         def rt_settlement_fcn_rule(model, t):
             return model.f_RT[t] == (
-                model.q_rt[t]*self.exp_P_rt[t] 
+                (model.q_rt[t] - model.q_da[t])*self.exp_P_rt[t] 
                 - gamma_over*model.phi_over[t] 
                 - gamma_under*model.phi_under[t]
                 )
@@ -1870,10 +1935,10 @@ class rolling_da(pyo.ConcreteModel):
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
         
     def solve(self):
+        
         self.build_model()
-        results = SOLVER.solve(self)
-        self.solved = True
-        return results
+        SOLVER.solve(self)
+        self.solved = True   
     
     def get_state_solutions(self):
         
@@ -1912,7 +1977,7 @@ class rolling_rt_init(pyo.ConcreteModel):
 
         # Intraday bidding variables
 
-        model.q_rt = pyo.Var(model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         
         # Intraday operation variables
         
@@ -1941,15 +2006,15 @@ class rolling_rt_init(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_rule_1(model, t):
-            return self.q_da_prev[t] + model.q_rt[t] <= E_0_partial[t] + B
+            return model.q_rt[t] <= self.q_da_prev[t] + omega
         
         def rt_bidding_amount_rule_2(model, t):
-            return self.q_da_prev[t] + model.q_rt[t] >= 0
+            return model.q_rt[t] >= self.q_da_prev[t] - omega
         
         ## Operations rules
         
         def dispatch_rule(model, t):
-            return model.Q_c[t] == self.q_da_prev[t] + model.q_rt[t]
+            return model.Q_c[t] == model.q_rt[t]
         
         def SOC_init_rule(model):
             return model.S[-1] == 0.5*S
@@ -1984,7 +2049,7 @@ class rolling_rt_init(pyo.ConcreteModel):
         
         def rt_settlement_fcn_rule(model, t):
             return model.f_RT[t] == (
-                model.q_rt[t]*self.exp_P_rt[t] 
+                (model.u[t] - self.q_da_prev[t])*self.exp_P_rt[t] 
                 - gamma_over*model.phi_over[t] 
                 - gamma_under*model.phi_under[t]
                 )
@@ -2012,12 +2077,12 @@ class rolling_rt_init(pyo.ConcreteModel):
             )
             
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
-        
+
     def solve(self):
+        
         self.build_model()
-        results = SOLVER.solve(self)
-        self.solved = True
-        return results
+        SOLVER.solve(self)
+        self.solved = True   
     
     def get_state_solutions(self):
         
@@ -2095,7 +2160,7 @@ class rolling_rt(pyo.ConcreteModel):
 
         model.Q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         
-        model.q_rt = pyo.Var(model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
 
         # Intraday operation variables
         
@@ -2128,24 +2193,24 @@ class rolling_rt(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_next_rule_1(model):
-            return model.Q_da[self.stage+1] + model.q_rt[self.stage+1] <= self.delta_E_0*E_0_partial[self.stage+1] + B
+            return model.q_rt[self.stage+1] <= model.Q_da[self.stage+1] + omega
         
         def rt_bidding_amount_next_rule_2(model):
-            return model.Q_da[self.stage+1] + model.q_rt[self.stage+1] >= 0
+            return model.q_rt[self.stage+1] >= model.Q_da[self.stage+1] - omega
         
         def rt_bidding_amount_rule_1(model, t):
-            return  model.Q_da[t] + model.q_rt[t] <= E_0_partial[t] + B
+            return model.q_rt[t] <= model.Q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, t):
-            return model.Q_da[t] + model.q_rt[t] >= 0
+            return model.q_rt[t] >= model.Q_da[t] - omega
         
         ## Operations rules
         
         def dispatch_stage_rule(model):
-            return model.Q_c[self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+            return model.Q_c[self.stage] == (1 + self.delta_c)*self.q_rt_prev
         
         def dispatch_rule(model, t):
-            return model.Q_c[t] == model.Q_da[t] + model.q_rt[t]
+            return model.Q_c[t] == model.q_rt[t]
         
         def SOC_init_rule(model):
             return model.S[self.stage-1] == self.S_prev
@@ -2183,14 +2248,14 @@ class rolling_rt(pyo.ConcreteModel):
         
         def rt_settlement_fcn_stage_rule(model):
             return model.f_RT[self.stage] == (
-                self.q_rt_prev*self.P_rt 
+                (self.q_rt_prev - model.Q_da[self.stage])*self.P_rt 
                 - gamma_over*model.phi_over[self.stage] 
                 - gamma_under*model.phi_under[self.stage]
                 )
         
         def rt_settlement_fcn_rule(model, t):
             return model.f_RT[t] == (
-                model.q_rt[t]*self.exp_P_rt[t] 
+                (model.u[t] - model.Q_da[t])*self.exp_P_rt[t] 
                 - gamma_over*model.phi_over[t] 
                 - gamma_under*model.phi_under[t]
                 )
@@ -2226,10 +2291,10 @@ class rolling_rt(pyo.ConcreteModel):
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
 
     def solve(self):
+        
         self.build_model()
-        results = SOLVER.solve(self)
-        self.solved = True
-        return results  
+        SOLVER.solve(self)
+        self.solved = True   
     
     def get_state_solutions(self):
         
@@ -2261,7 +2326,7 @@ class rolling_rt(pyo.ConcreteModel):
             self.solve()
             self.solved = True        
 
-        P_profit = self.q_rt_prev*self.P_rt
+        P_profit = (pyo.value(self.u[self.stage]) - pyo.value(self.Q_da[self.stage]))*self.P_rt
 
         return P_profit
 
@@ -2343,7 +2408,7 @@ class rolling_rt_last(pyo.ConcreteModel):
         ## Operations rules
         
         def dispatch_stage_rule(model):
-            return model.Q_c[self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+            return model.Q_c[self.stage] == (1 + self.delta_c)*self.q_rt_prev
         
         def SOC_init_rule(model):
             return model.S[self.stage-1] == self.S_prev
@@ -2375,7 +2440,7 @@ class rolling_rt_last(pyo.ConcreteModel):
         
         def rt_settlement_fcn_stage_rule(model):
             return model.f_RT[self.stage] == (
-                self.q_rt_prev*self.P_rt 
+                (self.q_rt_prev - model.Q_da[self.stage])*self.P_rt 
                 - gamma_over*model.phi_over[self.stage] 
                 - gamma_under*model.phi_under[self.stage]
                 )
@@ -2403,10 +2468,10 @@ class rolling_rt_last(pyo.ConcreteModel):
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
 
     def solve(self):
+        
         self.build_model()
-        results = SOLVER.solve(self)
-        self.solved = True
-        return results
+        SOLVER.solve(self)
+        self.solved = True   
 
     def get_settlement_fcn_value(self):
         
@@ -2418,23 +2483,6 @@ class rolling_rt_last(pyo.ConcreteModel):
         
         return fcn_value
 
-    def get_P_profit(self):
-        if not self.solved:
-            self.solve()
-            self.solved = True        
-
-        P_profit = self.q_rt_prev*self.P_rt
-
-        return P_profit
-
-    def get_Im_profit(self):
-        if not self.solved:
-            self.solve()
-            self.solved = True        
-
-        Im_profit = - gamma_over*pyo.value(self.phi_over[self.stage]) - gamma_under*pyo.value(self.phi_under[self.stage])
-
-        return Im_profit
 
 ## 3) 2-stage stochastic programming model
 
@@ -2470,7 +2518,7 @@ class two_stage_da(pyo.ConcreteModel):
 
         # Intraday bidding variables
         
-        model.q_rt = pyo.Var(model.DANODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(model.DANODE, model.TIME, domain = pyo.NonNegativeReals)
         
         # Intraday operation variables
         
@@ -2504,15 +2552,15 @@ class two_stage_da(pyo.ConcreteModel):
         ## RT bidding & market rules
         
         def rt_bidding_amount_rule_1(model,k ,t):
-            return model.q_da[t] + model.q_rt[k, t] <= E_0_partial[t] + B
+            return model.q_rt[k, t] <= model.q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, k, t):
-            return model.q_da[t] + model.q_rt[k, t] >= 0
+            return model.q_rt[k, t] >= model.q_da[t] - omega
         
         ## Operations rules
         
         def dispatch_rule(model, k, t):
-            return model.Q_c[k, t] == model.q_da[t] + model.q_rt[k, t]
+            return model.Q_c[k, t] == model.q_rt[k, t]
         
         def SOC_init_rule(model, k):
             return model.S[k, -1] == 0.5*S
@@ -2547,13 +2595,13 @@ class two_stage_da(pyo.ConcreteModel):
         
         def rt_settlement_fcn_rule(model, k, t):
             return model.f_RT[k, t] == (
-                model.q_rt[k, t]*self.P_rt_exp_list[k][t] 
+                (model.q_rt[k, t] - model.q_da[t])*self.P_rt_exp_list[k][t] 
                 - gamma_over*model.phi_over[k, t] 
                 - gamma_under*model.phi_under[k, t]
                 )
         
         model.da_bidding_amount = pyo.Constraint(model.TIME, rule = da_bidding_amount_rule)
-        model.rt_bidding_amount_1 = pyo.Constraint(model.DANODE, model.TIME, rule = rt_bidding_amount_rule_1)
+        model.rt_bidding_amount = pyo.Constraint(model.DANODE, model.TIME, rule = rt_bidding_amount_rule_1)
         model.rt_bidding_amount_2 = pyo.Constraint(model.DANODE, model.TIME, rule = rt_bidding_amount_rule_2)
 
         model.dispatch = pyo.Constraint(model.DANODE, model.TIME, rule = dispatch_rule)
@@ -2618,17 +2666,17 @@ class two_stage_rt_init(pyo.ConcreteModel):
         self.ID_params = ID_params
         self.exp_P_rt = exp_P_rt
         
-        self.N_t = len(self.ID_params[0])
+        self.N_t = len(self.ID_params)
         
         self.delta_E_sample = [0 for _ in range(self.N_t)]
         self.P_rt_sample = [0 for _ in range(self.N_t)]
         self.delta_c_sample = [0 for _ in range(self.N_t)]
         
         for j, ID_param in enumerate(self.ID_params):
-            
-            self.delta_E_sample[j] = ID_param[j][0]
-            self.P_rt_sample[j] = ID_param[j][1]
-            self.delta_c_sample[j] = ID_param[j][2]
+                        
+            self.delta_E_sample[j] = ID_param[0]
+            self.P_rt_sample[j] = ID_param[1]
+            self.delta_c_sample[j] = ID_param[2]
         
         self.T = T
     
@@ -2646,7 +2694,7 @@ class two_stage_rt_init(pyo.ConcreteModel):
 
         # Intraday bidding variables
 
-        model.q_rt = pyo.Var(model.IDNODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
         
         # Intraday operation variables
         
@@ -2674,19 +2722,22 @@ class two_stage_rt_init(pyo.ConcreteModel):
         
         ## RT bidding & market rules
         
+        def rt_bidding_nonanticipativity_rule(model, j):
+            return model.q_rt[j, 0] == model.q_rt[0, 0]
+        
         def rt_bidding_amount_rule_1(model, j, t):
-            return self.q_da_prev[t] + model.q_rt[j, t] <= E_0_partial[t] + B
+            return model.q_rt[j, t] <= self.q_da_prev[t] + omega
         
         def rt_bidding_amount_rule_2(model, j, t):
-            return self.q_da_prev[t] + model.q_rt[j, t] >= 0
+            return model.q_rt[j, t] >= self.q_da_prev[t] - omega
         
         ## Operations rules
         
         def dispatch_init_rule(model, j):
-            return model.Q_c[j, 0] == (self.q_da_prev[0] + model.q_rt[j, 0])*(1 + self.delta_c_sample[j])
+            return model.Q_c[j, 0] == model.q_rt[j, 0]*(1 + self.delta_c_sample[j])
                 
         def dispatch_rule(model, j, t):
-            return model.Q_c[j, t] == self.q_da_prev[t] + model.q_rt[j, t]
+            return model.Q_c[j, t] == model.q_rt[j, t]
         
         def SOC_init_rule(model, j):
             return model.S[j, -1] == 0.5*S
@@ -2721,18 +2772,19 @@ class two_stage_rt_init(pyo.ConcreteModel):
         
         def rt_settlement_init_rule(model, j):
             return model.f_RT[j, 0] == (
-                model.q_rt[j, 0]*self.P_rt_sample[j] 
+                (model.q_rt[j, 0] - self.q_da_prev[0])*self.P_rt_sample[j] 
                 - gamma_over*model.phi_over[j, 0] 
                 - gamma_under*model.phi_under[j, 0]
                 )
         
         def rt_settlement_fcn_rule(model, j, t):
             return model.f_RT[j, t] == (
-                model.q_rt[j, t]*self.exp_P_rt[t] 
+                (model.q_rt[j, t] - self.q_da_prev[t])*self.exp_P_rt[t] 
                 - gamma_over*model.phi_over[j, t] 
                 - gamma_under*model.phi_under[j, t]
                 )
         
+        model.rt_nonanticipativity = pyo.Constraint(model.IDNODE, rule = rt_bidding_nonanticipativity_rule)
         model.rt_bidding_amount_1 = pyo.Constraint(model.IDNODE, model.TIME, rule = rt_bidding_amount_rule_1)
         model.rt_bidding_amount_2 = pyo.Constraint(model.IDNODE, model.TIME, rule = rt_bidding_amount_rule_2)
         model.dispatch_init = pyo.Constraint(model.IDNODE, rule = dispatch_init_rule)
@@ -2775,7 +2827,7 @@ class two_stage_rt_init(pyo.ConcreteModel):
         
         State_var.append(pyo.value(self.S[0, -1]))
         State_var.append([pyo.value(self.q_da_prev[t]) for t in range(self.T)])
-        State_var.append(pyo.value(self.q_rt[0]))
+        State_var.append(pyo.value(self.q_rt[0, 0]))
         State_var.append(0)
         
         return State_var    
@@ -2825,7 +2877,7 @@ class two_stage_rt(pyo.ConcreteModel):
         self.P_rt = delta[1]
         self.delta_c = delta[2]
         
-        self.N_t = len(self.ID_params[0])
+        self.N_t = len(self.ID_params)
         
         self.delta_E_sample = [0 for _ in range(self.N_t)]
         self.P_rt_sample = [0 for _ in range(self.N_t)]
@@ -2833,9 +2885,9 @@ class two_stage_rt(pyo.ConcreteModel):
         
         for j, ID_param in enumerate(self.ID_params):
             
-            self.delta_E_sample[j] = ID_param[j][0]
-            self.P_rt_sample[j] = ID_param[j][1]
-            self.delta_c_sample[j] = ID_param[j][2]
+            self.delta_E_sample[j] = ID_param[0]
+            self.P_rt_sample[j] = ID_param[1]
+            self.delta_c_sample[j] = ID_param[2]
         
         self.T = T
 
@@ -2857,7 +2909,7 @@ class two_stage_rt(pyo.ConcreteModel):
 
         model.Q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         
-        model.q_rt = pyo.Var(model.IDNODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
 
         # Intraday operation variables
         
@@ -2906,37 +2958,41 @@ class two_stage_rt(pyo.ConcreteModel):
         
         def imbalance_under_non_anticipative_rule(model, j):
             return model.phi_under[j, self.stage] == model.phi_under[0, self.stage]
+        
+        def settlement_non_anticipative_rule(model, j):
+            return model.f_RT[j, self.stage] == model.f_RT[0, self.stage]
             
         ## RT bidding & market rules
         
         def rt_bidding_amount_init_rule_1(model, j):
-            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] <= self.delta_E_0*E_0_partial[self.stage+1] + B
+            return model.q_rt[j, self.stage+1] <= self.Q_prev[self.stage+1] + omega
         
         def rt_bidding_amount_init_rule_2(model, j):
-            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] >= 0
+            return model.q_rt[j, self.stage+1] >= self.Q_prev[self.stage+1] - omega
         
         def rt_bidding_amount_next_rule_1(model, j):
-            return model.Q_da[self.stage+2] + model.q_rt[j, self.stage+1] <= self.delta_E_sample[j]*E_0_partial[self.stage+1] + B
+            return model.q_rt[j, self.stage+2] <= self.Q_prev[self.stage+2] + omega
         
         def rt_bidding_amount_next_rule_2(model, j):
-            return model.Q_da[self.stage+2] + model.q_rt[j, self.stage+1] >= 0
+            return model.q_rt[j, self.stage+2] >= self.Q_prev[self.stage+2] - omega
         
         def rt_bidding_amount_rule_1(model, j, t):
-            return  model.Q_da[t] + model.q_rt[j, t] <= E_0_partial[t] + B
+            return  model.q_rt[j, t] <= self.Q_prev[t] + omega
         
         def rt_bidding_amount_rule_2(model, j, t):
-            return model.Q_da[t] + model.q_rt[j, t] >= 0
+            return model.q_rt[j, t] >= self.Q_prev[t] - omega
+
         
         ## Operations rules
         
         def dispatch_stage_rule(model, j):
-            return model.Q_c[j, self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+            return model.Q_c[j, self.stage] == (1 + self.delta_c)*self.q_rt_prev
         
         def dispatch_init_rule(model, j):
-            return model.Q_c[j, self.stage+1] == (1 + self.delta_c_sample[j])*(model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1])
+            return model.Q_c[j, self.stage+1] == (1 + self.delta_c_sample[j])*model.q_rt[j, self.stage+1]
         
         def dispatch_rule(model, j, t):
-            return model.Q_c[j, t] == model.Q_da[t] + model.q_rt[j, t]
+            return model.Q_c[j, t] == model.q_rt[j, t]
         
         def SOC_init_rule(model, j):
             return model.S[j, self.stage-1] == self.S_prev
@@ -2977,21 +3033,21 @@ class two_stage_rt(pyo.ConcreteModel):
         
         def rt_settlement_fcn_stage_rule(model, j):
             return model.f_RT[j, self.stage] == (
-                self.q_rt_prev*self.P_rt 
+                (self.q_rt_prev - self.Q_prev[self.stage])*self.P_rt 
                 - gamma_over*model.phi_over[j, self.stage] 
                 - gamma_under*model.phi_under[j, self.stage]
                 )
         
         def rt_settlement_fcn_init_rule(model, j):
             return model.f_RT[j, self.stage+1] == (
-                model.q_rt[j, self.stage+1]*self.P_rt_sample 
+                (model.q_rt[j, self.stage+1] - self.Q_prev[self.stage+1])*self.P_rt_sample[j]
                 - gamma_over*model.phi_over[j, self.stage+1] 
                 - gamma_under*model.phi_under[j, self.stage+1]
                 )
         
         def rt_settlement_fcn_rule(model, j, t):
             return model.f_RT[j, t] == (
-                model.q_rt[j, t]*self.exp_P_rt[t] 
+                (model.q_rt[j, t] - self.Q_prev[t])*self.exp_P_rt[t] 
                 - gamma_over*model.phi_over[j, t] 
                 - gamma_under*model.phi_under[j, t]
                 )
@@ -3004,10 +3060,11 @@ class two_stage_rt(pyo.ConcreteModel):
         model.generation_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = generation_amount_non_anticipative_rule)
         model.imbalance_over_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_over_non_anticipative_rule)
         model.imbalance_under_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_under_non_anticipative_rule)
+        model.settlement_non_anticipative = pyo.Constraint(model.IDNODE, rule = settlement_non_anticipative_rule)
         
         model.rt_bidding_amount_init_1 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_1)
         model.rt_bidding_amount_init_2 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_2)
-        model.rt_bidding_amount_next = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_next_rule_1)
+        model.rt_bidding_amount_next_1 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_next_rule_1)
         model.rt_bidding_amount_next_2 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_next_rule_2)
         model.rt_bidding_amount_1 = pyo.Constraint(model.IDNODE, model.BIDTIME_NEXT, rule = rt_bidding_amount_rule_1)
         model.rt_bidding_amount_2 = pyo.Constraint(model.IDNODE, model.BIDTIME_NEXT, rule = rt_bidding_amount_rule_2)
@@ -3090,14 +3147,14 @@ class two_stage_rt(pyo.ConcreteModel):
 
 class two_stage_rt_beforelast(pyo.ConcreteModel):
        
-    def __init__(self, stage, state, P_da, ID_params, exp_P_rt, delta):
+    def __init__(self, state, P_da, ID_params, delta):
         
         super().__init__()
 
         self.solved = False
-        
-        self.stage = stage
-        
+                
+        self.stage = T-2            
+    
         self.S_prev = state[0]
         self.Q_prev = state[1]
         self.q_rt_prev = state[2]
@@ -3105,13 +3162,12 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
         
         self.P_da = P_da
         self.ID_params = ID_params
-        self.exp_P_rt = exp_P_rt
                 
         self.delta_E_0 = delta[0]
         self.P_rt = delta[1]
         self.delta_c = delta[2]
         
-        self.N_t = len(self.ID_params[0])
+        self.N_t = len(self.ID_params)
         
         self.delta_E_sample = [0 for _ in range(self.N_t)]
         self.P_rt_sample = [0 for _ in range(self.N_t)]
@@ -3119,9 +3175,9 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
         
         for j, ID_param in enumerate(self.ID_params):
             
-            self.delta_E_sample[j] = ID_param[j][0]
-            self.P_rt_sample[j] = ID_param[j][1]
-            self.delta_c_sample[j] = ID_param[j][2]
+            self.delta_E_sample[j] = ID_param[0]
+            self.P_rt_sample[j] = ID_param[1]
+            self.delta_c_sample[j] = ID_param[2]
         
         self.T = T
 
@@ -3141,7 +3197,7 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
 
         model.Q_da = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         
-        model.q_rt = pyo.Var(model.IDNODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals)
+        model.q_rt = pyo.Var(model.IDNODE, model.TIME, domain = pyo.NonNegativeReals)
 
         # Intraday operation variables
         
@@ -3190,22 +3246,25 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
         
         def imbalance_under_non_anticipative_rule(model, j):
             return model.phi_under[j, self.stage] == model.phi_under[0, self.stage]
+        
+        def settlement_non_anticipative_rule(model, j):
+            return model.f_RT[j, self.stage] == model.f_RT[0, self.stage]
             
         ## RT bidding & market rules
         
         def rt_bidding_amount_init_rule_1(model, j):
-            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] <= self.delta_E_0*E_0_partial[self.stage+1] + B
-        
+            return model.q_rt[j, self.stage+1] <= self.Q_prev[self.stage+1] + omega
+
         def rt_bidding_amount_init_rule_2(model, j):
-            return model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1] >= 0
-        
+            return model.q_rt[j, self.stage+1] >= self.Q_prev[self.stage+1] - omega
+
         ## Operations rules
         
         def dispatch_stage_rule(model, j):
-            return model.Q_c[j, self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+            return model.Q_c[j, self.stage] == (1 + self.delta_c)*self.q_rt_prev
         
         def dispatch_init_rule(model, j):
-            return model.Q_c[j, self.stage+1] == (1 + self.delta_c_sample[j])*(model.Q_da[self.stage+1] + model.q_rt[j, self.stage+1])
+            return model.Q_c[j, self.stage+1] == (1 + self.delta_c_sample[j])*model.q_rt[j, self.stage+1]
         
         def SOC_init_rule(model, j):
             return model.S[j, self.stage-1] == self.S_prev
@@ -3240,14 +3299,14 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
         
         def rt_settlement_fcn_stage_rule(model, j):
             return model.f_RT[j, self.stage] == (
-                self.q_rt_prev*self.P_rt 
+                (self.q_rt_prev - self.Q_prev[self.stage])*self.P_rt 
                 - gamma_over*model.phi_over[j, self.stage] 
                 - gamma_under*model.phi_under[j, self.stage]
                 )
         
         def rt_settlement_fcn_init_rule(model, j):
             return model.f_RT[j, self.stage+1] == (
-                model.q_rt[j, self.stage+1]*self.P_rt_sample 
+                (model.q_rt[j, self.stage+1] - self.Q_prev[self.stage+1])*self.P_rt_sample[j]
                 - gamma_over*model.phi_over[j, self.stage+1] 
                 - gamma_under*model.phi_under[j, self.stage+1]
                 )
@@ -3260,6 +3319,7 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
         model.generation_amount_non_anticipative = pyo.Constraint(model.IDNODE, rule = generation_amount_non_anticipative_rule)
         model.imbalance_over_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_over_non_anticipative_rule)
         model.imbalance_under_non_anticipative = pyo.Constraint(model.IDNODE, rule = imbalance_under_non_anticipative_rule)
+        model.settlement_non_anticipative = pyo.Constraint(model.IDNODE, rule = settlement_non_anticipative_rule)
         
         model.rt_bidding_amount_init_1 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_1)
         model.rt_bidding_amount_init_2 = pyo.Constraint(model.IDNODE, rule = rt_bidding_amount_init_rule_2)
@@ -3380,6 +3440,8 @@ class two_stage_rt_last(pyo.ConcreteModel):
             model.TIME_ESS, bounds = (S_min, S_max), domain = pyo.NonNegativeReals, initialize = 0.0
         )
         
+        model.S_r = pyo.Var(domain = pyo.Reals)
+        
         model.g = pyo.Var(model.TIME, domain = pyo.NonNegativeReals)
         model.c = pyo.Var(model.TIME, bounds = (0, B), domain = pyo.Reals)
         model.d = pyo.Var(model.TIME, bounds = (0, B), domain = pyo.Reals)
@@ -3405,14 +3467,17 @@ class two_stage_rt_last(pyo.ConcreteModel):
         ## Operations rules
         
         def dispatch_stage_rule(model):
-            return model.Q_c[self.stage] == (1 + self.delta_c)*(model.Q_da[self.stage] + self.q_rt_prev)
+            return model.Q_c[self.stage] == (1 + self.delta_c)*self.q_rt_prev
         
         def SOC_init_rule(model):
             return model.S[self.stage-1] == self.S_prev
         
-        def SOC_last_rule(model):
-            return model.S[self.stage] == 0.5*S
+        def SOC_last_recourse_rule_1(model):
+            return model.S_r >= beta*(model.S[self.stage] - 0.5*S)
         
+        def SOC_last_recourse_rule_2(model):
+            return model.S_r >= -beta*(model.S[self.stage] - 0.5*S)
+     
         def SOC_balance_rule(model, t):
             return model.S[t] == model.S[t-1] + v*model.c[t] - (1/v)*model.d[t]
         
@@ -3437,7 +3502,7 @@ class two_stage_rt_last(pyo.ConcreteModel):
         
         def rt_settlement_fcn_stage_rule(model):
             return model.f_RT[self.stage] == (
-                self.q_rt_prev*self.P_rt 
+                (self.q_rt_prev - self.Q_prev[self.stage])*self.P_rt 
                 - gamma_over*model.phi_over[self.stage] 
                 - gamma_under*model.phi_under[self.stage]
                 )
@@ -3445,7 +3510,8 @@ class two_stage_rt_last(pyo.ConcreteModel):
         model.da_awarded_amount = pyo.Constraint(model.TIME, rule = da_awarded_amount_rule)
         model.dispatch_stage = pyo.Constraint(rule = dispatch_stage_rule)
         model.SOC_init = pyo.Constraint(rule = SOC_init_rule)
-        model.SOC_last = pyo.Constraint(rule = SOC_last_rule)
+        model.SOC_last_recourse_1 = pyo.Constraint(rule = SOC_last_recourse_rule_1)
+        model.SOC_last_recourse_2 = pyo.Constraint(rule = SOC_last_recourse_rule_2)
         model.SOC_balance = pyo.Constraint(model.TIME, rule = SOC_balance_rule)
         model.generation_stage = pyo.Constraint(rule = generation_stage_rule)
         model.charge = pyo.Constraint(model.TIME, rule = charge_rule)
@@ -3460,7 +3526,7 @@ class two_stage_rt_last(pyo.ConcreteModel):
             return sum(
                 model.f_RT[t] 
                 for t in model.TIME
-            )
+            ) - model.S_r
             
         model.objective = pyo.Objective(rule = objective_rule, sense = pyo.maximize)
 
@@ -3498,8 +3564,7 @@ class two_stage_rt_last(pyo.ConcreteModel):
 
         return Im_profit
 
-   
-   
+
 ## 4) 3-stage stochastic programming model
 
 class three_stage_da(pyo.ConcreteModel):
@@ -3559,7 +3624,7 @@ class three_stage_da(pyo.ConcreteModel):
         # Intraday bidding variables
         
         model.q_rt = pyo.Var(
-            model.DANODE, model.IDNODE, model.TIME, bounds = (-omega, omega), domain = pyo.Reals
+            model.DANODE, model.IDNODE, model.TIME, domain = pyo.NonNegativeReals
             )
         
         # Intraday operation variables
@@ -3597,15 +3662,15 @@ class three_stage_da(pyo.ConcreteModel):
             return model.q_rt[k, 0, 0] == model.q_rt[k, m, 0]
 
         def rt_bidding_amount_rule_1(model, k, m, t):
-            return model.q_da[t] + model.q_rt[k, m, t] <= self.delta_E_0_paths[k][m][t]*E_0_partial[t] + B
+            return model.q_rt[k, m, t] <= model.q_da[t] + omega
         
         def rt_bidding_amount_rule_2(model, k, m, t):
-            return model.q_da[t] + model.q_rt[k, m, t] >= 0
+            return model.q_rt[k, m, t] >= model.q_da[t] - omega
         
         ## Operations rules
 
         def dispatch_rule(model, k, m, t):
-            return model.Q_c[k, m, t] == (1 + self.delta_c_paths[k][m][t])*(model.q_da[t] + model.q_rt[k, m, t])
+            return model.Q_c[k, m, t] == (1 + self.delta_c_paths[k][m][t])*model.q_rt[k, m, t]
 
         def SOC_init_rule(model, k, m):
             return model.S[k, m, -1] == 0.5*S
@@ -3640,7 +3705,7 @@ class three_stage_da(pyo.ConcreteModel):
 
         def rt_settlement_fcn_rule(model, k, m, t):
             return model.f_RT[k, m, t] == (
-                model.q_rt[k, m, t]*self.P_rt_paths[k][m][t] 
+                (model.q_rt[k, m, t] - model.q_da[t])*self.P_rt_paths[k][m][t] 
                 - gamma_over*model.phi_over[k, m, t] 
                 - gamma_under*model.phi_under[k, m, t]
                 )
@@ -3698,9 +3763,7 @@ class three_stage_da(pyo.ConcreteModel):
         
         return State_var  
 
-
-# 3. Algorithms instances
-
+    
 
 ## PSDDiP Algorithm
 
@@ -3781,6 +3844,7 @@ class PSDDiPModel:
         breakstage_selection = 4,
         stopping_counter_limit = 5,
         approx_mode = False,
+        multicut_mode = False,
         ):
 
         ## STAGE = -1, 0, ..., STAGE - 1
@@ -3812,6 +3876,7 @@ class PSDDiPModel:
         self.N_t = len(self.RT_params[0][0])
         
         self.approx_mode = approx_mode
+        self.multicut_mode = multicut_mode
                    
         self.start_time = time.time()
         self.running_time = 0
@@ -3863,23 +3928,41 @@ class PSDDiPModel:
     # Initialize approximation of ECTGs        
     def _initialize_psi(self):
         
-        self.psi_da = [
-                    [                   
-                        [
-                            3*3600000*T,
-                            [0 for _ in range(self.STAGE)]
-                        ]
-                    ] for _ in range(self.K)
-            ]
+        if self.multicut_mode:
         
-        self.psi_da_1 = [
-                    [                   
+            self.psi_da = [
+                        [                   
+                            [
+                                3*3600000*T,
+                                [0 for _ in range(self.STAGE)]
+                            ]
+                        ] for _ in range(self.K)
+                ]
+            
+            self.psi_da_1 = [
+                        [                   
+                            [
+                                3*3600000*T,
+                                [0 for _ in range(self.STAGE)]
+                            ]
+                        ] for _ in range(self.K_eval)
+                ]
+            
+        else:
+            
+            self.psi_da = [
                         [
                             3*3600000*T,
                             [0 for _ in range(self.STAGE)]
                         ]
-                    ] for _ in range(self.K_eval)
-            ]
+                ]
+            
+            self.psi_da_1 = [
+                        [
+                            3*3600000*T,
+                            [0 for _ in range(self.STAGE)]
+                        ]
+                ]
         
         for k in range(self.K):
             for t in range(self.STAGE): ## psi(-1), ..., psi(T - 2)
@@ -3895,10 +3978,70 @@ class PSDDiPModel:
         
         ## cut selection for DA stage
         
-        if self.approx_mode:
+        if self.multicut_mode:
+           
+            if self.approx_mode:
+            
+                for k in range(self.K_eval):
+            
+                    min_index_da_list = []
+                
+                    for n in range(self.iteration):
+                        
+                        sol = self.forward_solutions_da[n]
+                        
+                        V_da = []
+                        
+                        for coeff_da in self.psi_da_1[k]:
+                                
+                            V_da.append(
+                                coeff_da[0] 
+                                + sum(coeff_da[1][t]*sol[0][t] for t in range(self.STAGE))
+                            )
+                        
+                        min_index_da = min(enumerate(V_da), key=lambda x: x[1])[0]
+
+                        min_index_da_list.append(min_index_da)
+
+                    min_index_da_list = list(dict.fromkeys(min_index_da_list))
+                    
+                    psi_da = [self.psi_da_1[k][i] for i in min_index_da_list] 
+                    
+                    self.psi_da_1[k] = psi_da
+            
+            elif self.approx_mode == False:
+                    
+                for k in range(self.K):
+                
+                    min_index_da_list = []
+                
+                    for n in range(self.iteration):
+                        
+                        sol = self.forward_solutions_da[n]
+                        
+                        V_da = []
+                        
+                        for coeff_da in self.psi_da[k]:
+                                
+                            V_da.append(
+                                coeff_da[0] 
+                                + sum(coeff_da[1][t]*sol[0][t] for t in range(self.STAGE))
+                            )
+                        
+                        min_index_da = min(enumerate(V_da), key=lambda x: x[1])[0]
+
+                        min_index_da_list.append(min_index_da)
+
+                    min_index_da_list = list(dict.fromkeys(min_index_da_list))
+                    
+                    psi_da = [self.psi_da[k][i] for i in min_index_da_list] 
+                    
+                    self.psi_da[k] = psi_da
         
-            for k in range(self.K_eval):
-        
+        else:
+           
+            if self.approx_mode:
+                        
                 min_index_da_list = []
             
                 for n in range(self.iteration):
@@ -3907,7 +4050,7 @@ class PSDDiPModel:
                     
                     V_da = []
                     
-                    for coeff_da in self.psi_da_1[k]:
+                    for coeff_da in self.psi_da_1:
                             
                         V_da.append(
                             coeff_da[0] 
@@ -3920,14 +4063,12 @@ class PSDDiPModel:
 
                 min_index_da_list = list(dict.fromkeys(min_index_da_list))
                 
-                psi_da = [self.psi_da_1[k][i] for i in min_index_da_list] 
+                psi_da = [self.psi_da_1[i] for i in min_index_da_list] 
                 
-                self.psi_da_1[k] = psi_da
-        
-        elif self.approx_mode == False:
-                
-            for k in range(self.K):
+                self.psi_da_1 = psi_da
             
+            elif self.approx_mode == False:
+                                    
                 min_index_da_list = []
             
                 for n in range(self.iteration):
@@ -3936,7 +4077,7 @@ class PSDDiPModel:
                     
                     V_da = []
                     
-                    for coeff_da in self.psi_da[k]:
+                    for coeff_da in self.psi_da:
                             
                         V_da.append(
                             coeff_da[0] 
@@ -3949,10 +4090,10 @@ class PSDDiPModel:
 
                 min_index_da_list = list(dict.fromkeys(min_index_da_list))
                 
-                psi_da = [self.psi_da[k][i] for i in min_index_da_list] 
+                psi_da = [self.psi_da[i] for i in min_index_da_list] 
                 
-                self.psi_da[k] = psi_da
-        
+                self.psi_da = psi_da
+    
         
         ## cut selection for ID stage
         
@@ -4076,7 +4217,11 @@ class PSDDiPModel:
                   
     def forward_pass(self, scenarios):
         
-        fw_da_subp = fw_da(self.DA_probs, self.psi_da)
+        if self.multicut_mode:
+            fw_da_subp = fw_da_multicut(self.DA_probs, self.psi_da)
+        else:
+            fw_da_subp = fw_da(self.psi_da)
+        
         fw_da_state = fw_da_subp.get_state_solutions()
         
         self.forward_solutions_da.append(fw_da_state)
@@ -4128,7 +4273,11 @@ class PSDDiPModel:
       
     def forward_pass_for_stopping(self, scenarios):
         
-        fw_da_subp = fw_da(self.DA_probs, self.psi_da)
+        if self.multicut_mode:
+            fw_da_subp = fw_da_multicut(self.DA_probs, self.psi_da)
+        else:
+            fw_da_subp = fw_da(self.psi_da)
+        
         fw_da_state = fw_da_subp.get_state_solutions()
         
         self.forward_solutions_da.append(fw_da_state)
@@ -4182,16 +4331,20 @@ class PSDDiPModel:
         
         return mu_hat
 
-    def forward_pass_1(self, scenarios):
-
-        fw_da_subp = fw_da(self.DA_probs_full, self.psi_da_1)
+    def forward_pass_1(self, scenarios):      
+        
+        if self.multicut_mode:
+            fw_da_subp = fw_da_multicut(self.DA_probs_full, self.psi_da_1)
+        else:   
+            fw_da_subp = fw_da(self.psi_da_1)
+        
         fw_da_state = fw_da_subp.get_state_solutions()
 
         self.forward_solutions_da.append(fw_da_state)
 
         f = []
-        S_last = []
-
+        S_last = []  
+  
         saved_k = set()  # <-- NEW: track which clusters already saved states
 
         for n, scenario in enumerate(scenarios):
@@ -4247,7 +4400,11 @@ class PSDDiPModel:
       
     def forward_pass_for_stopping_1(self, scenarios):
         
-        fw_da_subp = fw_da(self.DA_probs_full, self.psi_da_1)
+        if self.multicut_mode:
+            fw_da_subp = fw_da_multicut(self.DA_probs_full, self.psi_da_1)
+        else:
+            fw_da_subp = fw_da(self.psi_da_1)
+            
         fw_da_state = fw_da_subp.get_state_solutions()
         
         self.forward_solutions_da.append(fw_da_state)
@@ -4305,8 +4462,7 @@ class PSDDiPModel:
         self.LB.append(mu_hat) 
         
         return mu_hat
-
-       
+      
     # Backward Pass    
     def inner_product(self, t, pi, sol):
         
@@ -4388,23 +4544,55 @@ class PSDDiPModel:
 
         prev_solution = self.forward_solutions_da[-1]
 
-        for k, P_da in enumerate(self.DA_params):
-                        
-            fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
-                prev_solution, self.psi[k][0], P_da
-                )
+        if self.multicut_mode:
             
-            psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
-            
-            pi = [psi_sub[1]] 
+            for k, P_da in enumerate(self.DA_params):
+                            
+                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
+                    prev_solution, self.psi[k][0], P_da
+                    )
+                
+                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+                
+                pi = [psi_sub[1]] 
 
-            v = psi_sub[0] - self.inner_product_da(pi, prev_solution)
+                v = psi_sub[0] - self.inner_product_da(pi, prev_solution)
+                
+                cut_coeff = [v] + [pi[0]] 
+                self.psi_da[k].append(cut_coeff)
             
-            cut_coeff = [v] + [pi[0]] 
-            self.psi_da[k].append(cut_coeff)
-        
-        fw_da_for_UB = fw_da(self.DA_probs, self.psi_da)
-        self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+            fw_da_for_UB = fw_da_multicut(self.DA_probs, self.psi_da)
+            self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+  
+        else:   
+            
+            v_sum = 0
+            pi_mean = [[0 for _ in range(self.STAGE)]]
+            
+            for k, P_da in enumerate(self.DA_params):
+                
+                prob = self.DA_probs[k]
+                
+                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
+                    prev_solution, self.psi[k][0], P_da
+                    )
+                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+                
+                for i in range(self.STAGE):
+                    pi_mean[0][i] += psi_sub[1][i]*prob
+
+                v_mean += psi_sub[0]*prob
+
+            v = v_mean - self.inner_product_da(pi_mean, prev_solution)
+
+            cut_coeff = [v] + pi_mean
+            self.psi_da.append(cut_coeff)
+
+            self.forward_solutions_da = []
+            self.forward_solutions = [[[] for _ in range(self.STAGE)] for _ in range(self.K)]
+            
+            fw_da_for_UB = fw_da(self.psi_da)
+            self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
   
     def backward_pass_1(self):
 
@@ -4477,27 +4665,60 @@ class PSDDiPModel:
 
         prev_solution = self.forward_solutions_da[-1]
 
-        for n, P_da in enumerate(self.DA_params_full):
+        if self.multicut_mode:
             
-            k_nearest = self.find_cluster_index_for_evaluation(n)
-            
-            psi_ID = self.psi[k_nearest][0]
-            
-            fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
-                prev_solution, psi_ID, P_da
-                )
-            
-            psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
-            
-            pi = [psi_sub[1]] 
+            for n, P_da in enumerate(self.DA_params_full):
+                
+                k_nearest = self.find_cluster_index_for_evaluation(n)
+                
+                psi_ID = self.psi[k_nearest][0]
+                
+                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
+                    prev_solution, psi_ID, P_da
+                    )
+                
+                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+                
+                pi = [psi_sub[1]] 
 
-            v = psi_sub[0] - self.inner_product_da(pi, prev_solution)
+                v = psi_sub[0] - self.inner_product_da(pi, prev_solution)
+                
+                cut_coeff = [v] + [pi[0]] 
+                self.psi_da_1[n].append(cut_coeff)
             
-            cut_coeff = [v] + [pi[0]] 
-            self.psi_da_1[n].append(cut_coeff)
-        
-        fw_da_for_UB = fw_da(self.DA_probs_full, self.psi_da_1)
-        self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+            fw_da_for_UB = fw_da_multicut(self.DA_probs_full, self.psi_da_1)
+            self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
+            
+        else:   
+            
+            v_mean = 0
+            pi_mean = [[0 for _ in range(self.STAGE)]]
+            
+            for n, P_da in enumerate(self.DA_params_full):
+                
+                prob = self.DA_probs_full[n]
+                
+                k_nearest = self.find_cluster_index_for_evaluation(n)
+                
+                psi_ID = self.psi[k_nearest][0]
+                
+                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
+                    prev_solution, psi_ID, P_da
+                    )
+                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+                
+                for i in range(self.STAGE):
+                    pi_mean[0][i] += psi_sub[1][i]*prob
+
+                v_mean += psi_sub[0]*prob
+
+            v = v_mean - self.inner_product_da(pi_mean, prev_solution)
+
+            cut_coeff = [v] + pi_mean
+            self.psi_da_1.append(cut_coeff)
+
+            fw_da_for_UB = fw_da(self.psi_da_1)
+            self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
 
     # Main Loop
     def stopping_criterion(self):
@@ -4566,7 +4787,7 @@ class PSDDiPModel:
                 #print(f"cut_num = {(len(self.psi[0][2]))}")
                 
                 print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
-                print(f"  Running time for iter = {self.iteration} : {self.running_time:.2f} seconds\n")
+                #print(f"  Running time for iter = {self.iteration} : {self.running_time:.2f} seconds\n")
 
             else:
                 
@@ -4610,6 +4831,43 @@ class PSDDiPModel:
         print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {self.gap:.4f}")
         print(f"iteration : {self.iteration}, total_time : {self.running_time:.2f} seconds\n")
 
+    def plot_bounds(self, use_iteration_minus_one=False, ylim=None, figsize=(8, 4.5)):
+
+        LB = np.asarray(self.LB[1:], dtype=float)  # skip initial dummy -inf
+        UB = np.asarray(self.UB[1:], dtype=float)  # skip initial dummy +inf
+
+        if len(LB) == 0 or len(UB) == 0:
+            print("No valid LB/UB history to plot yet.")
+            return
+
+        n = min(len(LB), len(UB))
+        LB = LB[:n]
+        UB = UB[:n]
+
+        if use_iteration_minus_one:
+            x = np.arange(n)          # 0, 1, ..., n-1
+            xlabel = "Iteration - 1"
+        else:
+            x = np.arange(1, n + 1)   # 1, 2, ..., n
+            xlabel = "Iteration"
+
+        if ylim is None:
+            y0 = UB[0]
+            ylim = (0, 0.15 * y0)
+
+        plt.figure(figsize=figsize)
+        plt.plot(x, LB, marker="o", linewidth=1.8, label="LB")
+        plt.plot(x, UB, marker="s", linewidth=1.8, label="UB")
+        plt.xlabel(xlabel)
+        plt.ylabel("Bound value")
+        plt.title(f"LB/UB convergence (approx_mode={self.approx_mode})")
+        plt.ylim(*ylim)
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+
 
 # 4. Main execution
 
@@ -4620,7 +4878,7 @@ if __name__ == "__main__":
     random.seed(42)
     np.random.seed(42)
 
-    evaluation_num = int(50/K_eval)
+    evaluation_num = int(100/K_eval)
     
     def sample_scenario_paths(Scenario_tree, N):
         scenarios = []
@@ -4641,7 +4899,7 @@ if __name__ == "__main__":
     scenarios_for_SP = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num*2)
 
     # Base directory
-    BASE_OUTDIR = Path(f"./Stochastic_Approach/NestedBenders/scenario_paths/{price_setting}")
+    BASE_OUTDIR = Path(f"./Stochastic_Approach/NestedBenders/scenario_paths/{bin_num}")
     BASE_OUTDIR.mkdir(parents=True, exist_ok=True)
 
     # Save as npy (single file each)
@@ -4714,6 +4972,7 @@ if __name__ == "__main__":
         breakstage_selection=15,
         stopping_counter_limit=10,
         approx_mode=False,
+        multicut_mode=False,
     )
 
     checkpoint_path = PSI_DIR / f"{price_setting}_state.npy"
@@ -4729,6 +4988,7 @@ if __name__ == "__main__":
     
     
     psddip_multi_full.run_sddip()
+    psddip_multi_full.plot_bounds(use_iteration_minus_one=False)
     
     save_psddip_state(
         psddip_multi_full,
@@ -4738,9 +4998,6 @@ if __name__ == "__main__":
  
  
     """### Convergence of Final SOC Across Iterations (scenario-wise + statistics)
-
-    import numpy as np
-    import matplotlib.pyplot as plt
 
     # S_last_list_convergence: shape (N_iter, N_scenarios)
     S_last_list_convergence = psddip_multi_full.S_last_list
@@ -4770,7 +5027,7 @@ if __name__ == "__main__":
     plt.ylabel("Final State of Charge (SOC)")
     plt.title("Convergence of Final SOC Across Iterations")
 
-    plt.ylim(0.3*S, 0.7*S)        # physical SOC bounds
+    plt.ylim(0.1*S, 0.9*S)        # physical SOC bounds
     plt.grid(True)
     plt.legend()
 
@@ -4780,7 +5037,7 @@ if __name__ == "__main__":
  
     ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
     
-    """for approx_mode in [True, False]: 
+    for approx_mode in [True, False]: 
         
         for k, K in enumerate([K for K in K_list]):
             
@@ -4801,21 +5058,23 @@ if __name__ == "__main__":
                 alpha = 0.95,
                 tol=1e-4,
                 breakstage_selection=10,
-                stopping_counter_limit=12,
-                approx_mode=approx_mode,
+                stopping_counter_limit=6,
+                approx_mode=approx_mode,   
+                multicut_mode=False, 
             )
-            
+                        
             psddip_multi_da.run_sddip()
             
             BASE_DIR = Path(__file__).resolve().parent       
                     
-            PSI_DIR  = BASE_DIR / "psi_DA_LP" / f"{price_setting}" / ("approx" if approx_mode else "exact")
+            PSI_DIR  = BASE_DIR / "psi_DA_LP" / f"{bin_num}" / ("approx" if approx_mode else "exact")
             PSI_DIR.mkdir(parents=True, exist_ok=True)
 
             psi_path = PSI_DIR / f"psi_DA_{K}.npy"
 
             if approx_mode:
                 psi_DA = psddip_multi_da.psi_da_1
+                
             else:
                 psi_DA = psddip_multi_da.psi_da
 
@@ -4825,7 +5084,7 @@ if __name__ == "__main__":
                 allow_pickle=True
             )
 
-    print("✅ psd_DA saved as .npy:")"""
+    print("✅ psd_DA saved as .npy:")
     
  
     ## 4. Notify done via plot

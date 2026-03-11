@@ -221,7 +221,7 @@ Q_c_f_X_values = np.array([f_X(x) for x in Q_c_x_values])
 
 def sample_curtailment_error(p):
     if np.random.rand() < p:
-        return np.random.uniform(-1.0, 0.0)
+        return np.random.uniform(-0.5, 0.5)
     return 0.0
 
 
@@ -232,10 +232,10 @@ UB_price = P_max
 LB_energy = -540
 UB_energy = 18000
 num_bins_E = 30
-num_bins_P = 30
+num_bins_P = 2
 
 bin_edges_energy = np.linspace(LB_energy, UB_energy, num_bins_E + 1)
-bin_edges_price = np.linspace(LB_price, UB_price, num_bins_P)
+bin_edges_price = np.linspace(LB_price, UB_price, num_bins_P + 1)
 
 def merge_bins(data, conditioning_var, bin_edges, min_data_per_bin=10, tol=1e-9):
 
@@ -453,24 +453,6 @@ inspect_bins(data, 'E_0_value', 'day_ahead_price', num_bins_E)
 inspect_bins(data, 'day_ahead_price', 'real_time_price', num_bins_P)
 #plot_histogram(data, 'real_time_price', LB_price, UB_price)
 
-tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
-    data=data,
-    conditioning_var='E_0_value',
-    target_var='day_ahead_price',
-    bin_edges=bin_edges_energy,  
-    K=5,
-    min_data_per_bin=20
-)
-
-tgmm_model2_params, model2_bin_edges = train_conditional_tgmm(
-    data=data,
-    conditioning_var='day_ahead_price',
-    target_var='real_time_price',
-    bin_edges=bin_edges_price,  
-    K=5,
-    min_data_per_bin=20
-)
-
 
 def find_bin(value, bin_edges, tgmm_params):
 
@@ -524,6 +506,15 @@ def sample_real_time_price(P_da_value, tgmm_params, bin_edges, num_samples=1):
     return samples
 
 
+tgmm_model1_params, model1_bin_edges = train_conditional_tgmm(
+    data=data,
+    conditioning_var='E_0_value',
+    target_var='day_ahead_price',
+    bin_edges=bin_edges_energy,  
+    K=5,
+    min_data_per_bin=20
+)
+
 
 E_0_daily = E_0_daily[61:92]
 
@@ -531,21 +522,39 @@ P_da_daily = day_ahead_prices_daily[61:92]
 P_rt_daily = real_time_prices_daily[61:92]
 
 
-# Generate Scenario
-
 class scenario():
     
-    def __init__(self, N_t, E_0):
+    def __init__(self, N_t, E_0, bin_num):
         
         self.E_0 = E_0
         self.T = 24
         self.N_t = N_t
+        
+        self.bin_num = bin_num
         
         self.P_da = []
         self.delta_E = []
         self.Q_c = []
         self.P_rt = []
         self.delta = []
+        
+        self.tgmm_model2_params = None
+        self.model2_bin_edges = None
+        
+        self._conditional_dist_P_rt()
+
+    def _conditional_dist_P_rt(self):
+    
+        bin_edges_price = np.linspace(LB_price, UB_price, self.bin_num + 1)
+
+        self.tgmm_model2_params, self.model2_bin_edges = train_conditional_tgmm(
+            data=data,
+            conditioning_var='day_ahead_price',
+            target_var='real_time_price',
+            bin_edges=bin_edges_price,  
+            K=5,
+            min_data_per_bin=20
+        )
 
     def sample_multiple_P_da(self, n):
         
@@ -572,25 +581,25 @@ class scenario():
             ## sample one P_rt depending on E_0
             try:
                 P_rt = sample_real_time_price(
-                    P_da, tgmm_model2_params, model2_bin_edges, num_samples=1
+                    P_da, self.tgmm_model2_params, self.model2_bin_edges, num_samples=1
                 )
             except ValueError as e:
                 print(f"Error sampling P_rt for t={t}: {e}")        
             
             ## sample one delta_Q_c
-            if P_da < 0 and P_rt[0] < -P_r + 20:
+            if P_rt[0] < -P_r + 20:
                 delta_Q_c = sample_curtailment_error(1.0)
                 
-            elif P_da < 0 and P_rt[0] >= -P_r + 20 and P_rt[0] < -P_r + 40:
+            elif P_rt[0] >= -P_r + 20 and P_rt[0] < -P_r + 40:
                 delta_Q_c = sample_curtailment_error(0.8)
             
-            elif P_da < 0 and P_rt[0] >= -P_r + 40 and P_rt[0] < -P_r + 60:
+            elif P_rt[0] >= -P_r + 40 and P_rt[0] < -P_r + 60:
                 delta_Q_c = sample_curtailment_error(0.6)
             
-            elif P_da < 0 and P_rt[0] >= -P_r + 60 and P_rt[0] < -P_r + 80:
+            elif P_rt[0] >= -P_r + 60 and P_rt[0] < -P_r + 80:
                 delta_Q_c = sample_curtailment_error(0.4)
             
-            elif P_da < 0 and P_rt[0] >= 0 and P_rt[0] < 20:
+            elif P_rt[0] >= 0 and P_rt[0] < 20:
                 delta_Q_c = sample_curtailment_error(0.2)
                 
             else:
@@ -618,9 +627,9 @@ class scenario():
         return scenario
 
 
-evaluation_num = 50
+evaluation_num = 30
 
-K_list = [1, 5, 10, 20, 30, evaluation_num]
+K_list = [1, 5, 10, 15, 20, evaluation_num]
 
 # Save Energy forecast csv file
 
@@ -690,16 +699,16 @@ plt.savefig('./Stochastic_Approach/Scenarios/E_0_profiles_cloudy_normal_sunny.pn
 plt.close()
 
 
-E_0 = E_0_sunny
+E_0 = E_0_normal
 
 
 if __name__ == '__main__':
 
     # Save Reduced Day Ahead price and Reduced Scenario Tree csv files
         
-    price_mode = 'sunny'  # 'cloudy', 'normal', 'sunny'
+    price_mode = 'normal'  # 'cloudy', 'normal', 'sunny'
             
-    scenario_generator = scenario(3, E_0)
+    scenario_generator = scenario(3, E_0, num_bins_P)
         
     sampled_P_da = np.array(scenario_generator.sample_multiple_P_da(evaluation_num))
             

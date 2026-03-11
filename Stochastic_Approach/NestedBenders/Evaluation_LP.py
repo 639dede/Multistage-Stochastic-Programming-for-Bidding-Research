@@ -35,7 +35,7 @@ SOLVER.options['MIPGap'] = 1e-3
 assert SOLVER.available(), f"Solver {solver} is available."
 
 
-price_setting = 'cloudy'  # 'cloudy', 'normal', 'sunny'
+price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
 
 from NestedBenders.PSDDiP_LP import (
     fw_da,
@@ -47,6 +47,10 @@ from NestedBenders.PSDDiP_LP import (
     rolling_rt,
     rolling_rt_last,
     two_stage_da,
+    two_stage_rt_init,
+    two_stage_rt,
+    two_stage_rt_beforelast,
+    two_stage_rt_last,
     three_stage_da,
     K_list,
     )
@@ -85,19 +89,22 @@ else:
 
 ## 0. Load Price and Scenario csv files
 
-C = 21022.1
+P_r = 80
+P_max = 200
+
+E_0 = E_0
+
+C = 15000
 S = C
 B = C/3
 
 S_min = 0.1*S
 S_max = 0.9*S
 
-P_r = 80
-P_max = 200
-
 _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
 
+bin_num = 50
 
 def load_clustered_P_da(directory_path):
     """
@@ -188,11 +195,11 @@ def load_scenario_trees(base_dir):
     return Reduced_scenario_trees
 
 
-cluster_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/P_da_{price_setting}'
+cluster_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/P_da_{bin_num}'
 Reduced_P_da, Reduced_Probs = load_clustered_P_da(cluster_dir)
 
 
-clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_{price_setting}'
+clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_{bin_num}'
 Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
 
 T = 24
@@ -248,7 +255,6 @@ def exp_P_rt_given_P_da(n, Scenario_tree_params):
 
 exp_P_rt_glob = expectation_P_rt()
 
-
 ## 1. Load evaluation/test scenario paths
 
 K_eval = len(P_da_eval)
@@ -256,7 +262,7 @@ K_eval = len(P_da_eval)
 evaluation_num = 10
 
 BASE_DIR = Path(__file__).resolve().parent
-SCEN_ROOT = BASE_DIR / "scenario_paths" / price_setting
+SCEN_ROOT = BASE_DIR / "scenario_paths" / f"{bin_num}"
 
 scenarios_for_eval = np.load(
     SCEN_ROOT / "scenarios_eval.npy",
@@ -268,7 +274,7 @@ scenarios_for_SP = np.load(
     allow_pickle=True
 ).tolist()
 
-
+"""
 ## 2. Load ECTG functions for DA stage
 
 PSI_DA_DIR = BASE_DIR / "psi_DA_LP" / price_setting
@@ -300,6 +306,7 @@ state = np.load(state_path, allow_pickle=True).item()
 
 psi_ID = state["psi_ID"]        # this is the list you saved as model.psi
 
+"""
 
 ## 4. Evaluate
 
@@ -378,6 +385,107 @@ def evaluation_rolling_rolling(scenarios):
     return q_da, eval
 
 
+def evaluation_2SP_rolling(scenarios, scenarios_SP):
+
+    exp_P_rt_each = [exp_P_rt_given_P_da(n, Scenario_tree_eval) for n in range(K_eval)]
+    
+    da_subp = two_stage_da(P_da_eval, exp_P_rt_each)
+    
+    da_state = da_subp.get_state_solutions()
+                
+    q_da = da_state[0]
+                        
+    f = []
+    
+    f_DA = [0]*T
+    f_P  = [0]*T
+    f_E  = [0]*T
+    f_Im = [0]*T
+    
+    for n, scenarios_n in enumerate(scenarios):
+                    
+        P_da = P_da_eval[n]  
+        
+        scenario_paths = scenarios_SP[n]
+                            
+        exp_P_rt = exp_P_rt_given_P_da(n, Scenario_tree_eval)
+        
+        ID_params_list = [
+                [] for t in range(T)
+            ]
+        
+        for scenario in scenario_paths:
+            for t in range(T):  
+                ID_params_list[t].append(scenario[t])
+     
+        rt_init_subp = two_stage_rt_init(da_state, P_da, ID_params_list[0], exp_P_rt)
+        rt_init_state = rt_init_subp.get_state_solutions()       
+        
+        f_DA_list = rt_init_subp.get_DA_profit()
+        
+        for i in range(T):
+            f_DA[i] += f_DA_list[i]/K_eval
+        
+        fcn_value = rt_init_subp.get_settlement_fcn_value()
+        
+        for scenario in scenarios_n:
+            
+            state = rt_init_state
+            
+            f_scenario = fcn_value
+            
+            for t in range(T - 2): ## t = 0, ..., T-3
+                                    
+                rt_subp = two_stage_rt(
+                    t, state, P_da, ID_params_list[t+1], exp_P_rt, scenario[t]
+                    )
+                
+                f_P[t] += rt_subp.get_P_profit()/(K_eval*evaluation_num)
+                f_Im[t] += rt_subp.get_Im_profit()/(K_eval*evaluation_num)
+                
+                state = rt_subp.get_state_solutions()
+                
+                f_scenario += rt_subp.get_settlement_fcn_value()
+            
+            ## t = T-2
+            
+            rt_beforelast_subp = two_stage_rt_beforelast(
+                state, P_da, ID_params_list[T-1], scenario[T-2]
+                )
+
+            f_P[T-2] += rt_beforelast_subp.get_P_profit()/(K_eval*evaluation_num)
+            f_Im[T-2] += rt_beforelast_subp.get_Im_profit()/(K_eval*evaluation_num)
+
+            f_scenario += rt_beforelast_subp.get_settlement_fcn_value()
+            
+            ## t = T-1
+            
+            rt_last_subp = two_stage_rt_last(
+                state, P_da, scenario[T-1]
+                )
+
+            f_P[T-1] += rt_last_subp.get_P_profit()/(K_eval*evaluation_num)
+            f_Im[T-1] += rt_last_subp.get_Im_profit()/(K_eval*evaluation_num)
+
+            f_scenario += rt_last_subp.get_settlement_fcn_value()
+                        
+            f.append(f_scenario)
+        
+    mu_hat = np.mean(f)
+    
+    sigma_hat = np.std(f, ddof=1)  
+
+    z_alpha_half = 1.96  
+    
+    eval = mu_hat 
+
+    print(f"\nRolling 2SP for price setting = {price_setting}")
+    print(f"Evaluation : {eval}")
+    
+    return q_da, eval
+
+
+"""
 def evaluation_rolling_sddip(scenarios):
         
     da_subp = rolling_da(exp_P_da, exp_P_rt_glob)
@@ -460,6 +568,7 @@ def evaluation_rolling_sddip(scenarios):
     print(f"Evaluation : {eval}")
     
     return q_da, q_ID_list, S_list, f_P, f_Im, eval
+
 
 
 def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
@@ -645,14 +754,17 @@ def evaluation_psddip_sddip(K, scenarios, approx_mode):
     print(f"Evaluation : {eval}")
     
     return q_da, q_ID_list, S_list, f_P, f_Im, eval
-    
+    """
 
 scenarios = scenarios_for_eval
-
 
 #%% Cut mode index: 'SB' -> 0, 'L-sub' -> 1
 
 evaluation_rolling_rolling(scenarios)
+evaluation_2SP_rolling(scenarios, scenarios_for_SP)
+
+
+"""
 q_da_r, q_ID_r, S_r, f_P_r, f_Im_r, eval_r = evaluation_rolling_sddip(scenarios)
 q_da_s2, q_ID_s2, S_s2, f_P_s2, f_Im_s2, eval_s2 = evaluation_SP_sddip(2, scenarios, scenarios_for_SP)  
 q_da_s3, q_ID_s3, S_s3, f_P_s3, f_Im_s3, eval_s3 = evaluation_SP_sddip(3, scenarios, scenarios_for_SP)
@@ -712,10 +824,9 @@ def save_solutions_lp(
     q_da_p_exact, q_ID_p_exact, S_p_exact, f_P_p_exact, f_Im_p_exact, eval_p_exact,
     filename=None
 ):
-    """
-    Saves a single npy dict into the same folder as this file's sibling: NestedBenders/Solutions_LP/
-    File: <price_setting>_solutions.npy by default.
-    """
+    #Saves a single npy dict into the same folder as this file's sibling: NestedBenders/Solutions_LP/
+    #File: <price_setting>_solutions.npy by default.
+
 
     # directory: .../NestedBenders/Solutions_LP
     SOL_DIR = os.path.join(os.path.dirname(__file__), "Solutions_LP")
@@ -776,4 +887,4 @@ save_solutions_lp(
     f_P_p_exact=f_P_p_exact, f_Im_p_exact=f_Im_p_exact, eval_p_exact=eval_p_exact,
 
     filename=f"{price_setting}_solutions.npy"
-)
+)"""

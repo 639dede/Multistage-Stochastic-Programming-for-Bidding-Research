@@ -569,7 +569,7 @@ def print_eval_table(price_setting, baselines, approx_mode=True, approx_ks=None)
 
 if __name__ == "__main__":
 
-    price_setting = "sunny"     # change as needed
+    price_setting = "cloudy"     # change as needed
     approx_mode = False          # True=approx, False=exact
     K_pick = 50                 # PSDDiP curve to compare. Use None to plot ALL K curves.
 
