@@ -37,7 +37,6 @@ assert SOLVER.available(), f"Solver {solver} is available."
 
 inspect = False
 
-price_setting = 'normal'  # 'cloudy', 'normal', 'sunny'
 
 # 1. Parameters & Computational settings
 
@@ -47,6 +46,12 @@ E_0_path_cloudy = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_cloudy.cs
 np.set_printoptions(suppress=True, precision=4)
 
 E_0_cloudy = np.loadtxt(E_0_path_cloudy, delimiter=',')
+
+
+E_0_path_mid = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_mid.csv'
+np.set_printoptions(suppress=True, precision=4)
+
+E_0_mid = np.loadtxt(E_0_path_mid, delimiter=',')
 
 
 E_0_path_normal = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_normal.csv'
@@ -60,15 +65,6 @@ np.set_printoptions(suppress=True, precision=4)
 
 E_0_sunny = np.loadtxt(E_0_path_sunny, delimiter=',')
 
-
-if price_setting == 'cloudy':
-    E_0 = E_0_cloudy    
-
-elif price_setting == 'normal':
-    E_0 = E_0_normal
-    
-else:
-    E_0 = E_0_sunny
 
 E_0 = E_0_normal
 
@@ -182,7 +178,6 @@ T = 24
 hours = np.arange(T)
 
 K_list = [len(P_da_list) for P_da_list in Reduced_P_da]
-
 
 
 """## Plot clustered P_da profiles for each K
@@ -326,7 +321,6 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
 """
 
 
-
 ## Parameters 
 
 T = 24
@@ -337,7 +331,7 @@ P_max = 200
 
 E_0 = E_0
 
-C = 15000
+C = 20000
 S = C
 B = C/3
 
@@ -350,7 +344,7 @@ v = 0.95
 gamma_over = 2*P_max
 gamma_under = 2*P_max
 
-omega = 0.1*S
+omega = 0.3*S
 
 E_0_partial = E_0
 
@@ -2326,7 +2320,7 @@ class rolling_rt(pyo.ConcreteModel):
             self.solve()
             self.solved = True        
 
-        P_profit = (pyo.value(self.u[self.stage]) - pyo.value(self.Q_da[self.stage]))*self.P_rt
+        P_profit = (self.q_rt_prev - pyo.value(self.Q_da[self.stage]))*self.P_rt
 
         return P_profit
 
@@ -2338,7 +2332,25 @@ class rolling_rt(pyo.ConcreteModel):
         Im_profit = - gamma_over*pyo.value(self.phi_over[self.stage]) - gamma_under*pyo.value(self.phi_under[self.stage])
 
         return Im_profit
+   
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
 
+        ID_solution = self.q_rt_prev
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        S_solution = pyo.value(self.S[self.stage])
+
+        return S_solution
+    
 class rolling_rt_last(pyo.ConcreteModel):
        
     def __init__(self, state, P_da, delta):
@@ -2482,7 +2494,42 @@ class rolling_rt_last(pyo.ConcreteModel):
         fcn_value = pyo.value(self.f_RT[self.stage])
         
         return fcn_value
+ 
+    def get_P_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
 
+        P_profit = (self.q_rt_prev - pyo.value(self.Q_da[self.stage]))*self.P_rt
+
+        return P_profit
+
+    def get_Im_profit(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        Im_profit = - gamma_over*pyo.value(self.phi_over[self.stage]) - gamma_under*pyo.value(self.phi_under[self.stage])
+
+        return Im_profit
+
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = self.q_rt_prev
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        S_solution = pyo.value(self.S[self.stage])
+
+        return S_solution
 
 ## 3) 2-stage stochastic programming model
 
@@ -2595,7 +2642,7 @@ class two_stage_da(pyo.ConcreteModel):
         
         def rt_settlement_fcn_rule(model, k, t):
             return model.f_RT[k, t] == (
-                (model.q_rt[k, t] - model.q_da[t])*self.P_rt_exp_list[k][t] 
+                (model.u[k, t] - model.q_da[t])*self.P_rt_exp_list[k][t] 
                 - gamma_over*model.phi_over[k, t] 
                 - gamma_under*model.phi_under[k, t]
                 )
@@ -3132,7 +3179,7 @@ class two_stage_rt(pyo.ConcreteModel):
             self.solve()
             self.solved = True        
 
-        P_profit = self.q_rt_prev*self.P_rt
+        P_profit = (self.q_rt_prev - self.Q_prev[self.stage])*self.P_rt 
 
         return P_profit
 
@@ -3144,6 +3191,24 @@ class two_stage_rt(pyo.ConcreteModel):
         Im_profit = - gamma_over*pyo.value(self.phi_over[0, self.stage]) - gamma_under*pyo.value(self.phi_under[0, self.stage])
 
         return Im_profit
+
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = self.q_rt_prev
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        S_solution = pyo.value(self.S[0, self.stage])
+
+        return S_solution
 
 class two_stage_rt_beforelast(pyo.ConcreteModel):
        
@@ -3383,7 +3448,7 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
             self.solve()
             self.solved = True        
 
-        P_profit = self.q_rt_prev*self.P_rt
+        P_profit = (self.q_rt_prev - self.Q_prev[self.stage])*self.P_rt 
 
         return P_profit
 
@@ -3396,6 +3461,24 @@ class two_stage_rt_beforelast(pyo.ConcreteModel):
 
         return Im_profit
 
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = self.q_rt_prev
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        S_solution = pyo.value(self.S[0, self.stage])
+
+        return S_solution
+    
 class two_stage_rt_last(pyo.ConcreteModel):
        
     def __init__(self, state, P_da, delta):
@@ -3551,7 +3634,7 @@ class two_stage_rt_last(pyo.ConcreteModel):
             self.solve()
             self.solved = True        
 
-        P_profit = self.q_rt_prev*self.P_rt
+        P_profit = (self.q_rt_prev - self.Q_prev[self.stage])*self.P_rt 
 
         return P_profit
 
@@ -3564,6 +3647,23 @@ class two_stage_rt_last(pyo.ConcreteModel):
 
         return Im_profit
 
+    def get_ID_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        ID_solution = pyo.value(self.q_rt_prev)
+
+        return ID_solution
+
+    def get_S_solution(self):
+        if not self.solved:
+            self.solve()
+            self.solved = True        
+
+        S_solution = pyo.value(self.S[self.stage])
+
+        return S_solution
 
 ## 4) 3-stage stochastic programming model
 
@@ -3773,6 +3873,25 @@ def inner_product(t, pi, sol):
     
     return sum(pi[i]*sol[i] for i in [0, 2, 3]) + sum(pi[1][j]*sol[1][j] for j in range(T - t))
 
+def process_single_da_cut(prev_solution, psi_ID_init, P_da, STAGE):
+    """
+    Solve DA-stage cut generation subproblem:
+        fw_rt_init_LP_relax(prev_solution, psi_ID_init, P_da)
+
+    Returns:
+        psi_sub = [obj_value, pi_vector]
+    Fallback:
+        [big_M, zero_vector]
+    """
+    try:
+        fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(prev_solution, psi_ID_init, P_da)
+        psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
+        return psi_sub
+    except Exception:
+        return [
+            3 * 3600000 * STAGE,
+            [0 for _ in range(STAGE)]
+        ]
 
 def basic_cut_rt(t, STAGE=T):
     # Matches _initialize_psi() for RT stage t
@@ -3922,9 +4041,13 @@ class PSDDiPModel:
                     [] for _ in range(self.STAGE)
                 ] for _ in range(self.K)
             ] 
-                
+        
+        self.eval_to_cluster = self._build_eval_to_cluster_map()
+        self.cluster_to_eval = self._build_cluster_to_eval_map()        
+        
         self._initialize_psi()
-    
+
+  
     # Initialize approximation of ECTGs        
     def _initialize_psi(self):
         
@@ -3972,7 +4095,45 @@ class PSDDiPModel:
                     [0 for _ in range(self.STAGE - t)], 
                     0, 0
                     ])
+   
+    def _build_eval_to_cluster_map(self):
+        """
+        Precompute nearest reduced DA cluster for each full/evaluation DA profile.
+        Returns
+        -------
+        list[int]
+            eval_to_cluster[n] = nearest cluster index k for evaluation profile n
+        """
+        full = np.asarray(self.DA_params_full, dtype=float)     # shape: (K_eval, STAGE)
+        centers = np.asarray(self.DA_params, dtype=float)       # shape: (K, STAGE)
 
+        # diff shape: (K_eval, K, STAGE)
+        diff = full[:, None, :] - centers[None, :, :]
+        dists = np.linalg.norm(diff, axis=2)                    # shape: (K_eval, K)
+
+        return np.argmin(dists, axis=1).tolist()
+
+    def _build_cluster_to_eval_map(self):
+        """
+        Build reverse map:
+            cluster_to_eval[k] = list of evaluation indices n assigned to cluster k
+        """
+        cluster_to_eval = {k: [] for k in range(self.K)}
+
+        for n, k in enumerate(self.eval_to_cluster):
+            cluster_to_eval[k].append(n)
+
+        return cluster_to_eval
+    
+    def find_cluster_index_for_evaluation(self, n):
+    
+        actual_P_da = np.array(self.DA_params_full[n])
+        centers = np.array(self.DA_params)  
+        dists = np.linalg.norm(centers - actual_P_da, axis=1)
+        
+        return int(np.argmin(dists))
+ 
+    
     # Cut selection
     def cut_selection(self):
         
@@ -4171,10 +4332,9 @@ class PSDDiPModel:
         
         for n in range(self.K_eval): 
             
-            k = self.find_cluster_index_for_evaluation(n)
+            k = self.eval_to_cluster[n]
                         
             scenario = []
-            
             scenario_params = self.RT_params[k]
             
             for stage_params in scenario_params:
@@ -4184,37 +4344,36 @@ class PSDDiPModel:
             scenarios.append(scenario)
                      
         return scenarios
-    
+
     def sample_scenarios_for_stopping_1(self):
         
         scenarios = []
         
         for n in range(self.K_eval):
             
-            k = self.find_cluster_index_for_evaluation(n)
+            k = self.eval_to_cluster[n]
             
-            scenarios_k = []
+            scenarios_n = []
             
             for _ in range(self.M):
-                scenario = [random.choice(stage_params)
-                            for stage_params in self.RT_params[k]]
+                scenario = [
+                    random.choice(stage_params)
+                    for stage_params in self.RT_params[k]
+                ]
+                scenarios_n.append(scenario)
                 
-                scenarios_k.append(scenario)
-                
-            scenarios.append(scenarios_k)
+            scenarios.append(scenarios_n)
             
         return scenarios
-   
-   
+  
+  
     def find_cluster_index_for_evaluation(self, n):
-    
-        actual_P_da = np.array(self.DA_params_full[n])
-        centers = np.array(self.DA_params)  
-        dists = np.linalg.norm(centers - actual_P_da, axis=1)
-        
-        return int(np.argmin(dists))
-   
-                  
+        """
+        O(1) lookup instead of recomputing nearest cluster every time.
+        """
+        return self.eval_to_cluster[n] 
+
+
     def forward_pass(self, scenarios):
         
         if self.multicut_mode:
@@ -4332,27 +4491,32 @@ class PSDDiPModel:
         return mu_hat
 
     def forward_pass_1(self, scenarios):      
-        
+
         if self.multicut_mode:
             fw_da_subp = fw_da_multicut(self.DA_probs_full, self.psi_da_1)
         else:   
             fw_da_subp = fw_da(self.psi_da_1)
-        
-        fw_da_state = fw_da_subp.get_state_solutions()
 
+        fw_da_state = fw_da_subp.get_state_solutions()
         self.forward_solutions_da.append(fw_da_state)
 
         f = []
-        S_last = []  
-  
-        saved_k = set()  # <-- NEW: track which clusters already saved states
+        S_last = []
+
+        # --------------------------------------------------
+        # Random representative n for each cluster k
+        # --------------------------------------------------
+        representative_n_for_k = {}
+        for k in range(self.K):
+            if len(self.cluster_to_eval[k]) > 0:
+                representative_n_for_k[k] = random.choice(self.cluster_to_eval[k])
 
         for n, scenario in enumerate(scenarios):
 
             P_da = self.DA_params_full[n]
-            k = self.find_cluster_index_for_evaluation(n)
+            k = self.eval_to_cluster[n]
 
-            save_states = (k not in saved_k)  # <-- NEW
+            save_states = (representative_n_for_k.get(k, None) == n)
 
             psi_ID_init = self.psi[k][0]
 
@@ -4360,12 +4524,12 @@ class PSDDiPModel:
             fw_rt_init_state = fw_rt_init_subp.get_state_solutions()
 
             if save_states:
-                self.forward_solutions[k][0].append(fw_rt_init_state)  # x(-1)
+                self.forward_solutions[k][0].append(fw_rt_init_state)
 
             state = fw_rt_init_state
             f_scenario = fw_rt_init_subp.get_settlement_fcn_value()
 
-            for t in range(self.STAGE - 1):  # t = 0, ..., T-2
+            for t in range(self.STAGE - 1):
 
                 psi_ID = self.psi[k][t + 1]
                 fw_rt_subp = fw_rt(t, state, psi_ID, P_da, scenario[t])
@@ -4377,7 +4541,6 @@ class PSDDiPModel:
 
                 f_scenario += fw_rt_subp.get_settlement_fcn_value()
 
-            # t = T-1
             fw_rt_last_subp = fw_rt_last(state, P_da, scenario[self.STAGE - 1])
 
             f_scenario += fw_rt_last_subp.get_settlement_fcn_value()
@@ -4386,18 +4549,13 @@ class PSDDiPModel:
 
             f.append(f_scenario)
 
-            if save_states:
-                saved_k.add(k)  # <-- NEW: mark cluster saved after first encounter
-
         self.S_last_list.append(S_last)
 
         mu_hat = np.mean(f)
-        sigma_hat = np.std(f, ddof=1)
-        z_alpha_half = 1.96
-
         self.LB.append(mu_hat)
+
         return mu_hat
-      
+   
     def forward_pass_for_stopping_1(self, scenarios):
         
         if self.multicut_mode:
@@ -4416,25 +4574,23 @@ class PSDDiPModel:
             f = []
             
             P_da = self.DA_params_full[n]
-            
-            k = self.find_cluster_index_for_evaluation(n)
+            k = self.eval_to_cluster[n]
             
             psi_ID_init = self.psi[k][0]
             
             fw_rt_init_subp = fw_rt_init(fw_da_state, psi_ID_init, P_da)
             fw_rt_init_state = fw_rt_init_subp.get_state_solutions()
             
-            self.forward_solutions[k][0].append(fw_rt_init_state) ## x(-1)
+            self.forward_solutions[k][0].append(fw_rt_init_state)
             
             f_init = fw_rt_init_subp.get_settlement_fcn_value()
             
             for scenario in scenarios_n:
                 
                 state = fw_rt_init_state
-                
                 f_scenario = f_init
                 
-                for t in range(self.STAGE - 1): ## t = 0, ..., T-2
+                for t in range(self.STAGE - 1):
                     
                     psi_ID = self.psi[k][t+1]
                     fw_rt_subp = fw_rt(t, state, psi_ID, P_da, scenario[t])
@@ -4444,24 +4600,18 @@ class PSDDiPModel:
                     self.forward_solutions[k][t+1].append(state)
                     f_scenario += fw_rt_subp.get_settlement_fcn_value()
                 
-                ## t = T-1
-                
                 fw_rt_last_subp = fw_rt_last(state, P_da, scenario[self.STAGE-1])
 
                 f_scenario += fw_rt_last_subp.get_settlement_fcn_value()
                             
                 f.append(f_scenario)
             
-            mu_hat += np.mean(f)*self.DA_probs_full[n]
-            
-        #sigma_hat = np.std(f, ddof=1)  
-
-        #z_alpha_half = 1.96  
+            mu_hat += np.mean(f) * self.DA_probs_full[n]
         
-        #self.LB.append(mu_hat - z_alpha_half * (sigma_hat / np.sqrt(self.M))) 
         self.LB.append(mu_hat) 
         
         return mu_hat
+    
       
     # Backward Pass    
     def inner_product(self, t, pi, sol):
@@ -4545,51 +4695,50 @@ class PSDDiPModel:
         prev_solution = self.forward_solutions_da[-1]
 
         if self.multicut_mode:
-            
-            for k, P_da in enumerate(self.DA_params):
-                            
-                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
-                    prev_solution, self.psi[k][0], P_da
-                    )
-                
-                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
-                
-                pi = [psi_sub[1]] 
 
+            with mp.Pool() as pool:
+                da_args = [
+                    (prev_solution, self.psi[k][0], P_da, self.STAGE)
+                    for k, P_da in enumerate(self.DA_params)
+                ]
+
+                da_results = pool.starmap(process_single_da_cut, da_args)
+
+            for k, psi_sub in enumerate(da_results):
+                pi = [psi_sub[1]]
                 v = psi_sub[0] - self.inner_product_da(pi, prev_solution)
-                
-                cut_coeff = [v] + [pi[0]] 
+
+                cut_coeff = [v] + [pi[0]]
                 self.psi_da[k].append(cut_coeff)
-            
+
             fw_da_for_UB = fw_da_multicut(self.DA_probs, self.psi_da)
             self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
-  
-        else:   
-            
-            v_sum = 0
-            pi_mean = [[0 for _ in range(self.STAGE)]]
-            
-            for k, P_da in enumerate(self.DA_params):
-                
-                prob = self.DA_probs[k]
-                
-                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
-                    prev_solution, self.psi[k][0], P_da
-                    )
-                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
-                
-                for i in range(self.STAGE):
-                    pi_mean[0][i] += psi_sub[1][i]*prob
 
-                v_mean += psi_sub[0]*prob
+        else:
+
+            pi_mean = [[0 for _ in range(self.STAGE)]]
+            v_mean = 0.0
+
+            with mp.Pool() as pool:
+                da_args = [
+                    (prev_solution, self.psi[k][0], P_da, self.STAGE)
+                    for k, P_da in enumerate(self.DA_params)
+                ]
+
+                da_results = pool.starmap(process_single_da_cut, da_args)
+
+            for k, psi_sub in enumerate(da_results):
+                prob = self.DA_probs[k]
+
+                for i in range(self.STAGE):
+                    pi_mean[0][i] += psi_sub[1][i] * prob
+
+                v_mean += psi_sub[0] * prob
 
             v = v_mean - self.inner_product_da(pi_mean, prev_solution)
 
             cut_coeff = [v] + pi_mean
             self.psi_da.append(cut_coeff)
-
-            self.forward_solutions_da = []
-            self.forward_solutions = [[[] for _ in range(self.STAGE)] for _ in range(self.K)]
             
             fw_da_for_UB = fw_da(self.psi_da)
             self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
@@ -4666,51 +4815,47 @@ class PSDDiPModel:
         prev_solution = self.forward_solutions_da[-1]
 
         if self.multicut_mode:
-            
-            for n, P_da in enumerate(self.DA_params_full):
-                
-                k_nearest = self.find_cluster_index_for_evaluation(n)
-                
-                psi_ID = self.psi[k_nearest][0]
-                
-                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
-                    prev_solution, psi_ID, P_da
-                    )
-                
-                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
-                
-                pi = [psi_sub[1]] 
 
+            with mp.Pool() as pool:
+                da_args = []
+                for n, P_da in enumerate(self.DA_params_full):
+                    k_nearest = self.eval_to_cluster[n]
+                    psi_ID = self.psi[k_nearest][0]
+                    da_args.append((prev_solution, psi_ID, P_da, self.STAGE))
+
+                da_results = pool.starmap(process_single_da_cut, da_args)
+
+            for n, psi_sub in enumerate(da_results):
+                pi = [psi_sub[1]]
                 v = psi_sub[0] - self.inner_product_da(pi, prev_solution)
-                
-                cut_coeff = [v] + [pi[0]] 
+
+                cut_coeff = [v] + [pi[0]]
                 self.psi_da_1[n].append(cut_coeff)
-            
+
             fw_da_for_UB = fw_da_multicut(self.DA_probs_full, self.psi_da_1)
             self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
-            
-        else:   
-            
-            v_mean = 0
-            pi_mean = [[0 for _ in range(self.STAGE)]]
-            
-            for n, P_da in enumerate(self.DA_params_full):
-                
-                prob = self.DA_probs_full[n]
-                
-                k_nearest = self.find_cluster_index_for_evaluation(n)
-                
-                psi_ID = self.psi[k_nearest][0]
-                
-                fw_rt_init_LP_relax_subp = fw_rt_init_LP_relax(
-                    prev_solution, psi_ID, P_da
-                    )
-                psi_sub = fw_rt_init_LP_relax_subp.get_cut_coefficients()
-                
-                for i in range(self.STAGE):
-                    pi_mean[0][i] += psi_sub[1][i]*prob
 
-                v_mean += psi_sub[0]*prob
+        else:
+
+            pi_mean = [[0 for _ in range(self.STAGE)]]
+            v_mean = 0.0
+
+            with mp.Pool() as pool:
+                da_args = []
+                for n, P_da in enumerate(self.DA_params_full):
+                    k_nearest = self.eval_to_cluster[n]
+                    psi_ID = self.psi[k_nearest][0]
+                    da_args.append((prev_solution, psi_ID, P_da, self.STAGE))
+
+                da_results = pool.starmap(process_single_da_cut, da_args)
+
+            for n, psi_sub in enumerate(da_results):
+                prob = self.DA_probs_full[n]
+
+                for i in range(self.STAGE):
+                    pi_mean[0][i] += psi_sub[1][i] * prob
+
+                v_mean += psi_sub[0] * prob
 
             v = v_mean - self.inner_product_da(pi_mean, prev_solution)
 
@@ -4719,7 +4864,7 @@ class PSDDiPModel:
 
             fw_da_for_UB = fw_da(self.psi_da_1)
             self.UB.append(pyo.value(fw_da_for_UB.get_objective_value()))
-
+    
     # Main Loop
     def stopping_criterion(self):
         
@@ -4774,7 +4919,7 @@ class PSDDiPModel:
 
                     self.forward_pass_1(scenarios)
 
-                print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
+                #print(f"  LB for iter = {self.iteration} updated to: {self.LB[self.iteration]:.4f}")
 
                 self.backward_pass_1()
                 
@@ -4786,7 +4931,7 @@ class PSDDiPModel:
                 
                 #print(f"cut_num = {(len(self.psi[0][2]))}")
                 
-                print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
+                #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
                 #print(f"  Running time for iter = {self.iteration} : {self.running_time:.2f} seconds\n")
 
             else:
@@ -4826,7 +4971,7 @@ class PSDDiPModel:
                 
                 #print(f"  UB for iter = {self.iteration} updated to: {self.UB[self.iteration]:.4f}")
 
-        print(f"\nPSDDiPModel for price setting = {price_setting}, approx_mode = {self.approx_mode}")
+        print(f"\nPSDDiPModel for bin setting = {bin_num}, approx_mode = {self.approx_mode}")
         print(f"SDDiP complete. for T = {self.STAGE}, k = {self.K}")
         print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {self.gap:.4f}")
         print(f"iteration : {self.iteration}, total_time : {self.running_time:.2f} seconds\n")
@@ -4878,7 +5023,9 @@ if __name__ == "__main__":
     random.seed(42)
     np.random.seed(42)
 
-    evaluation_num = int(100/K_eval)
+    total_evaluation = 200
+    
+    evaluation_num = int(total_evaluation/K_eval)
     
     def sample_scenario_paths(Scenario_tree, N):
         scenarios = []
@@ -4896,7 +5043,7 @@ if __name__ == "__main__":
     # Sample
     scenarios_for_eval = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num)
     scenarios_for_test = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num)
-    scenarios_for_SP = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num*2)
+    scenarios_for_SP = sample_scenario_paths(Scenario_tree_evaluate, evaluation_num)
 
     # Base directory
     BASE_OUTDIR = Path(f"./Stochastic_Approach/NestedBenders/scenario_paths/{bin_num}")
@@ -4911,9 +5058,9 @@ if __name__ == "__main__":
     print(BASE_OUTDIR)
     
     
-    ## 2. Run full-PSDDiP to get psi_ID and save as npy
+    """## 2. Run full-PSDDiP to get psi_ID and save as npy
     
-    """def save_psddip_state(model, base_dir, price_setting):
+    def save_psddip_state(model, base_dir, bin_num):
         
         base_dir = Path(base_dir)
         base_dir.mkdir(exist_ok=True)
@@ -4929,16 +5076,16 @@ if __name__ == "__main__":
         }
 
         np.save(
-            base_dir / f"{price_setting}_state.npy",
+            base_dir / f"{bin_num}_state.npy",
             state,
             allow_pickle=True
         )
 
         print("✅ PSDDiP checkpoint saved")
 
-    def load_psddip_state(model, base_dir, price_setting):
+    def load_psddip_state(model, base_dir, bin_num):
         base_dir = Path(base_dir)
-        state_path = base_dir / f"{price_setting}_state.npy"
+        state_path = base_dir / f"{bin_num}_state.npy"
 
         if not state_path.exists():
             raise FileNotFoundError(f"No checkpoint found at {state_path}")
@@ -4970,30 +5117,30 @@ if __name__ == "__main__":
         alpha=0.95,
         tol=1e-4,
         breakstage_selection=15,
-        stopping_counter_limit=10,
+        stopping_counter_limit=20,
         approx_mode=False,
         multicut_mode=False,
     )
 
-    checkpoint_path = PSI_DIR / f"{price_setting}_state.npy"
+    checkpoint_path = PSI_DIR / f"{bin_num}_state.npy"
     
     if checkpoint_path.exists():
         load_psddip_state(
             psddip_multi_full,
             PSI_DIR,
-            price_setting
+            bin_num
         )
     else:
         print("ℹ️ No checkpoint found — starting fresh")
     
     
     psddip_multi_full.run_sddip()
-    psddip_multi_full.plot_bounds(use_iteration_minus_one=False)
+    #psddip_multi_full.plot_bounds(use_iteration_minus_one=False)
     
     save_psddip_state(
         psddip_multi_full,
         PSI_DIR,
-        price_setting
+        bin_num
     )"""
  
  
@@ -5034,47 +5181,82 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()"""
     
- 
-    ## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
-    
-    for approx_mode in [True, False]: 
-        
-        for k, K in enumerate([K for K in K_list]):
+     
+    """## 3. Run each PSDDiP for K in K_list to get psi_DA and save as npy
+
+    K_full = K_list[-1]
+
+    for approx_mode in [True, False]:
+
+        for k, K in enumerate(K_list):
+
+            BASE_DIR = Path(__file__).resolve().parent
+            MODE_DIR = BASE_DIR / "psi_DA_LP" / f"{bin_num}" / ("approx" if approx_mode else "exact")
+            MODE_DIR.mkdir(parents=True, exist_ok=True)
+
+            psi_path = MODE_DIR / f"psi_DA_{K}.npy"
+            meta_path = MODE_DIR / f"meta_{K}.npy"
+
+            # ---------------------------------------------------------
+            # Case 1: K is the full scenario set -> reuse full PSDDiP
+            # ---------------------------------------------------------
+            if K == K_full:
+                print(f"ℹ️ K={K} is full case — skipping rerun and reusing Full-PSDDiP results")
+
+                psi_DA = psddip_multi_full.psi_da
+
+                np.save(
+                    psi_path,
+                    np.array(psi_DA, dtype=object),
+                    allow_pickle=True
+                )
+
+                runtime_meta = {
+                    "bin_num": bin_num,
+                    "K": K,
+                    "approx_mode": approx_mode,
+                    "sample_num": sample_num,
+                    "running_time": float(psddip_multi_full.running_time),
+                    "iteration": int(psddip_multi_full.iteration),
+                    "final_LB": float(psddip_multi_full.LB[psddip_multi_full.iteration]),
+                    "final_UB": float(psddip_multi_full.UB[psddip_multi_full.iteration]),
+                    "final_gap": float(psddip_multi_full.gap),
+                    "reused_from_full_psddip": True,
+                }
+
+                np.save(meta_path, runtime_meta, allow_pickle=True)
+                continue
+
+            # ---------------------------------------------------------
+            # Case 2: reduced-K case -> run normally
+            # ---------------------------------------------------------
             
             if approx_mode:
                 sample_num = evaluation_num
-            
             else:
-                sample_num = int(200/K)
-            
+                sample_num = int(total_evaluation / K)
+
             psddip_multi_da = PSDDiPModel(
-                STAGE = T,
+                STAGE=T,
                 DA_params_reduced=Reduced_P_da[k],
                 DA_prob=Reduced_Probs[k],
                 ID_params_reduced=Reduced_scenario_trees[k],
                 DA_params_full=P_da_evaluate,
                 DA_prob_full=Probs_evaluate,
                 sample_num=sample_num,
-                alpha = 0.95,
+                alpha=0.95,
                 tol=1e-4,
                 breakstage_selection=10,
-                stopping_counter_limit=6,
-                approx_mode=approx_mode,   
-                multicut_mode=False, 
+                stopping_counter_limit=15,
+                approx_mode=approx_mode,
+                multicut_mode=False,
             )
-                        
-            psddip_multi_da.run_sddip()
-            
-            BASE_DIR = Path(__file__).resolve().parent       
-                    
-            PSI_DIR  = BASE_DIR / "psi_DA_LP" / f"{bin_num}" / ("approx" if approx_mode else "exact")
-            PSI_DIR.mkdir(parents=True, exist_ok=True)
 
-            psi_path = PSI_DIR / f"psi_DA_{K}.npy"
+            if approx_mode:
+                psddip_multi_da.run_sddip()
 
             if approx_mode:
                 psi_DA = psddip_multi_da.psi_da_1
-                
             else:
                 psi_DA = psddip_multi_da.psi_da
 
@@ -5084,12 +5266,27 @@ if __name__ == "__main__":
                 allow_pickle=True
             )
 
-    print("✅ psd_DA saved as .npy:")
+            runtime_meta = {
+                "bin_num": bin_num,
+                "K": K,
+                "approx_mode": approx_mode,
+                "sample_num": sample_num,
+                "running_time": float(psddip_multi_da.running_time),
+                "iteration": int(psddip_multi_da.iteration),
+                "final_LB": float(psddip_multi_da.LB[psddip_multi_da.iteration]),
+                "final_UB": float(psddip_multi_da.UB[psddip_multi_da.iteration]),
+                "final_gap": float(psddip_multi_da.gap),
+                "reused_from_full_psddip": False,
+            }
+
+            np.save(meta_path, runtime_meta, allow_pickle=True)
+
+    print("✅ psi_DA and runtime meta saved as .npy")"""
     
  
     ## 4. Notify done via plot
     
-    def notify_done_via_plot(title="✅ PSDDiP finished", subtitle=f"Price setting: {price_setting}"):
+    def notify_done_via_plot(title="✅ PSDDiP finished", subtitle=f"Bin setting: {bin_num}"):
         fig, ax = plt.subplots(figsize=(6, 3))
         ax.axis("off")
         ax.text(0.5, 0.65, title, ha="center", va="center", fontsize=20, weight="bold")

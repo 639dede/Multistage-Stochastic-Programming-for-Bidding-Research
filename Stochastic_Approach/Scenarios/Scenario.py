@@ -221,7 +221,7 @@ Q_c_f_X_values = np.array([f_X(x) for x in Q_c_x_values])
 
 def sample_curtailment_error(p):
     if np.random.rand() < p:
-        return np.random.uniform(-0.5, 0.5)
+        return np.random.uniform(-1.0, 0.0)
     return 0.0
 
 
@@ -232,7 +232,7 @@ UB_price = P_max
 LB_energy = -540
 UB_energy = 18000
 num_bins_E = 30
-num_bins_P = 2
+num_bins_P = 30
 
 bin_edges_energy = np.linspace(LB_energy, UB_energy, num_bins_E + 1)
 bin_edges_price = np.linspace(LB_price, UB_price, num_bins_P + 1)
@@ -546,6 +546,8 @@ class scenario():
     def _conditional_dist_P_rt(self):
     
         bin_edges_price = np.linspace(LB_price, UB_price, self.bin_num + 1)
+        
+        bin_edges_price = merge_bins(data, 'day_ahead_price', bin_edges_price, min_data_per_bin=10)
 
         self.tgmm_model2_params, self.model2_bin_edges = train_conditional_tgmm(
             data=data,
@@ -553,7 +555,7 @@ class scenario():
             target_var='real_time_price',
             bin_edges=bin_edges_price,  
             K=5,
-            min_data_per_bin=20
+            min_data_per_bin=10
         )
 
     def sample_multiple_P_da(self, n):
@@ -587,23 +589,39 @@ class scenario():
                 print(f"Error sampling P_rt for t={t}: {e}")        
             
             ## sample one delta_Q_c
-            if P_rt[0] < -P_r + 20:
-                delta_Q_c = sample_curtailment_error(1.0)
-                
-            elif P_rt[0] >= -P_r + 20 and P_rt[0] < -P_r + 40:
-                delta_Q_c = sample_curtailment_error(0.8)
             
-            elif P_rt[0] >= -P_r + 40 and P_rt[0] < -P_r + 60:
-                delta_Q_c = sample_curtailment_error(0.6)
-            
-            elif P_rt[0] >= -P_r + 60 and P_rt[0] < -P_r + 80:
-                delta_Q_c = sample_curtailment_error(0.4)
-            
-            elif P_rt[0] >= 0 and P_rt[0] < 20:
-                delta_Q_c = sample_curtailment_error(0.2)
-                
+            if P_rt[0] < -P_r + 10:
+                delta_Q_c = sample_curtailment_error(0.75)
+
+            elif P_rt[0] < -P_r + 20:
+                delta_Q_c = sample_curtailment_error(0.70)
+
+            elif P_rt[0] < -P_r + 30:
+                delta_Q_c = sample_curtailment_error(0.64)
+
+            elif P_rt[0] < -P_r + 40:
+                delta_Q_c = sample_curtailment_error(0.58)
+
+            elif P_rt[0] < -P_r + 50:
+                delta_Q_c = sample_curtailment_error(0.52)
+
+            elif P_rt[0] < -P_r + 60:
+                delta_Q_c = sample_curtailment_error(0.45)
+
+            elif P_rt[0] < -P_r + 70:
+                delta_Q_c = sample_curtailment_error(0.37)
+
+            elif P_rt[0] < 0:
+                delta_Q_c = sample_curtailment_error(0.29)
+
+            elif P_rt[0] < 10:
+                delta_Q_c = sample_curtailment_error(0.21)
+
+            elif P_rt[0] < 20:
+                delta_Q_c = sample_curtailment_error(0.13)
+
             else:
-                delta_Q_c = 0.0
+                delta_Q_c = sample_curtailment_error(0.05)
             
             ## sample one delta depending on t = -1, ..., 23
             if t == 23:
@@ -627,9 +645,9 @@ class scenario():
         return scenario
 
 
-evaluation_num = 30
+evaluation_num = 50
 
-K_list = [1, 5, 10, 15, 20, evaluation_num]
+K_list = [1, 5, 10, 20, 30, evaluation_num]
 
 # Save Energy forecast csv file
 
@@ -671,13 +689,15 @@ def remap_daylight_window(base, start_shift=0, end_shift=0, scale=1.0,
     return out
 
 E_0_cloudy = remap_daylight_window(base, start_shift=+1, end_shift=-2, scale=0.7)  # later start, earlier end
-E_0_normal = remap_daylight_window(base, start_shift= +0, end_shift= +1, scale=1.15)  # baseline
+E_0_mid = remap_daylight_window(base, start_shift=-1, end_shift=+1, scale=1.10)  # unchanged
+E_0_normal = remap_daylight_window(base, start_shift= -1, end_shift= +2, scale=1.40)  # baseline
 E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  # earlier start, later end
 
 # Save CSVs 
 outdir = './Stochastic_Approach/Scenarios/Energy_forecast'
 os.makedirs(outdir, exist_ok=True)
 pd.DataFrame(E_0_cloudy).to_csv(os.path.join(outdir, 'E_0_cloudy.csv'), index=False, header=False)
+pd.DataFrame(E_0_mid).to_csv(os.path.join(outdir, 'E_0_mid.csv'), index=False, header=False)
 pd.DataFrame(E_0_normal).to_csv(os.path.join(outdir, 'E_0_normal.csv'), index=False, header=False)
 pd.DataFrame(E_0_sunny ).to_csv(os.path.join(outdir, 'E_0_sunny.csv' ), index=False, header=False)
 
@@ -690,12 +710,13 @@ def plot_E_0(ax, y, title):
     ax.set_ylim(0, 20000)
     ax.grid(True)
 
-fig, axs = plt.subplots(1, 3, figsize=(12, 3.2), sharey=True)
+fig, axs = plt.subplots(1, 4, figsize=(16, 3.2), sharey=True)
 plot_E_0(axs[0], E_0_cloudy, "Cloudy")
-plot_E_0(axs[1], E_0_normal, "Normal")
-plot_E_0(axs[2], E_0_sunny,  "Sunny")
+plot_E_0(axs[1], E_0_mid, "Mid")
+plot_E_0(axs[2], E_0_normal, "Normal")
+plot_E_0(axs[3], E_0_sunny,  "Sunny")
 plt.tight_layout()
-plt.savefig('./Stochastic_Approach/Scenarios/E_0_profiles_cloudy_normal_sunny.png', dpi=300)
+plt.savefig('./Stochastic_Approach/Scenarios/E_0_profiles_cloudy_mid_normal_sunny.png', dpi=300)
 plt.close()
 
 
