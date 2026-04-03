@@ -753,10 +753,10 @@ def print_runtime_table_across_bin_num():
 
 if __name__ == "__main__":
 
-    bin_num = 50
+    bin_num = 6
 
     SOLUTION_LABELS = ["Rolling", "2SP", "SDDP", "PSDDiP(K=50)"]
-    COMPARE_LABELS_ACROSS_BIN = ["SDDP", "PSDDiP(K=5)", "PSDDiP(K=50)"]
+    COMPARE_LABELS_ACROSS_BIN = ["SDDP", "PSDDiP(K=50)"]
 
     print_available_files()
 

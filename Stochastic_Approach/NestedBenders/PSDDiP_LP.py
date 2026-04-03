@@ -75,7 +75,7 @@ _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
 
 
-bin_num = 50
+bin_num = 10
 
 
 def load_clustered_P_da(directory_path):

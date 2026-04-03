@@ -105,7 +105,7 @@ _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
 
 
-bin_num = 50
+bin_num = 20
 
 
 def load_clustered_P_da(directory_path):
@@ -261,7 +261,6 @@ exp_P_rt_glob = expectation_P_rt()
 
 K_eval = len(P_da_eval)
 
-evaluation_num = 1
 
 BASE_DIR = Path(__file__).resolve().parent
 SCEN_ROOT = BASE_DIR / "scenario_paths" / f"{bin_num}"
@@ -890,3 +889,28 @@ save_solutions_lp(
 
     filename=f"{bin_num}_solutions.npy"
 )
+
+
+## 6. Notify done via plot
+
+def notify_done_via_plot(title="✅ Evaluation finished", subtitle=None):
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.axis("off")
+
+    ax.text(0.5, 0.65, title, ha="center", va="center",
+            fontsize=20, weight="bold")
+
+    if subtitle is not None:
+        ax.text(0.5, 0.40, subtitle, ha="center", va="center",
+                fontsize=12)
+
+    try:
+        fig.canvas.manager.set_window_title("Evaluation — Done")
+    except Exception:
+        pass
+
+    plt.show()
+    
+notify_done_via_plot()

@@ -645,7 +645,7 @@ class scenario():
         return scenario
 
 
-evaluation_num = 50
+evaluation_num = 40
 
 K_list = [1, 5, 10, 20, 30, evaluation_num]
 
@@ -690,7 +690,7 @@ def remap_daylight_window(base, start_shift=0, end_shift=0, scale=1.0,
 
 E_0_cloudy = remap_daylight_window(base, start_shift=+1, end_shift=-2, scale=0.7)  # later start, earlier end
 E_0_mid = remap_daylight_window(base, start_shift=-1, end_shift=+1, scale=1.10)  # unchanged
-E_0_normal = remap_daylight_window(base, start_shift= -1, end_shift= +2, scale=1.40)  # baseline
+E_0_normal = remap_daylight_window(base, start_shift= -1, end_shift= +2, scale=1.30)  # baseline
 E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  # earlier start, later end
 
 # Save CSVs 
