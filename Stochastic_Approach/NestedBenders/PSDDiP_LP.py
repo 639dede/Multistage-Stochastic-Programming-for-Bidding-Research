@@ -66,7 +66,7 @@ np.set_printoptions(suppress=True, precision=4)
 E_0_sunny = np.loadtxt(E_0_path_sunny, delimiter=',')
 
 
-E_0 = E_0_normal
+E_0 = E_0_mid
 
 
 ## Load Price and Scenario csv files
@@ -75,7 +75,7 @@ _price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
 _tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
 
 
-bin_num = 10
+bin_num = 5
 
 
 def load_clustered_P_da(directory_path):
@@ -179,29 +179,41 @@ hours = np.arange(T)
 
 K_list = [len(P_da_list) for P_da_list in Reduced_P_da]
 
+# -----------------------------
+# Global plotting style
+# -----------------------------
+LABEL_FS = 30
+TICK_FS = 30
+LEGEND_FS = 20
 
-"""## Plot clustered P_da profiles for each K
+hours = np.arange(24)
 
+# -----------------------------
+# Plot clustered P_da profiles for each K
+# -----------------------------
 for i, P_da_list in enumerate(Reduced_P_da):
     fig, ax = plt.subplots(figsize=(10, 6))
     
     for profile in P_da_list:
         ax.plot(hours, profile, color='blue', alpha=0.6)
     
-    ax.set_title(f"K = {K_list[i]}: Clustered Day-Ahead Price Profiles", fontsize=20)
-    ax.set_xlabel("Hour", fontsize=20)
-    ax.set_ylabel("Price (KRW)", fontsize=20)
-    ax.tick_params(axis='both', labelsize=20)
+    # Removed title
+    ax.set_xlabel("Hour", fontsize=LABEL_FS)
+    ax.set_ylabel("Price (KRW)", fontsize=LABEL_FS)
+    ax.tick_params(axis='both', labelsize=TICK_FS)
     ax.grid(True)
     ax.set_ylim(-120, 200)
+    ax.set_xlim(0, 23)
+    ax.set_xticks([0, 6, 12, 18, 23])
+    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=TICK_FS)
+
     plt.tight_layout()
     plt.show()
 
 
-## Plot clustered P_rt profiles for each K
-
-hours = np.arange(24)
-
+# -----------------------------
+# Plot clustered P_rt profiles for each K
+# -----------------------------
 for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
 
     paths = []
@@ -215,39 +227,50 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     if P.ndim != 2 or P.shape[1] != 24:
         raise ValueError(f"Unexpected shape for P (got {P.shape})")
 
+    p_min = np.min(P, axis=0)
+    p_max = np.max(P, axis=0)
     q25 = np.percentile(P, 25, axis=0)
     q75 = np.percentile(P, 75, axis=0)
     mean = P.mean(axis=0)
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.fill_between(hours, q25, q75, alpha=0.3, color="green",
-                    label='Central 50% (25–75%)')
+    ax.fill_between(
+        hours, p_min, p_max,
+        alpha=0.15, color="skyblue",
+        label='Full Range (0–100%)'
+    )
 
-    n_show = min(15, len(P))
-    rng_idx = np.linspace(0, len(P) - 1, n_show, dtype=int)
-    for idx in rng_idx:
-        ax.plot(hours, P[idx], color='black', alpha=0.2, linewidth=1.0)
+    ax.fill_between(
+        hours, q25, q75,
+        alpha=0.3, color="green",
+        label='Central 50% (25–75%)'
+    )
 
-    ax.plot(hours, mean, linewidth=1.8, linestyle='--',
-            color='orange', label='Mean')
+    ax.plot(
+        hours, mean,
+        linewidth=1.8, linestyle='--',
+        color='orange', label='Mean'
+    )
 
-    ax.set_title(f"K = {k}: Real-Time Price Scenarios", fontsize=20)
-    ax.set_xlabel("Hour", fontsize=20)
-    ax.set_ylabel("P_rt (KRW)", fontsize=20)
+    # Removed title
+    ax.set_xlabel("Hour", fontsize=LABEL_FS)
+    ax.set_ylabel("Price (KRW)", fontsize=LABEL_FS)
     ax.set_ylim(-120, 200)
     ax.set_xlim(0, 23)
     ax.set_xticks([0, 6, 12, 18, 23])
-    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=20)
+    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=TICK_FS)
+    ax.tick_params(axis='y', labelsize=TICK_FS)
     ax.grid(True)
 
-    ax.legend(loc='upper right', fontsize=18)
+    ax.legend(loc='upper right', fontsize=LEGEND_FS)
     plt.tight_layout()
     plt.show()
 
 
-## Plot q_c and E_1 paths for each K
-
+# -----------------------------
+# Helper functions
+# -----------------------------
 def build_paths_from_trees(scenario_trees, component_idx):
     paths = []
     for scenario in scenario_trees:
@@ -276,26 +299,51 @@ def build_E1_paths_from_trees(scenario_trees, E_0_vec, deltaE_idx=0):
     return np.asarray(paths, dtype=float)
 
 
+# -----------------------------
+# Plot q_c and E_1 paths for each K
+# -----------------------------
 for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
 
     # ---------- q_c ----------
     qc_paths = build_paths_from_trees(scenario_trees, component_idx=2)
 
+    qc_min = np.min(qc_paths, axis=0)
+    qc_max = np.max(qc_paths, axis=0)
+    q25 = np.percentile(qc_paths, 25, axis=0)
+    q75 = np.percentile(qc_paths, 75, axis=0)
+    mean = qc_paths.mean(axis=0)
+
     fig, ax = plt.subplots(figsize=(10, 6))
-    n_show = min(30, len(qc_paths))
-    idxs = np.linspace(0, len(qc_paths) - 1, n_show, dtype=int)
 
-    for idx in idxs:
-        ax.plot(hours, qc_paths[idx], color="black", alpha=0.25, linewidth=1.0)
+    ax.fill_between(
+        hours, qc_min, qc_max,
+        alpha=0.15, color="skyblue",
+        label='Full Range (0–100%)'
+    )
 
-    ax.set_title(f"K = {k}: q_c trajectories", fontsize=20)
-    ax.set_xlabel("Hour", fontsize=20)
-    ax.set_ylabel("q_c", fontsize=20)
+    ax.fill_between(
+        hours, q25, q75,
+        alpha=0.3, color="green",
+        label='Central 50% (25–75%)'
+    )
+
+    ax.plot(
+        hours, mean,
+        linewidth=2.0, linestyle='--',
+        color='orange', label='Mean'
+    )
+
+    # Removed title
+    ax.set_xlabel("Hour", fontsize=LABEL_FS)
+    ax.set_ylabel("Curtailment Ratio", fontsize=LABEL_FS)
     ax.set_ylim(-1.0, 1.0)
     ax.set_xlim(0, 23)
     ax.set_xticks([0, 6, 12, 18, 23])
-    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=20)
+    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=TICK_FS)
+    ax.tick_params(axis='y', labelsize=TICK_FS)
     ax.grid(True, alpha=0.3)
+    ax.legend(loc='upper right', fontsize=LEGEND_FS)
+
     plt.tight_layout()
     plt.show()
 
@@ -309,16 +357,18 @@ for k, scenario_trees in zip(K_list, Reduced_scenario_trees):
     for idx in idxs:
         ax.plot(hours, E1_paths[idx], color="black", alpha=0.25, linewidth=1.0)
 
-    ax.set_title(f"K = {k}: E_1 trajectories (delta_E × E_0)", fontsize=20)
-    ax.set_xlabel("Hour", fontsize=20)
-    ax.set_ylabel("E_1", fontsize=20)
+    # Removed title
+    ax.set_xlabel("Hour", fontsize=LABEL_FS)
+    ax.set_ylabel("PV Generation (kWh)", fontsize=LABEL_FS)
     ax.set_xlim(0, 23)
     ax.set_xticks([0, 6, 12, 18, 23])
-    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=20)
+    ax.set_xticklabels(['0h', '6h', '12h', '18h', '24h'], fontsize=TICK_FS)
+    ax.tick_params(axis='y', labelsize=TICK_FS)
     ax.grid(True, alpha=0.3)
+
     plt.tight_layout()
     plt.show()
-"""
+    
 
 
 ## Parameters 
@@ -4976,10 +5026,11 @@ class PSDDiPModel:
         print(f"Final LB = {self.LB[self.iteration]:.4f}, UB = {self.UB[self.iteration]:.4f}, gap = {self.gap:.4f}")
         print(f"iteration : {self.iteration}, total_time : {self.running_time:.2f} seconds\n")
 
+
     def plot_bounds(self, use_iteration_minus_one=False, ylim=None, figsize=(8, 4.5)):
 
-        LB = np.asarray(self.LB[1:], dtype=float)  # skip initial dummy -inf
-        UB = np.asarray(self.UB[1:], dtype=float)  # skip initial dummy +inf
+        LB = np.asarray(self.LB[1:], dtype=float)
+        UB = np.asarray(self.UB[1:], dtype=float)
 
         if len(LB) == 0 or len(UB) == 0:
             print("No valid LB/UB history to plot yet.")
@@ -4990,28 +5041,36 @@ class PSDDiPModel:
         UB = UB[:n]
 
         if use_iteration_minus_one:
-            x = np.arange(n)          # 0, 1, ..., n-1
+            x = np.arange(n)
             xlabel = "Iteration - 1"
         else:
-            x = np.arange(1, n + 1)   # 1, 2, ..., n
+            x = np.arange(1, n + 1)
             xlabel = "Iteration"
 
         if ylim is None:
             y0 = UB[0]
             ylim = (0, 0.15 * y0)
 
+        scale = 1.5
+
         plt.figure(figsize=figsize)
-        plt.plot(x, LB, marker="o", linewidth=1.8, label="LB")
-        plt.plot(x, UB, marker="s", linewidth=1.8, label="UB")
-        plt.xlabel(xlabel)
-        plt.ylabel("Bound value")
-        plt.title(f"LB/UB convergence (approx_mode={self.approx_mode})")
+
+        plt.plot(x, UB, linestyle='-', linewidth=2.0, color='black', label="UB")
+        plt.plot(x, LB, linestyle=':', linewidth=2.0, color='black', label="LB")
+
+        plt.xlabel(xlabel, fontsize=12*scale)
+        plt.ylabel("Bound value", fontsize=12*scale)
+        plt.title(f"LB/UB convergence", fontsize=14*scale)
+
+        plt.xticks(fontsize=10*scale)
+        plt.yticks(fontsize=10*scale)
+        plt.legend(fontsize=10*scale)
+
         plt.ylim(*ylim)
         plt.grid(True, alpha=0.3)
-        plt.legend()
+
         plt.tight_layout()
         plt.show()
-
 
 
 # 4. Main execution
@@ -5135,7 +5194,7 @@ if __name__ == "__main__":
     
     
     psddip_multi_full.run_sddip()
-    #psddip_multi_full.plot_bounds(use_iteration_minus_one=False)
+    psddip_multi_full.plot_bounds(use_iteration_minus_one=False)
     
     save_psddip_state(
         psddip_multi_full,
@@ -5146,37 +5205,40 @@ if __name__ == "__main__":
  
     """### Convergence of Final SOC Across Iterations (scenario-wise + statistics)
 
-    # S_last_list_convergence: shape (N_iter, N_scenarios)
     S_last_list_convergence = psddip_multi_full.S_last_list
     S_arr = np.asarray(S_last_list_convergence)
 
     N_iter, N_scenarios = S_arr.shape
     iterations = np.arange(1, N_iter + 1)
 
-    # statistics across scenarios (per iteration)
     mean_S = S_arr.mean(axis=1)
     q10 = np.quantile(S_arr, 0.10, axis=1)
     q90 = np.quantile(S_arr, 0.90, axis=1)
 
+    scale = 1.7
+
     plt.figure(figsize=(10, 6))
 
-    # 1) scenario-wise trajectories (thin, transparent)
+    # scenario-wise trajectories
     for s in range(N_scenarios):
         plt.plot(iterations, S_arr[:, s], color="gray", alpha=0.25)
 
-    # 2) quantile band
+    # quantile band
     plt.fill_between(iterations, q10, q90, color="tab:blue", alpha=0.25, label="10–90% quantile")
 
-    # 3) mean trajectory
+    # mean
     plt.plot(iterations, mean_S, color="black", linewidth=2.5, label="Mean")
 
-    plt.xlabel("Iteration")
-    plt.ylabel("Final State of Charge (SOC)")
-    plt.title("Convergence of Final SOC Across Iterations")
+    plt.xlabel("Iteration", fontsize=12*scale)
+    plt.ylabel("Final State of Charge (SOC)", fontsize=12*scale)
+    plt.title("Convergence of Final SOC Across Iterations", fontsize=14*scale)
 
-    plt.ylim(0.1*S, 0.9*S)        # physical SOC bounds
+    plt.xticks(fontsize=10*scale)
+    plt.yticks(fontsize=10*scale)
+    plt.legend(fontsize=10*scale)
+
+    plt.ylim(0.1*S, 0.9*S)
     plt.grid(True)
-    plt.legend()
 
     plt.tight_layout()
     plt.show()"""

@@ -688,10 +688,10 @@ def remap_daylight_window(base, start_shift=0, end_shift=0, scale=1.0,
     out[s1:e1+1] = seg1
     return out
 
-E_0_cloudy = remap_daylight_window(base, start_shift=+1, end_shift=-2, scale=0.7)  # later start, earlier end
-E_0_mid = remap_daylight_window(base, start_shift=-1, end_shift=+1, scale=1.10)  # unchanged
-E_0_normal = remap_daylight_window(base, start_shift= -1, end_shift= +2, scale=1.30)  # baseline
-E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  # earlier start, later end
+E_0_cloudy = remap_daylight_window(base, start_shift=+1, end_shift=-2, scale=0.7)  
+E_0_mid = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.30) 
+E_0_normal = remap_daylight_window(base, start_shift= -1, end_shift= +2, scale=1.40)  
+E_0_sunny  = remap_daylight_window(base, start_shift=-1, end_shift=+2, scale=1.6)  
 
 # Save CSVs 
 outdir = './Stochastic_Approach/Scenarios/Energy_forecast'

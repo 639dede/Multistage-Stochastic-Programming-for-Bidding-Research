@@ -26,8 +26,8 @@ logging.getLogger("pyomo.core").setLevel(logging.ERROR)
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_path)
 
-solver='gurobi'
-SOLVER=pyo.SolverFactory(solver)
+solver = 'gurobi'
+SOLVER = pyo.SolverFactory(solver)
 
 SOLVER.options['TimeLimit'] = 7200
 SOLVER.options['MIPGap'] = 1e-3
@@ -53,72 +53,59 @@ from NestedBenders.PSDDiP_LP import (
     two_stage_rt_last,
     three_stage_da,
     K_list,
-    )
+)
 
+# ============================================================
 # 1. Parameters & Computational settings
-
-## Load Energy Forecast list
+# ============================================================
 
 E_0_path_cloudy = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_cloudy.csv'
+E_0_path_normal = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_normal.csv'
+E_0_path_sunny  = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_sunny.csv'
+
 np.set_printoptions(suppress=True, precision=4)
 
 E_0_cloudy = np.loadtxt(E_0_path_cloudy, delimiter=',')
-
-
-E_0_path_normal = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_normal.csv'
-np.set_printoptions(suppress=True, precision=4)
-
 E_0_normal = np.loadtxt(E_0_path_normal, delimiter=',')
-
-
-E_0_path_sunny = './Stochastic_Approach/Scenarios/Energy_forecast/E_0_sunny.csv'
-np.set_printoptions(suppress=True, precision=4)
-
-E_0_sunny = np.loadtxt(E_0_path_sunny, delimiter=',')
-
+E_0_sunny  = np.loadtxt(E_0_path_sunny, delimiter=',')
 
 if price_setting == 'cloudy':
-    E_0 = E_0_cloudy    
-
+    E_0 = E_0_cloudy
 elif price_setting == 'normal':
     E_0 = E_0_normal
-    
 else:
     E_0 = E_0_sunny
-
-
-## 0. Load Price and Scenario csv files
 
 P_r = 80
 P_max = 200
 
-E_0 = E_0
-
 C = 20000
 S = C
-B = C/3
+B = C / 3
 
-S_min = 0.1*S
-S_max = 0.9*S
+S_min = 0.1 * S
+S_max = 0.9 * S
 
-_price_re = re.compile(r'^K(\d+)\.csv$')        # matches K6.csv, K500.csv
-_tree_re  = re.compile(r'^scenario_(\d+)\.csv$')# matches scenario_0.csv ...
+_price_re = re.compile(r'^K(\d+)\.csv$')
+_tree_re  = re.compile(r'^scenario_(\d+)\.csv$')
+
+bin_num = 5
+T = 24
 
 
-bin_num = 20
-
+# ============================================================
+# Load reduced DA prices / scenario trees
+# ============================================================
 
 def load_clustered_P_da(directory_path):
     """
-    directory_path: './Stochastic_Approach/Scenarios/Reduced_data/P_da_<mode>'
+    directory_path: './Stochastic_Approach/Scenarios/Reduced_data/P_da_<bin_num>'
     Returns:
       Reduced_P_da  -> list of (K,24) lists
       Reduced_Probs -> list of (K,) lists
     """
-    # only price files (exclude *.probs.csv)
     names = [n for n in os.listdir(directory_path)
              if _price_re.match(n) and not n.endswith('.probs.csv')]
-    # sort by K
     names.sort(key=lambda n: int(_price_re.match(n).group(1)))
 
     Reduced_P_da, Reduced_Probs = [], []
@@ -127,19 +114,16 @@ def load_clustered_P_da(directory_path):
         price_path = os.path.join(directory_path, name)
         P = np.loadtxt(price_path, delimiter=',')
 
-        # shape to (K,24)
         if P.ndim == 1:
             P = P.reshape(1, -1)
         elif P.shape[1] != 24 and P.shape[0] == 24:
             P = P.T
+
         assert P.shape[1] == 24, f"{price_path} has shape {P.shape}; expected (K,24) or (24,K)"
 
         K = P.shape[0]
 
-        # matching probs file: Kx.probs.csv
-        probs_path = os.path.join(
-            directory_path, name.replace('.csv', '.probs.csv')
-        )
+        probs_path = os.path.join(directory_path, name.replace('.csv', '.probs.csv'))
         if os.path.exists(probs_path):
             q = np.loadtxt(probs_path, delimiter=',').astype(float)
             q = np.atleast_1d(q).ravel()
@@ -158,7 +142,7 @@ def load_clustered_P_da(directory_path):
 
 def load_scenario_trees(base_dir):
     """
-    base_dir: './Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_<mode>'
+    base_dir: './Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_<bin_num>'
     Returns:
       Reduced_scenario_trees -> list over K (ascending), each is a list of trees
     """
@@ -181,10 +165,9 @@ def load_scenario_trees(base_dir):
             fpath = os.path.join(k_path, fname)
             data = np.loadtxt(fpath, delimiter=',')
 
-            if data.ndim == 1:    
+            if data.ndim == 1:
                 data = data.reshape(1, -1)
 
-            T = 24
             tree = [[] for _ in range(T)]
             for row in data:
                 t = int(row[0])
@@ -200,11 +183,8 @@ def load_scenario_trees(base_dir):
 cluster_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/P_da_{bin_num}'
 Reduced_P_da, Reduced_Probs = load_clustered_P_da(cluster_dir)
 
-
 clustered_tree_dir = f'./Stochastic_Approach/Scenarios/Reduced_data/scenario_trees_{bin_num}'
 Reduced_scenario_trees = load_scenario_trees(clustered_tree_dir)
-
-T = 24
 
 E_0_partial = E_0
 
@@ -215,52 +195,43 @@ Scenario_tree_eval = Reduced_scenario_trees[-1]
 exp_P_da = Reduced_P_da[0][0]
 scenario_exp = Reduced_scenario_trees[0]
 
+K_eval = len(P_da_eval)
+
+
 def expectation_P_rt():
-    
     exp_P_rt_list = []
-    
     scenario_tree_rt = scenario_exp[0]
-    
+
     for t in range(T):
-        
         branches_t = scenario_tree_rt[t]
-        
-        exp_P_rt = 0
-        
-        for b in branches_t:   
-            
-            exp_P_rt += b[1]/len(branches_t)
-        
+        exp_P_rt = 0.0
+        for b in branches_t:
+            exp_P_rt += b[1] / len(branches_t)
         exp_P_rt_list.append(exp_P_rt)
-                        
-    return exp_P_rt_list 
+
+    return exp_P_rt_list
+
 
 def exp_P_rt_given_P_da(n, Scenario_tree_params):
-
     exp_P_rt_list = []
-    
     scenario_tree_rt = Scenario_tree_params[n]
-    
+
     for t in range(T):
-        
         branches_t = scenario_tree_rt[t]
-        
-        exp_P_rt = 0
-        
-        for b in branches_t:   
-            
-            exp_P_rt += b[1]/len(branches_t)
-        
+        exp_P_rt = 0.0
+        for b in branches_t:
+            exp_P_rt += b[1] / len(branches_t)
         exp_P_rt_list.append(exp_P_rt)
-                        
+
     return exp_P_rt_list
+
 
 exp_P_rt_glob = expectation_P_rt()
 
-## 1. Load evaluation/test scenario paths
 
-K_eval = len(P_da_eval)
-
+# ============================================================
+# 2. Load evaluation/test scenario paths
+# ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 SCEN_ROOT = BASE_DIR / "scenario_paths" / f"{bin_num}"
@@ -276,7 +247,9 @@ scenarios_for_SP = np.load(
 ).tolist()
 
 
-## 2. Load ECTG functions for DA stage
+# ============================================================
+# 3. Load ECTG functions for DA stage
+# ============================================================
 
 PSI_DA_DIR = BASE_DIR / "psi_DA_LP" / f"{bin_num}"
 
@@ -288,11 +261,12 @@ for K in K_list:
     if not psi_DA_exact_path.exists():
         raise FileNotFoundError(f"Missing psi_DA_exact file: {psi_DA_exact_path}")
     psi_DA_exact_list.append(np.load(psi_DA_exact_path, allow_pickle=True).tolist())
-    
+
     psi_DA_approx_path = PSI_DA_DIR / 'approx' / f"psi_DA_{K}.npy"
     if not psi_DA_approx_path.exists():
         raise FileNotFoundError(f"Missing psi_DA_approx file: {psi_DA_approx_path}")
     psi_DA_approx_list.append(np.load(psi_DA_approx_path, allow_pickle=True).tolist())
+
 
 def load_psddip_runtime_lp(bin_num, K_list):
     """
@@ -320,12 +294,15 @@ def load_psddip_runtime_lp(bin_num, K_list):
 
     return runtime_dict
 
+
 runtime_psddip = load_psddip_runtime_lp(bin_num=bin_num, K_list=K_list)
 runtime_p_approx = runtime_psddip["approx"]
 runtime_p_exact = runtime_psddip["exact"]
 
 
-## 3. Load ECTG functions for ID stages
+# ============================================================
+# 4. Load ECTG functions for ID stages
+# ============================================================
 
 PSI_FULL_DIR = BASE_DIR / "psi_full_LP"
 state_path = PSI_FULL_DIR / f"{bin_num}_state.npy"
@@ -334,482 +311,569 @@ if not state_path.exists():
     raise FileNotFoundError(f"Missing full checkpoint: {state_path}")
 
 state = np.load(state_path, allow_pickle=True).item()
-
-psi_ID = state["psi_ID"]        # this is the list you saved as model.psi
-
+psi_ID = state["psi_ID"]
 
 
-## 4. Evaluate
+# ============================================================
+# Helper: stochastic-parameter extraction
+# ============================================================
 
-# Evaluation
+def extract_stage_random_values(stage_data):
+    """
+    Extract realized stochastic parameters from one stage scenario[t].
+
+    Expected return:
+        P_ID_t, delta_E_t, delta_C_t
+    """
+
+    if isinstance(stage_data, dict):
+        return (
+            float(stage_data["P_ID"]),
+            float(stage_data["delta_E"]),
+            float(stage_data["delta_C"]),
+        )
+
+    if isinstance(stage_data, (list, tuple, np.ndarray)):
+        if len(stage_data) == 3:
+            # Most likely structure from your printed sample:
+            # [delta_E, P_ID, delta_C]
+            delta_E_t = float(stage_data[0])
+            P_ID_t    = float(stage_data[1])
+            delta_C_t = float(stage_data[2])
+            return P_ID_t, delta_E_t, delta_C_t
+
+        raise ValueError(
+            f"Unsupported stage_data length={len(stage_data)}. "
+            f"stage_data={stage_data}"
+        )
+
+    raise TypeError(
+        f"Unsupported stage_data type: {type(stage_data)}. "
+        f"stage_data={stage_data}"
+    )
+
+
+def build_pathwise_mean(nested_paths):
+    """
+    nested_paths[n][path_idx][t]  -> mean over path_idx for each n
+    returns:
+        mean_curves[n][t]
+    """
+    out = []
+    for n_data in nested_paths:
+        arr = np.asarray(n_data, dtype=float)
+        if arr.ndim == 1:
+            out.append(arr.tolist())
+        else:
+            out.append(arr.mean(axis=0).tolist())
+    return out
+
+
+def build_scalar_mean(values):
+    """
+    values[n][path_idx] or values[n] -> mean over path_idx for each n
+    returns:
+        mean_values[n]
+    """
+    out = []
+    for n_data in values:
+        arr = np.asarray(n_data, dtype=float)
+        if arr.ndim == 0:
+            out.append(float(arr))
+        else:
+            out.append(float(arr.mean()))
+    return out
+
+
+# ============================================================
+# 5. Evaluate
+# ============================================================
 
 def evaluation_rolling_rolling(scenarios):
-    
     da_subp = rolling_da(exp_P_da, exp_P_rt_glob)
     da_state = da_subp.get_state_solutions()
-                
     q_da = da_state[0]
-                        
+
     f = []
-    
-    q_ID_list = [[0] * T for _ in range(K_eval)]
-    S_list = [[0.5 * S] + [0] * T for _ in range(K_eval)]
-    
-    f_P  = [[0] * T for _ in range(K_eval)]
-    f_Im = [[0] * T for _ in range(K_eval)]
-    
+
+    f_DA = []
+
+    q_ID_paths = []
+    S_paths = []
+    f_P_paths = []
+    f_Im_paths = []
+    eval_paths = []
+
+    P_DA_paths = []
+    P_ID_paths = []
+    delta_E_paths = []
+    delta_C_paths = []
+
     for n, scenarios_n in enumerate(scenarios):
-                    
-        P_da = P_da_eval[n]  
+        P_da = P_da_eval[n]
         exp_P_rt = exp_P_rt_given_P_da(n, Scenario_tree_eval)
-                    
+
         rt_init_subp = rolling_rt_init(da_state, P_da, exp_P_rt)
-        rt_init_state = rt_init_subp.get_state_solutions()       
-        
+        rt_init_state = rt_init_subp.get_state_solutions()
         fcn_value = rt_init_subp.get_settlement_fcn_value()
-        
-        j = True
-        
+        f_DA.append(float(fcn_value))
+
+        q_ID_paths_n = []
+        S_paths_n = []
+        f_P_paths_n = []
+        f_Im_paths_n = []
+        eval_paths_n = []
+
+        P_DA_paths_n = []
+        P_ID_paths_n = []
+        delta_E_paths_n = []
+        delta_C_paths_n = []
+
         for scenario in scenarios_n:
-            
             state = rt_init_state
             f_scenario = fcn_value
-            
-            for t in range(T - 1):   # t = 0, ..., T-2
-                                                    
+
+            q_ID_one = [0.0] * T
+            S_one = [0.5 * S] + [0.0] * T
+            f_P_one = [0.0] * T
+            f_Im_one = [0.0] * T
+
+            P_DA_one = list(P_da)
+            P_ID_one = [0.0] * T
+            delta_E_one = [0.0] * T
+            delta_C_one = [0.0] * T
+
+            for t in range(T - 1):
+                P_ID_t, delta_E_t, delta_C_t = extract_stage_random_values(scenario[t])
+
+                P_ID_one[t] = P_ID_t
+                delta_E_one[t] = delta_E_t
+                delta_C_one[t] = delta_C_t
+
                 rt_subp = rolling_rt(t, state, P_da, exp_P_rt, scenario[t])
-                
-                if j:
-                    q_ID_list[n][t] = rt_subp.get_ID_solution()
-                    S_list[n][t + 1] = rt_subp.get_S_solution()
-                    f_P[n][t] = rt_subp.get_P_profit()
-                    f_Im[n][t] = rt_subp.get_Im_profit()
-                
+
+                q_ID_one[t] = rt_subp.get_ID_solution()
+                S_one[t + 1] = rt_subp.get_S_solution()
+                f_P_one[t] = rt_subp.get_P_profit()
+                f_Im_one[t] = rt_subp.get_Im_profit()
+
                 state = rt_subp.get_state_solutions()
                 f_scenario += rt_subp.get_settlement_fcn_value()
-            
-            # t = T-1
+
+            P_ID_t, delta_E_t, delta_C_t = extract_stage_random_values(scenario[T - 1])
+            P_ID_one[T - 1] = P_ID_t
+            delta_E_one[T - 1] = delta_E_t
+            delta_C_one[T - 1] = delta_C_t
+
             rt_last_subp = rolling_rt_last(state, P_da, scenario[T - 1])
 
-            if j:
-                q_ID_list[n][T - 1] = rt_last_subp.get_ID_solution()
-                S_list[n][T] = rt_last_subp.get_S_solution()
-                f_P[n][T - 1] = rt_last_subp.get_P_profit()
-                f_Im[n][T - 1] = rt_last_subp.get_Im_profit()
+            q_ID_one[T - 1] = rt_last_subp.get_ID_solution()
+            S_one[T] = rt_last_subp.get_S_solution()
+            f_P_one[T - 1] = rt_last_subp.get_P_profit()
+            f_Im_one[T - 1] = rt_last_subp.get_Im_profit()
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
+
+            q_ID_paths_n.append(q_ID_one)
+            S_paths_n.append(S_one)
+            f_P_paths_n.append(f_P_one)
+            f_Im_paths_n.append(f_Im_one)
+            eval_paths_n.append(float(f_scenario))
+
+            P_DA_paths_n.append(P_DA_one)
+            P_ID_paths_n.append(P_ID_one)
+            delta_E_paths_n.append(delta_E_one)
+            delta_C_paths_n.append(delta_C_one)
+
             f.append(f_scenario)
-            
-            j = False
-        
-    mu_hat = np.mean(f)
-    eval = mu_hat
+
+        q_ID_paths.append(q_ID_paths_n)
+        S_paths.append(S_paths_n)
+        f_P_paths.append(f_P_paths_n)
+        f_Im_paths.append(f_Im_paths_n)
+        eval_paths.append(eval_paths_n)
+
+        P_DA_paths.append(P_DA_paths_n)
+        P_ID_paths.append(P_ID_paths_n)
+        delta_E_paths.append(delta_E_paths_n)
+        delta_C_paths.append(delta_C_paths_n)
+
+    eval_mean = float(np.mean(f))
+
+    f_DA_mean = build_scalar_mean(f_DA)
+    q_ID_mean = build_pathwise_mean(q_ID_paths)
+    S_mean    = build_pathwise_mean(S_paths)
+    f_P_mean  = build_pathwise_mean(f_P_paths)
+    f_Im_mean = build_pathwise_mean(f_Im_paths)
 
     print(f"\nRolling -> Rolling for bin_num = {bin_num}")
-    print(f"Evaluation : {eval}")
-    
-    return q_da, q_ID_list, S_list, f_P, f_Im, eval
+    print(f"Evaluation : {eval_mean}")
+
+    return {
+        "q_da": q_da,
+        "f_DA": f_DA_mean,
+        "q_ID": q_ID_mean,
+        "S": S_mean,
+        "f_P": f_P_mean,
+        "f_Im": f_Im_mean,
+        "eval": eval_mean,
+        "f_DA_paths": f_DA,
+        "q_ID_paths": q_ID_paths,
+        "S_paths": S_paths,
+        "f_P_paths": f_P_paths,
+        "f_Im_paths": f_Im_paths,
+        "eval_paths": eval_paths,
+        "P_DA_paths": P_DA_paths,
+        "P_ID_paths": P_ID_paths,
+        "delta_E_paths": delta_E_paths,
+        "delta_C_paths": delta_C_paths,
+    }
 
 
 def evaluation_2SP_rolling(scenarios, scenarios_SP):
-
     exp_P_rt_each = [exp_P_rt_given_P_da(n, Scenario_tree_eval) for n in range(K_eval)]
-    
+
     da_subp = two_stage_da(P_da_eval, exp_P_rt_each)
     da_state = da_subp.get_state_solutions()
-                
     q_da = da_state[0]
-                        
+
     f = []
-    
-    q_ID_list = [[0] * T for _ in range(K_eval)]
-    S_list = [[0.5 * S] + [0] * T for _ in range(K_eval)]
-    
-    f_P  = [[0] * T for _ in range(K_eval)]
-    f_Im = [[0] * T for _ in range(K_eval)]
-    
+
+    f_DA = []
+
+    q_ID_paths = []
+    S_paths = []
+    f_P_paths = []
+    f_Im_paths = []
+    eval_paths = []
+
+    P_DA_paths = []
+    P_ID_paths = []
+    delta_E_paths = []
+    delta_C_paths = []
+
     for n, scenarios_n in enumerate(scenarios):
-                    
-        P_da = P_da_eval[n]  
+        P_da = P_da_eval[n]
         scenario_paths = scenarios_SP[n]
         exp_P_rt = exp_P_rt_given_P_da(n, Scenario_tree_eval)
-        
+
         ID_params_list = [[] for _ in range(T)]
-        
         for scenario in scenario_paths:
             for t in range(T):
                 ID_params_list[t].append(scenario[t])
-     
+
         rt_init_subp = two_stage_rt_init(da_state, P_da, ID_params_list[0], exp_P_rt)
-        rt_init_state = rt_init_subp.get_state_solutions()       
-        
+        rt_init_state = rt_init_subp.get_state_solutions()
         fcn_value = rt_init_subp.get_settlement_fcn_value()
-        
-        j = True
-        
+        f_DA.append(float(fcn_value))
+
+        q_ID_paths_n = []
+        S_paths_n = []
+        f_P_paths_n = []
+        f_Im_paths_n = []
+        eval_paths_n = []
+
+        P_DA_paths_n = []
+        P_ID_paths_n = []
+        delta_E_paths_n = []
+        delta_C_paths_n = []
+
         for scenario in scenarios_n:
-            
             state = rt_init_state
             f_scenario = fcn_value
-            
-            for t in range(T - 2):   # t = 0, ..., T-3
-                                                    
+
+            q_ID_one = [0.0] * T
+            S_one = [0.5 * S] + [0.0] * T
+            f_P_one = [0.0] * T
+            f_Im_one = [0.0] * T
+
+            P_DA_one = list(P_da)
+            P_ID_one = [0.0] * T
+            delta_E_one = [0.0] * T
+            delta_C_one = [0.0] * T
+
+            for t in range(T - 2):
+                P_ID_t, delta_E_t, delta_C_t = extract_stage_random_values(scenario[t])
+
+                P_ID_one[t] = P_ID_t
+                delta_E_one[t] = delta_E_t
+                delta_C_one[t] = delta_C_t
+
                 rt_subp = two_stage_rt(
                     t, state, P_da, ID_params_list[t + 1], exp_P_rt, scenario[t]
                 )
-                
-                if j:
-                    q_ID_list[n][t] = rt_subp.get_ID_solution()
-                    S_list[n][t + 1] = rt_subp.get_S_solution()
-                    f_P[n][t] = rt_subp.get_P_profit()
-                    f_Im[n][t] = rt_subp.get_Im_profit()
-                
+
+                q_ID_one[t] = rt_subp.get_ID_solution()
+                S_one[t + 1] = rt_subp.get_S_solution()
+                f_P_one[t] = rt_subp.get_P_profit()
+                f_Im_one[t] = rt_subp.get_Im_profit()
+
                 state = rt_subp.get_state_solutions()
                 f_scenario += rt_subp.get_settlement_fcn_value()
-            
-            # t = T-2
+
+            P_ID_t, delta_E_t, delta_C_t = extract_stage_random_values(scenario[T - 2])
+            P_ID_one[T - 2] = P_ID_t
+            delta_E_one[T - 2] = delta_E_t
+            delta_C_one[T - 2] = delta_C_t
+
             rt_beforelast_subp = two_stage_rt_beforelast(
                 state, P_da, ID_params_list[T - 1], scenario[T - 2]
             )
-                
-            if j:
-                q_ID_list[n][T - 2] = rt_beforelast_subp.get_ID_solution()
-                S_list[n][T - 1] = rt_beforelast_subp.get_S_solution()
-                f_P[n][T - 2] = rt_beforelast_subp.get_P_profit()
-                f_Im[n][T - 2] = rt_beforelast_subp.get_Im_profit()
+
+            q_ID_one[T - 2] = rt_beforelast_subp.get_ID_solution()
+            S_one[T - 1] = rt_beforelast_subp.get_S_solution()
+            f_P_one[T - 2] = rt_beforelast_subp.get_P_profit()
+            f_Im_one[T - 2] = rt_beforelast_subp.get_Im_profit()
 
             state = rt_beforelast_subp.get_state_solutions()
             f_scenario += rt_beforelast_subp.get_settlement_fcn_value()
-            
-            # t = T-1
-            rt_last_subp = two_stage_rt_last(
-                state, P_da, scenario[T - 1]
-            )
 
-            if j:
-                q_ID_list[n][T - 1] = rt_last_subp.get_ID_solution()
-                S_list[n][T] = rt_last_subp.get_S_solution()
-                f_P[n][T - 1] = rt_last_subp.get_P_profit()
-                f_Im[n][T - 1] = rt_last_subp.get_Im_profit()
+            P_ID_t, delta_E_t, delta_C_t = extract_stage_random_values(scenario[T - 1])
+            P_ID_one[T - 1] = P_ID_t
+            delta_E_one[T - 1] = delta_E_t
+            delta_C_one[T - 1] = delta_C_t
+
+            rt_last_subp = two_stage_rt_last(state, P_da, scenario[T - 1])
+
+            q_ID_one[T - 1] = rt_last_subp.get_ID_solution()
+            S_one[T] = rt_last_subp.get_S_solution()
+            f_P_one[T - 1] = rt_last_subp.get_P_profit()
+            f_Im_one[T - 1] = rt_last_subp.get_Im_profit()
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
+
+            q_ID_paths_n.append(q_ID_one)
+            S_paths_n.append(S_one)
+            f_P_paths_n.append(f_P_one)
+            f_Im_paths_n.append(f_Im_one)
+            eval_paths_n.append(float(f_scenario))
+
+            P_DA_paths_n.append(P_DA_one)
+            P_ID_paths_n.append(P_ID_one)
+            delta_E_paths_n.append(delta_E_one)
+            delta_C_paths_n.append(delta_C_one)
+
             f.append(f_scenario)
-            
-            j = False
-        
-    mu_hat = np.mean(f)
-    eval = mu_hat
+
+        q_ID_paths.append(q_ID_paths_n)
+        S_paths.append(S_paths_n)
+        f_P_paths.append(f_P_paths_n)
+        f_Im_paths.append(f_Im_paths_n)
+        eval_paths.append(eval_paths_n)
+
+        P_DA_paths.append(P_DA_paths_n)
+        P_ID_paths.append(P_ID_paths_n)
+        delta_E_paths.append(delta_E_paths_n)
+        delta_C_paths.append(delta_C_paths_n)
+
+    eval_mean = float(np.mean(f))
+
+    f_DA_mean = build_scalar_mean(f_DA)
+    q_ID_mean = build_pathwise_mean(q_ID_paths)
+    S_mean    = build_pathwise_mean(S_paths)
+    f_P_mean  = build_pathwise_mean(f_P_paths)
+    f_Im_mean = build_pathwise_mean(f_Im_paths)
 
     print(f"\n2-SP -> Rolling for bin_num = {bin_num}")
-    print(f"Evaluation : {eval}")
-    
-    return q_da, q_ID_list, S_list, f_P, f_Im, eval
+    print(f"Evaluation : {eval_mean}")
+
+    return {
+        "q_da": q_da,
+        "f_DA": f_DA_mean,
+        "q_ID": q_ID_mean,
+        "S": S_mean,
+        "f_P": f_P_mean,
+        "f_Im": f_Im_mean,
+        "eval": eval_mean,
+        "f_DA_paths": f_DA,
+        "q_ID_paths": q_ID_paths,
+        "S_paths": S_paths,
+        "f_P_paths": f_P_paths,
+        "f_Im_paths": f_Im_paths,
+        "eval_paths": eval_paths,
+        "P_DA_paths": P_DA_paths,
+        "P_ID_paths": P_ID_paths,
+        "delta_E_paths": delta_E_paths,
+        "delta_C_paths": delta_C_paths,
+    }
 
 
-"""
-def evaluation_rolling_sddip(scenarios):
-        
-    da_subp = rolling_da(exp_P_da, exp_P_rt_glob)
-    
-    da_state = da_subp.get_state_solutions()
-                
-    q_da = da_state[0]
-                        
-    f = []
-    
-    f_DA = [0]*T
-        
-    q_ID_list = [[0]*T for _ in range(K_eval)]
-    S_list = [[0.5*S]+[0]*T for _ in range(K_eval)]
-    
-    f_P  = [[0]*T for _ in range(K_eval)]
-    f_Im = [[0]*T for _ in range(K_eval)]
-    
-    for n, scenarios_n in enumerate(scenarios):
-                    
-        P_da = P_da_eval[n]
-                
-        rt_init_subp = fw_rt_init(da_state, psi_ID[n][0], P_da)
-        rt_init_state = rt_init_subp.get_state_solutions()
-        
-        f_DA_list = rt_init_subp.get_DA_profit()
-        
-        for i in range(T):
-            f_DA[i] += f_DA_list[i]/K_eval
-        
-        fcn_value = rt_init_subp.get_settlement_fcn_value()
-        
-        j = True
-            
-        for scenario in scenarios_n:
-            
-            state = rt_init_state
-            
-            f_scenario = fcn_value
-            
-            for t in range(T - 1): ## t = 0, ..., T-2
-                
-                rt_subp = fw_rt(t, state, psi_ID[n][t+1], P_da, scenario[t])
-                
-                if j:
-                    q_ID_list[n][t] = rt_subp.get_ID_solution()
-                    S_list[n][t+1] = rt_subp.get_S_solution()
-                    f_P[n][t] = rt_subp.get_P_profit()
-                    f_Im[n][t] = rt_subp.get_Im_profit()
-                
-                state = rt_subp.get_state_solutions()
-                
-                f_scenario += rt_subp.get_settlement_fcn_value()
-            
-            ## t = T-1
-            
-            rt_last_subp = fw_rt_last(state, P_da, scenario[T-1])
-
-            if j:
-                q_ID_list[n][T-1] = rt_last_subp.get_ID_solution()
-                S_list[n][T] = rt_last_subp.get_S_solution()
-                f_P[n][T-1] += rt_last_subp.get_P_profit()
-                f_Im[n][T-1] += rt_last_subp.get_Im_profit()
-
-            f_scenario += rt_last_subp.get_settlement_fcn_value()
-                        
-            f.append(f_scenario)
-            
-            j = False
-        
-    mu_hat = np.mean(f)
-    
-    sigma_hat = np.std(f, ddof=1)  
-
-    z_alpha_half = 1.96  
-    
-    eval = mu_hat 
-    
-    print(f"\nRolling Horizon -> SDDiP for price setting = {bin_num}")
-    print(f"Evaluation : {eval}")
-    
-    return q_da, q_ID_list, S_list, f_P, f_Im, eval
-
-
-def evaluation_SP_sddip(stage_num, scenarios, scenarios_SP):
-        
-    if stage_num == 2:
-        
-        exp_P_rt_each = [exp_P_rt_given_P_da(n, Scenario_tree_eval) for n in range(K_eval)]
-        
-        da_subp = two_stage_da(P_da_eval, exp_P_rt_each)
-        
-    elif stage_num == 3:
-        
-        da_subp = three_stage_da(P_da_eval, scenarios_SP)  
-          
-    da_state = da_subp.get_state_solutions()
-                
-    q_da = da_state[0]
-                        
-    f = []
-    
-    f_DA = [0]*T
-        
-    q_ID_list = [[0]*T for _ in range(K_eval)]
-    S_list = [[0.5*S]+[0]*T for _ in range(K_eval)]
-    
-    f_P  = [[0]*T for _ in range(K_eval)]
-    f_Im = [[0]*T for _ in range(K_eval)]
-        
-    for n, scenarios_n in enumerate(scenarios):
-                    
-        P_da = P_da_eval[n]
-                
-        rt_init_subp = fw_rt_init(da_state, psi_ID[n][0], P_da)
-        rt_init_state = rt_init_subp.get_state_solutions()
-        
-        f_DA_list = rt_init_subp.get_DA_profit()
-        
-        for i in range(T):
-            f_DA[i] += f_DA_list[i]/K_eval
-        
-        fcn_value = rt_init_subp.get_settlement_fcn_value()
-        
-        j = True
-            
-        for scenario in scenarios_n:
-            
-            state = rt_init_state
-            
-            f_scenario = fcn_value
-            
-            for t in range(T - 1): ## t = 0, ..., T-2
-                
-                rt_subp = fw_rt(t, state, psi_ID[n][t+1], P_da, scenario[t])
-                
-                if j:
-                    q_ID_list[n][t] = rt_subp.get_ID_solution()
-                    S_list[n][t+1] = rt_subp.get_S_solution()
-                    f_P[n][t] = rt_subp.get_P_profit()
-                    f_Im[n][t] = rt_subp.get_Im_profit()
-                
-                state = rt_subp.get_state_solutions()
-                
-                f_scenario += rt_subp.get_settlement_fcn_value()
-            
-            ## t = T-1
-            
-            rt_last_subp = fw_rt_last(state, P_da, scenario[T-1])
-
-            if j:
-                q_ID_list[n][T-1] = rt_last_subp.get_ID_solution()
-                S_list[n][T] = rt_last_subp.get_S_solution()
-                f_P[n][T-1] += rt_last_subp.get_P_profit()
-                f_Im[n][T-1] += rt_last_subp.get_Im_profit()
-
-            f_scenario += rt_last_subp.get_settlement_fcn_value()
-                        
-            f.append(f_scenario)
-            
-            j = False
-        
-    mu_hat = np.mean(f)
-    
-    sigma_hat = np.std(f, ddof=1)  
-
-    z_alpha_half = 1.96  
-    
-    eval = mu_hat 
-    
-    print(f"\n{stage_num}-SP -> SDDiP for price setting = {bin_num}")
-    print(f"Evaluation : {eval}")
-    
-    return q_da, q_ID_list, S_list, f_P, f_Im, eval
-"""
-        
 def evaluation_psddip_sddip(K, scenarios, approx_mode):
-    
     k_idx = K_list.index(K)
-    
-    if approx_mode:
-        psi_DA_list = psi_DA_approx_list
-    else:
-        psi_DA_list = psi_DA_exact_list
+    psi_DA_list = psi_DA_approx_list if approx_mode else psi_DA_exact_list
 
     da_subp = fw_da(psi_DA_list[k_idx])
     da_state = da_subp.get_state_solutions()
-    
     q_da = da_state[0]
-    
+
     f = []
-        
-    q_ID_list = [[0] * T for _ in range(K_eval)]
-    S_list = [[0.5 * S] + [0] * T for _ in range(K_eval)]
-    
-    f_P  = [[0] * T for _ in range(K_eval)]
-    f_Im = [[0] * T for _ in range(K_eval)]
-    
+
+    f_DA = []
+
+    q_ID_paths = []
+    S_paths = []
+    f_P_paths = []
+    f_Im_paths = []
+    eval_paths = []
+
+    P_DA_paths = []
+    P_ID_paths = []
+    delta_E_paths = []
+    delta_C_paths = []
+
     for n, scenarios_n in enumerate(scenarios):
-                    
         P_da = P_da_eval[n]
-                
+
         rt_init_subp = fw_rt_init(da_state, psi_ID[n][0], P_da)
         rt_init_state = rt_init_subp.get_state_solutions()
-        
         fcn_value = rt_init_subp.get_settlement_fcn_value()
-        
-        j = True
-            
+        f_DA.append(float(fcn_value))
+
+        q_ID_paths_n = []
+        S_paths_n = []
+        f_P_paths_n = []
+        f_Im_paths_n = []
+        eval_paths_n = []
+
+        P_DA_paths_n = []
+        P_ID_paths_n = []
+        delta_E_paths_n = []
+        delta_C_paths_n = []
+
         for scenario in scenarios_n:
-            
             state = rt_init_state
             f_scenario = fcn_value
-            
+
+            q_ID_one = [0.0] * T
+            S_one = [0.5 * S] + [0.0] * T
+            f_P_one = [0.0] * T
+            f_Im_one = [0.0] * T
+
+            P_DA_one = list(P_da)
+            P_ID_one = [0.0] * T
+            delta_E_one = [0.0] * T
+            delta_C_one = [0.0] * T
+
             for t in range(T - 1):
-                
+                P_ID_t, delta_E_t, delta_C_t = extract_stage_random_values(scenario[t])
+
+                P_ID_one[t] = P_ID_t
+                delta_E_one[t] = delta_E_t
+                delta_C_one[t] = delta_C_t
+
                 rt_subp = fw_rt(t, state, psi_ID[n][t + 1], P_da, scenario[t])
-                
-                if j:
-                    q_ID_list[n][t] = rt_subp.get_ID_solution()
-                    S_list[n][t + 1] = rt_subp.get_S_solution()
-                    f_P[n][t] = rt_subp.get_P_profit()
-                    f_Im[n][t] = rt_subp.get_Im_profit()
-                
+
+                q_ID_one[t] = rt_subp.get_ID_solution()
+                S_one[t + 1] = rt_subp.get_S_solution()
+                f_P_one[t] = rt_subp.get_P_profit()
+                f_Im_one[t] = rt_subp.get_Im_profit()
+
                 state = rt_subp.get_state_solutions()
                 f_scenario += rt_subp.get_settlement_fcn_value()
-            
+
+            P_ID_t, delta_E_t, delta_C_t = extract_stage_random_values(scenario[T - 1])
+            P_ID_one[T - 1] = P_ID_t
+            delta_E_one[T - 1] = delta_E_t
+            delta_C_one[T - 1] = delta_C_t
+
             rt_last_subp = fw_rt_last(state, P_da, scenario[T - 1])
 
-            if j:
-                q_ID_list[n][T - 1] = rt_last_subp.get_ID_solution()
-                S_list[n][T] = rt_last_subp.get_S_solution()
-                f_P[n][T - 1] = rt_last_subp.get_P_profit()
-                f_Im[n][T - 1] = rt_last_subp.get_Im_profit()
+            q_ID_one[T - 1] = rt_last_subp.get_ID_solution()
+            S_one[T] = rt_last_subp.get_S_solution()
+            f_P_one[T - 1] = rt_last_subp.get_P_profit()
+            f_Im_one[T - 1] = rt_last_subp.get_Im_profit()
 
             f_scenario += rt_last_subp.get_settlement_fcn_value()
+
+            q_ID_paths_n.append(q_ID_one)
+            S_paths_n.append(S_one)
+            f_P_paths_n.append(f_P_one)
+            f_Im_paths_n.append(f_Im_one)
+            eval_paths_n.append(float(f_scenario))
+
+            P_DA_paths_n.append(P_DA_one)
+            P_ID_paths_n.append(P_ID_one)
+            delta_E_paths_n.append(delta_E_one)
+            delta_C_paths_n.append(delta_C_one)
+
             f.append(f_scenario)
-            
-            j = False
-        
-    mu_hat = np.mean(f)
-    eval = mu_hat
-    
+
+        q_ID_paths.append(q_ID_paths_n)
+        S_paths.append(S_paths_n)
+        f_P_paths.append(f_P_paths_n)
+        f_Im_paths.append(f_Im_paths_n)
+        eval_paths.append(eval_paths_n)
+
+        P_DA_paths.append(P_DA_paths_n)
+        P_ID_paths.append(P_ID_paths_n)
+        delta_E_paths.append(delta_E_paths_n)
+        delta_C_paths.append(delta_C_paths_n)
+
+    eval_mean = float(np.mean(f))
+
+    f_DA_mean = build_scalar_mean(f_DA)
+    q_ID_mean = build_pathwise_mean(q_ID_paths)
+    S_mean    = build_pathwise_mean(S_paths)
+    f_P_mean  = build_pathwise_mean(f_P_paths)
+    f_Im_mean = build_pathwise_mean(f_Im_paths)
+
     mode_name = "approx" if approx_mode else "exact"
     print(f"\nPSDDiP ({mode_name}, K={K}) -> SDDiP for bin_num = {bin_num}")
-    print(f"Evaluation : {eval}")
-    
-    return q_da, q_ID_list, S_list, f_P, f_Im, eval
+    print(f"Evaluation : {eval_mean}")
 
+    return {
+        "q_da": q_da,
+        "f_DA": f_DA_mean,
+        "q_ID": q_ID_mean,
+        "S": S_mean,
+        "f_P": f_P_mean,
+        "f_Im": f_Im_mean,
+        "eval": eval_mean,
+        "f_DA_paths": f_DA,
+        "q_ID_paths": q_ID_paths,
+        "S_paths": S_paths,
+        "f_P_paths": f_P_paths,
+        "f_Im_paths": f_Im_paths,
+        "eval_paths": eval_paths,
+        "P_DA_paths": P_DA_paths,
+        "P_ID_paths": P_ID_paths,
+        "delta_E_paths": delta_E_paths,
+        "delta_C_paths": delta_C_paths,
+    }
+
+
+# ============================================================
+# 6. Run evaluations
+# ============================================================
 
 scenarios = scenarios_for_eval
 
-q_da_r, q_ID_r, S_r, f_P_r, f_Im_r, eval_r = evaluation_rolling_rolling(scenarios)
-q_da_s2, q_ID_s2, S_s2, f_P_s2, f_Im_s2, eval_s2 = evaluation_2SP_rolling(
-    scenarios, scenarios_for_SP
-)
+sol_r = evaluation_rolling_rolling(scenarios)
+sol_s2 = evaluation_2SP_rolling(scenarios, scenarios_for_SP)
 
-q_da_p_approx = []
-q_ID_p_approx = []
-S_p_approx    = []
-f_P_p_approx  = []
-f_Im_p_approx = []
-eval_p_approx = []
-
-q_da_p_exact = []
-q_ID_p_exact = []
-S_p_exact    = []
-f_P_p_exact  = []
-f_Im_p_exact = []
-eval_p_exact = []
+sol_p_approx = []
+sol_p_exact = []
 
 for K in K_list:
-    q_da, q_ID, S_sol, f_P, f_Im, eval = evaluation_psddip_sddip(
-        K, scenarios, approx_mode=True
-    )
-    q_da_p_approx.append(q_da)
-    q_ID_p_approx.append(q_ID)
-    S_p_approx.append(S_sol)
-    f_P_p_approx.append(f_P)
-    f_Im_p_approx.append(f_Im)
-    eval_p_approx.append(eval)
+    sol_p_approx.append(evaluation_psddip_sddip(K, scenarios, approx_mode=True))
 
 for K in K_list:
-    q_da, q_ID, S_sol, f_P, f_Im, eval = evaluation_psddip_sddip(
-        K, scenarios, approx_mode=False
-    )
-    q_da_p_exact.append(q_da)
-    q_ID_p_exact.append(q_ID)
-    S_p_exact.append(S_sol)
-    f_P_p_exact.append(f_P)
-    f_Im_p_exact.append(f_Im)
-    eval_p_exact.append(eval)
+    sol_p_exact.append(evaluation_psddip_sddip(K, scenarios, approx_mode=False))
 
 
-## 5. Save solutions
+# ============================================================
+# 7. Save solutions
+# ============================================================
 
 def save_solutions_lp(
     bin_num,
     K_list,
-    q_da_r, q_ID_r, S_r, f_P_r, f_Im_r, eval_r,
-    q_da_s2, q_ID_s2, S_s2, f_P_s2, f_Im_s2, eval_s2,
-    q_da_p_approx, q_ID_p_approx, S_p_approx, f_P_p_approx, f_Im_p_approx, eval_p_approx, runtime_p_approx,
-    q_da_p_exact, q_ID_p_exact, S_p_exact, f_P_p_exact, f_Im_p_exact, eval_p_exact, runtime_p_exact,
+    sol_r,
+    sol_s2,
+    sol_p_approx,
+    runtime_p_approx,
+    sol_p_exact,
+    runtime_p_exact,
     filename=None
 ):
     SOL_DIR = os.path.join(os.path.dirname(__file__), "Solutions_LP")
@@ -823,39 +887,47 @@ def save_solutions_lp(
             "bin_num": bin_num,
             "K_list": list(K_list),
         },
-        "Rolling -> Rolling": {
-            "q_da": q_da_r,
-            "q_ID": q_ID_r,
-            "S": S_r,
-            "f_P": f_P_r,
-            "f_Im": f_Im_r,
-            "eval": eval_r,
-        },
-        "2-SP -> Rolling": {
-            "q_da": q_da_s2,
-            "q_ID": q_ID_s2,
-            "S": S_s2,
-            "f_P": f_P_s2,
-            "f_Im": f_Im_s2,
-            "eval": eval_s2,
-        },
+        "Rolling -> Rolling": sol_r,
+        "2-SP -> Rolling": sol_s2,
         "PSDDiP -> SDDiP": {
             "approx": {
-                "q_da": q_da_p_approx,
-                "q_ID": q_ID_p_approx,
-                "S": S_p_approx,
-                "f_P": f_P_p_approx,
-                "f_Im": f_Im_p_approx,
-                "eval": eval_p_approx,
+                "q_da": [d["q_da"] for d in sol_p_approx],
+                "f_DA": [d["f_DA"] for d in sol_p_approx],
+                "q_ID": [d["q_ID"] for d in sol_p_approx],
+                "S": [d["S"] for d in sol_p_approx],
+                "f_P": [d["f_P"] for d in sol_p_approx],
+                "f_Im": [d["f_Im"] for d in sol_p_approx],
+                "eval": [d["eval"] for d in sol_p_approx],
+                "f_DA_paths": [d["f_DA_paths"] for d in sol_p_approx],
+                "q_ID_paths": [d["q_ID_paths"] for d in sol_p_approx],
+                "S_paths": [d["S_paths"] for d in sol_p_approx],
+                "f_P_paths": [d["f_P_paths"] for d in sol_p_approx],
+                "f_Im_paths": [d["f_Im_paths"] for d in sol_p_approx],
+                "eval_paths": [d["eval_paths"] for d in sol_p_approx],
+                "P_DA_paths": [d["P_DA_paths"] for d in sol_p_approx],
+                "P_ID_paths": [d["P_ID_paths"] for d in sol_p_approx],
+                "delta_E_paths": [d["delta_E_paths"] for d in sol_p_approx],
+                "delta_C_paths": [d["delta_C_paths"] for d in sol_p_approx],
                 "runtime": runtime_p_approx,
             },
             "exact": {
-                "q_da": q_da_p_exact,
-                "q_ID": q_ID_p_exact,
-                "S": S_p_exact,
-                "f_P": f_P_p_exact,
-                "f_Im": f_Im_p_exact,
-                "eval": eval_p_exact,
+                "q_da": [d["q_da"] for d in sol_p_exact],
+                "f_DA": [d["f_DA"] for d in sol_p_exact],
+                "q_ID": [d["q_ID"] for d in sol_p_exact],
+                "S": [d["S"] for d in sol_p_exact],
+                "f_P": [d["f_P"] for d in sol_p_exact],
+                "f_Im": [d["f_Im"] for d in sol_p_exact],
+                "eval": [d["eval"] for d in sol_p_exact],
+                "f_DA_paths": [d["f_DA_paths"] for d in sol_p_exact],
+                "q_ID_paths": [d["q_ID_paths"] for d in sol_p_exact],
+                "S_paths": [d["S_paths"] for d in sol_p_exact],
+                "f_P_paths": [d["f_P_paths"] for d in sol_p_exact],
+                "f_Im_paths": [d["f_Im_paths"] for d in sol_p_exact],
+                "eval_paths": [d["eval_paths"] for d in sol_p_exact],
+                "P_DA_paths": [d["P_DA_paths"] for d in sol_p_exact],
+                "P_ID_paths": [d["P_ID_paths"] for d in sol_p_exact],
+                "delta_E_paths": [d["delta_E_paths"] for d in sol_p_exact],
+                "delta_C_paths": [d["delta_C_paths"] for d in sol_p_exact],
                 "runtime": runtime_p_exact,
             },
         },
@@ -866,36 +938,24 @@ def save_solutions_lp(
     print(f"✅ Saved LP solutions to: {save_path}")
 
 
-# ---- call it once after evaluation is finished ----
-
-runtime_psddip = load_psddip_runtime_lp(bin_num=bin_num, K_list=K_list)
-runtime_p_approx = runtime_psddip["approx"]
-runtime_p_exact = runtime_psddip["exact"]
-
 save_solutions_lp(
     bin_num=bin_num,
     K_list=K_list,
-
-    q_da_r=q_da_r, q_ID_r=q_ID_r, S_r=S_r, f_P_r=f_P_r, f_Im_r=f_Im_r, eval_r=eval_r,
-    q_da_s2=q_da_s2, q_ID_s2=q_ID_s2, S_s2=S_s2, f_P_s2=f_P_s2, f_Im_s2=f_Im_s2, eval_s2=eval_s2,
-
-    q_da_p_approx=q_da_p_approx, q_ID_p_approx=q_ID_p_approx, S_p_approx=S_p_approx,
-    f_P_p_approx=f_P_p_approx, f_Im_p_approx=f_Im_p_approx, eval_p_approx=eval_p_approx,
+    sol_r=sol_r,
+    sol_s2=sol_s2,
+    sol_p_approx=sol_p_approx,
     runtime_p_approx=runtime_p_approx,
-
-    q_da_p_exact=q_da_p_exact, q_ID_p_exact=q_ID_p_exact, S_p_exact=S_p_exact,
-    f_P_p_exact=f_P_p_exact, f_Im_p_exact=f_Im_p_exact, eval_p_exact=eval_p_exact,
+    sol_p_exact=sol_p_exact,
     runtime_p_exact=runtime_p_exact,
-
     filename=f"{bin_num}_solutions.npy"
 )
 
 
-## 6. Notify done via plot
+# ============================================================
+# 8. Notify done
+# ============================================================
 
 def notify_done_via_plot(title="✅ Evaluation finished", subtitle=None):
-    import matplotlib.pyplot as plt
-
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.axis("off")
 
@@ -912,5 +972,6 @@ def notify_done_via_plot(title="✅ Evaluation finished", subtitle=None):
         pass
 
     plt.show()
-    
+
+
 notify_done_via_plot()
